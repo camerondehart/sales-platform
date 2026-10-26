@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/export-email",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/tick",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

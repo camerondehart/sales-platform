@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.env*.local
+.env
+tsconfig.tsbuildinfo
+next-env.d.ts
+# Local JSON storage (sample products.json is tracked; everything else is live data)
+data/*
+!data/products.json

@@ -1,0 +1,112 @@
+import { redirect } from "next/navigation";
+import { getApprovedVisitor } from "@/lib/auth";
+import { getProducts, isExternal } from "@/lib/storage";
+import { applyVideoFlag, isEnabled } from "@/lib/flags";
+import AuthForms from "./AuthForms";
+import Scene from "./components/Scene";
+import ScrollHint from "./components/ScrollHint";
+import { AskAssistantLink } from "./components/assistant/AskAssistant";
+import RetailClient from "./retail/RetailClient";
+import { brand } from "@/lib/brand";
+
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  if (await getApprovedVisitor()) redirect("/gallery");
+
+  // The public shop lives on the homepage below the sign-in hero, so a
+  // visitor who isn't a member has something to do rather than a dead end.
+  const shopProducts = await applyVideoFlag((await getProducts()).filter(isExternal));
+
+  return (
+    <>
+    <Scene />
+    {shopProducts.length > 0 && <ScrollHint />}
+    <div id="top" className="gate gate-scene home-hero">
+      {/* 👇 Wider card */}
+      <div className="gate-card" style={{ maxWidth: "560px" }}>
+        <div className="gate-kicker">Member Access</div>
+        <h1 className="gate-title">{brand.members}</h1>
+        <div className="gate-ornament" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+        <p className="gate-subtitle">
+          A private companion to {brand.name}. Sign in to explore our member collection, or request access below.
+        </p>
+
+        {/* Prominent warning message – now naturally wider */}
+        <div className="gate-notice">
+          <strong>🌿 Welcome to our new home!</strong><br />
+          <strong>Shopped with us before?</strong> Your account is already here — tap <strong>“First time here since our old shop? Email me a link”</strong> below to set your password.<br />
+          New here? Choose <strong>“Join {brand.members}”</strong> to request access. Approval usually takes less than 24 hours.
+        </div>
+
+        <AuthForms
+          codeLogin={await isEnabled("email_code_login").catch(() => false)}
+          staffLink={await isEnabled("admin_magic_link").catch(() => false)}
+        />
+        {shopProducts.length > 0 ? (
+          <a className="scroll-cue" href="#shop" aria-label="Scroll down to our shop, open to everyone">
+            <span className="scroll-cue-lead">No account needed</span>
+            <span className="scroll-cue-main">Shop our range below</span>
+            <span className="scroll-cue-chev" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
+          </a>
+        ) : (
+          <div className="gate-footer">
+            Not a member yet? Request access above.
+          </div>
+        )}
+      </div>
+    </div>
+
+    {shopProducts.length > 0 && (
+      <section id="shop" className="home-shop">
+        <div className="home-shop-head">
+          <div className="about-kicker">Open to everyone</div>
+          <h2 className="about-title">{brand.name}</h2>
+          <p className="about-lede">{brand.tagline}</p>
+          <div className="home-shop-links">
+            <a href="/about">Read about us →</a>
+            <a href="/events">Classes &amp; events →</a>
+            <AskAssistantLink label="Not sure where to start? Ask our Concierge" question="I'm new here — what would you recommend to start with?" />
+          </div>
+        </div>
+
+        <RetailClient products={shopProducts} embedded />
+
+        <footer className="footnotes">
+          <div className="footnotes-ornament" aria-hidden="true">
+            <span></span><span>{brand.emoji}</span><span></span>
+          </div>
+          <div className="footnotes-grid">
+            <div className="footnote">
+              <div className="footnote-icon" aria-hidden="true">📦</div>
+              <div className="footnote-title">Shipping</div>
+              <p>
+                {brand.shippingNote} Questions? Email{" "}
+                <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.{" "}
+                <a href="/terms">Terms of Service</a>
+              </p>
+            </div>
+            <div className="footnote">
+              <div className="footnote-icon" aria-hidden="true">🌿</div>
+              <div className="footnote-title">Join {brand.members}</div>
+              <p>
+                Members get early access to events and a private catalog.{" "}
+                <a href="#top">Request access ↑</a>
+              </p>
+            </div>
+          </div>
+        </footer>
+      </section>
+    )}
+    </>
+  );
+}

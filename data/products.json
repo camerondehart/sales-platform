@@ -1,0 +1,33 @@
+[
+  {
+    "id": "sample_1",
+    "name": "Signature Blend — Small Batch",
+    "description": "<p>A sample product. Replace it by signing in to /admin → Products.</p>",
+    "price": "$32",
+    "image": "https://images.unsplash.com/photo-1523362628745-0c100150b504?w=800",
+    "category": "Featured",
+    "visibility": "both",
+    "createdAt": 1700000000000
+  },
+  {
+    "id": "sample_2",
+    "name": "Everyday Essentials Set",
+    "description": "<p>Another sample, on sale to show the price tag.</p>",
+    "price": "$48",
+    "salePrice": "$40",
+    "image": "https://images.unsplash.com/photo-1556228453-efd6c1ff04f6?w=800",
+    "category": "Sets",
+    "visibility": "both",
+    "createdAt": 1700000001000
+  },
+  {
+    "id": "sample_3",
+    "name": "Members' Reserve",
+    "description": "<p>Only members see this one (visibility: internal).</p>",
+    "price": "$60",
+    "image": "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800",
+    "category": "Reserve",
+    "visibility": "internal",
+    "createdAt": 1700000002000
+  }
+]
