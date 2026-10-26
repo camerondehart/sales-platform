@@ -7701,3 +7701,137 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
   .cart-drawer-foot { padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px)); }
   .cart-drawer-foot .submit { width: 100%; }
 }
+
+/* ─────────────── Settings → tiles (2026-10-26) ───────────────
+   Each setting is a compact card. The open one grows into a full-width
+   panel in place; the others flow around it. */
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.9rem; align-items: stretch; margin-bottom: 2.5rem; }
+.settings-tile {
+  all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 0.85rem; row-gap: 0.6rem;
+  padding: 1rem 1.1rem 0.9rem; min-height: 0; border: 1px solid var(--rule-soft); border-radius: var(--r-lg, 14px); background: var(--surface);
+  box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.04)); color: var(--ink); text-align: left;
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.settings-tile:hover, .settings-tile:focus-visible { transform: translateY(-2px); border-color: var(--green); box-shadow: 0 10px 24px -14px rgba(47, 93, 58, 0.45); }
+.settings-tile:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.settings-tile-icon { font-size: 1.35rem; line-height: 1; width: 2.1rem; height: 2.1rem; display: grid; place-items: center; border-radius: 10px; background: rgba(133, 186, 69, 0.12); }
+.settings-tile-text { min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.settings-tile-text strong { font-size: 0.95rem; line-height: 1.25; display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; }
+.settings-tile-text small { font-size: 0.78rem; line-height: 1.4; color: var(--ink-soft); }
+.settings-tile-badge { display: inline-grid; place-items: center; min-width: 1.3rem; height: 1.3rem; padding: 0 0.4rem; border-radius: 999px; background: var(--mint); color: #fff; font-size: 0.66rem; font-weight: 700; }
+.settings-tile-go { grid-column: 2; align-self: end; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-strong); opacity: 0; transform: translateX(-4px); transition: opacity 0.18s ease, transform 0.18s ease; }
+.settings-tile:hover .settings-tile-go, .settings-tile:focus-visible .settings-tile-go { opacity: 1; transform: none; }
+@media (pointer: coarse) { .settings-tile-go { opacity: 1; transform: none; } }
+
+.settings-open { grid-column: 1 / -1; position: relative; min-width: 0; scroll-margin-top: 7rem; transform-origin: top left; animation: settings-grow 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.settings-open > .admin-section { overflow-x: clip; }
+.settings-grid > * { min-width: 0; }
+.settings-open > .admin-section { margin-bottom: 0; }
+.settings-close {
+  position: absolute; top: 0.85rem; right: 0.9rem; z-index: 2; width: 2.1rem; height: 2.1rem; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--rule-soft); background: var(--surface); color: var(--ink-soft); font-size: 1.25rem; line-height: 1; cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.settings-close:hover { border-color: var(--red); color: var(--red); transform: rotate(90deg); }
+.settings-close:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.settings-open .admin-section h2, .settings-open .al-toggle { padding-right: 3rem; }
+@keyframes settings-grow { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .settings-open { animation: none; } .settings-tile, .settings-tile-go, .settings-close { transition: none; } }
+@media (max-width: 560px) {
+  /* One column of short rows: icon, title + summary, chevron. */
+  .settings-grid { grid-template-columns: 1fr; gap: 0.55rem; }
+  .settings-tile { grid-template-columns: auto 1fr auto; grid-template-rows: auto; align-items: center; padding: 0.8rem 0.9rem; }
+  .settings-tile-go { grid-column: 3; grid-row: 1; align-self: center; opacity: 1; transform: none; font-size: 0; }
+  .settings-tile-go::after { content: "›"; font-size: 1.3rem; line-height: 1; color: var(--ink-faint); }
+  .settings-close { top: 0.6rem; right: 0.6rem; }
+  .settings-open { scroll-margin-top: 9.5rem; }
+  .staff-row { flex-wrap: wrap; }
+  .staff-email { overflow-wrap: anywhere; }
+}
+
+/* ─────────────── Staff dashboard dark theme (2026-10-26) ───────────────
+   Switched by the header button (Auto / Dark / Light). The attribute is set
+   only while the dashboard is mounted, so customer pages never change.
+   Most of the admin reads the tokens; the rules below retune the tokens and
+   then catch the handful of panels that used literal white. */
+.theme-switch { white-space: nowrap; }
+html[data-admin-theme="dark"] {
+  --white:        #15190f;
+  --cream:        #222919;
+  --light-grey:   #6f786a;
+  --grey:         #a3ab9d;
+  --dark-grey:    #e4e8dc;
+  --ink:          #e4e8dc;
+  --ink-soft:     #a3ab9d;
+  --ink-faint:    #7c857a;
+  --paper:        #15190f;
+  --surface:      #1c2216;
+  --surface-alt:  #242c1d;
+  --rule:         #3b4535;
+  --rule-soft:    #2d3628;
+  --accent-strong: #a6d55f;
+  --mint-deep:    #4fd9bb;
+  --yellow-deep:  #d6d86a;
+  --danger-strong: #e58b8d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --e-2: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --e-3: 0 10px 28px rgba(0, 0, 0, 0.4);
+  --e-4: 0 18px 48px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+html[data-admin-theme="dark"] body { background: #11150c; }
+html[data-admin-theme="dark"] .admin-header { background: rgba(17, 21, 12, 0.9); border-bottom-color: var(--rule-soft); }
+html[data-admin-theme="dark"] .admin-tabs { background: rgba(17, 21, 12, 0.94); }
+@media (min-width: 1100px) { html[data-admin-theme="dark"] .admin-tabs { background: linear-gradient(180deg, #0f160b 0%, #0a1007 100%); box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5); } }
+html[data-admin-theme="dark"] .admin-tab.active { background: rgba(133, 186, 69, 0.14); }
+html[data-admin-theme="dark"] .admin-section,
+html[data-admin-theme="dark"] .kpi,
+html[data-admin-theme="dark"] .settings-tile,
+html[data-admin-theme="dark"] .settings-close { background: var(--surface); border-color: var(--rule-soft); }
+html[data-admin-theme="dark"] .admin-section h2 { color: var(--ink); border-bottom-color: var(--rule-soft); }
+/* Panels that were painted literal white */
+html[data-admin-theme="dark"] :is(.flag-row, .kpi-card, .an-card, .tpl-card, .al-list, .pqr-code, .esc-card, .esc-bubble.assistant,
+  .cv-insights > div, .ms-aud-card, .mi-grid div, .ip, .rem-stage, .ch-row, .sw-row, .tb-box, .seg button.on, .src-list li,
+  .as-panel, .as-chip, .as-assistant .as-bubble, .as-card, .as-compose, .as-compose textarea, .al-filters select, .al-search input,
+  .email-preview-subject, .ap-toggle, .tb-ring span, .msel-search, .history-modal, .modal, .today-card, .tb-card) { background: var(--surface); border-color: var(--rule-soft); color: var(--ink); }
+html[data-admin-theme="dark"] :is(.ap-toggle.on) { background: rgba(133, 186, 69, 0.12); border-color: rgba(133, 186, 69, 0.45); }
+html[data-admin-theme="dark"] .esc-btn:not(.primary) { background: var(--surface-alt); border-color: var(--rule); color: var(--ink); }
+html[data-admin-theme="dark"] .esc-btn:not(.primary):hover:not(:disabled) { border-color: var(--green); color: var(--accent-strong); }
+html[data-admin-theme="dark"] :is(.ms-model, .ms-summary, .ms-aud-card) { background: var(--surface); border-color: var(--rule-soft); color: var(--ink); }
+html[data-admin-theme="dark"] :is(.ms-bar, .ms-model-bar, .ms-stack) { background: rgba(255, 255, 255, 0.08); }
+html[data-admin-theme="dark"] .ms-chip { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
+html[data-admin-theme="dark"] .ap-switch { background: #3b4535; }
+html[data-admin-theme="dark"] .ap-toggle.on .ap-switch { background: var(--green); }
+html[data-admin-theme="dark"] .notice { background: rgba(15, 199, 163, 0.1); color: var(--ink); }
+html[data-admin-theme="dark"] .flag-chip { background: rgba(214, 216, 106, 0.16); color: var(--yellow-deep); }
+html[data-admin-theme="dark"] :is(input, textarea, select) { background: var(--surface-alt); color: var(--ink); border-color: var(--rule); }
+html[data-admin-theme="dark"] :is(input, textarea)::placeholder { color: var(--ink-faint); }
+html[data-admin-theme="dark"] .user-row:hover, html[data-admin-theme="dark"] .admin-row:hover { background: rgba(133, 186, 69, 0.08); }
+html[data-admin-theme="dark"] .al-row.is-failed, html[data-admin-theme="dark"] .cv-row.flag-high { background: rgba(200, 97, 100, 0.12); }
+html[data-admin-theme="dark"] .an-note { background: rgba(133, 186, 69, 0.12); color: var(--ink); }
+html[data-admin-theme="dark"] .an-hl.watch .an-hl-icon { background: rgba(214, 216, 106, 0.16); color: var(--yellow-deep); }
+html[data-admin-theme="dark"] .an-hl.info .an-hl-icon { background: rgba(79, 143, 184, 0.2); color: #9cc8e8; }
+html[data-admin-theme="dark"] .an-hl { background: var(--surface); border-color: var(--rule-soft); }
+html[data-admin-theme="dark"] .save-banner { background: var(--surface-alt); }
+html[data-admin-theme="dark"] .expired-explainer { background: rgba(180, 83, 42, 0.14); }
+html[data-admin-theme="dark"] .tb-group-label:hover, html[data-admin-theme="dark"] .tb-group:not(.is-open) .tb-group-label { background: rgba(255, 255, 255, 0.04); }
+html[data-admin-theme="dark"] :is(.tb-chip, .tb-box, .tb-go) { background: var(--surface-alt); border-color: var(--rule); color: var(--ink); }
+html[data-admin-theme="dark"] .tb-go.is-ask { background: var(--tb); border-color: var(--tb); color: #fff; }
+html[data-admin-theme="dark"] .masthead-brand h1, html[data-admin-theme="dark"] .admin-header h1 { color: var(--ink); }
+html[data-admin-theme="dark"] .admin-header nav a, html[data-admin-theme="dark"] .admin-header nav button { color: var(--ink); border-bottom-color: var(--rule); }
+html[data-admin-theme="dark"] .help-frame { color-scheme: light; }
+
+/* Dashboard: footer sits at the bottom of the window when a tab is short (Settings tiles). */
+body:has(.admin-shell) { display: flex; flex-direction: column; }
+body:has(.admin-shell) .admin-shell { flex: 1 0 auto; min-width: 0; }
+body:has(.admin-shell) .site-foot { margin-top: auto; }
+html[data-admin-theme="dark"] .site-foot { border-top-color: var(--rule-soft); }
+
+/* Product form: "Tidy with Concierge" sits on the Description label row. */
+.desc-label { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; }
+.desc-label-text { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: var(--ink-soft); }
+.field .tidy-guide { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
+.desc-tools { display: inline-flex; align-items: center; gap: 0.7rem; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.tidy-btn { padding: 0.32rem 0.75rem; font-size: 0.76rem; }
+.tidy-btn:disabled { opacity: 0.6; cursor: wait; }

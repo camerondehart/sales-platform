@@ -32,7 +32,7 @@ def confirm(a):
 # ============ Feature flags
 s,r,_=req("/api/admin/flags")
 keys=[f["key"] for f in r.get("flags",[])]
-check("flags: all 11 listed for this environment", s==200 and len(keys)==11 and r["env"]=="development", (s,r))
+check("flags: all 12 listed for this environment", s==200 and len(keys)==12 and r["env"]=="development", (s,r))
 s,r,_=req("/api/admin/flags", cookie=MEMBER)
 check("flags: admin only", s==401, s)
 _s,_fl,_=req("/api/admin/flags")
@@ -239,7 +239,7 @@ check("QR link: removed product still lands on the shop (never a dead code)", s=
 s,html,_=req("/terms", cookie=None, raw=True)
 check("terms page live", s==200 and "Terms of Service" in html, s)
 s,html,_=req("/join?event=Farmers%20Market", cookie=None, raw=True)
-check("event QR page: sign-up form, then the public shop below with the scroll cue", s==200 and "Join the mailing list" in html and "Farmers Market" in html and 'id="shop"' in html and "Shop our wellness range below" in html and "Harmony Blend Extract" in html, s)
+check("event QR page: sign-up form, then the public shop below with the scroll cue", s==200 and "Join the mailing list" in html and "Farmers Market" in html and 'id="shop"' in html and "Shop our range below" in html and "Harmony Blend Extract" in html, s)
 # ---------- event offers: an event's sign-ups get its discount code in the welcome email
 s,r,_=req("/api/admin/discounts", {"code":"FARMERS15","type":"percentage","value":15,"perCustomerLimit":1})
 did=r["discount"]["id"]

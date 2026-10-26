@@ -17,12 +17,12 @@ type Flag = {
   shared?: boolean;
 };
 
-export default function FlagsPanel() {
+export default function FlagsPanel({ fold = true }: { fold?: boolean }) {
   const [env, setEnv] = useState("");
   const [flags, setFlags] = useState<Flag[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!fold);
 
   const load = () =>
     fetch("/api/admin/flags", { cache: "no-store" })
@@ -66,10 +66,12 @@ export default function FlagsPanel() {
   return (
     <section className="admin-section">
       <h2>
-        <button type="button" className="flag-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          Feature switches
-          <span className="flag-fold-hint">{open ? "Hide" : "Show"} <span aria-hidden="true">{open ? "▴" : "▾"}</span></span>
-        </button>
+        {fold ? (
+          <button type="button" className="flag-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            Feature switches
+            <span className="flag-fold-hint">{open ? "Hide" : "Show"} <span aria-hidden="true">{open ? "▴" : "▾"}</span></span>
+          </button>
+        ) : "Feature switches"}
       </h2>
       {open && (<>
       <p className="field-hint" style={{ marginTop: "-0.4rem" }}>

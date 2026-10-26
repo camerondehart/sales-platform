@@ -12,13 +12,13 @@ type Settings = { stages: Stage[]; expireAfterHours: number };
 
 const toLabel = (h: number) => (h % 24 === 0 ? `${h / 24} day${h === 24 ? "" : "s"}` : `${h} hours`);
 
-export default function RemindersPanel() {
+export default function RemindersPanel({ fold = true }: { fold?: boolean }) {
   const [s, setS] = useState<Settings | null>(null);
   const [expired, setExpired] = useState(0);
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!fold);
 
   const load = async () => {
     const [r, f] = await Promise.all([
@@ -71,11 +71,15 @@ export default function RemindersPanel() {
   return (
     <section className="admin-section">
       <h2>
-        <button type="button" className="flag-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          Payment reminders
-          {expired > 0 && <span className="badge" title="Expired unpaid orders">{expired}</span>}
-          <span className="flag-fold-hint">{open ? "Hide" : "Show"} <span aria-hidden="true">{open ? "▴" : "▾"}</span></span>
-        </button>
+        {fold ? (
+          <button type="button" className="flag-fold" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            Payment reminders
+            {expired > 0 && <span className="badge" title="Expired unpaid orders">{expired}</span>}
+            <span className="flag-fold-hint">{open ? "Hide" : "Show"} <span aria-hidden="true">{open ? "▴" : "▾"}</span></span>
+          </button>
+        ) : (
+          <>Payment reminders{expired > 0 && <span className="badge" title="Expired unpaid orders">{expired}</span>}</>
+        )}
       </h2>
       {open && (<>
       <p className="field-hint" style={{ marginTop: "-0.4rem" }}>

@@ -46,7 +46,7 @@ const when = (t: number) =>
 
 const pretty = (a: string) => a.replace(/[._]/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
-export default function ActivityLog() {
+export default function ActivityLog({ fold = true }: { fold?: boolean }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [error, setError] = useState("");
   const [area, setArea] = useState("");
@@ -57,7 +57,7 @@ export default function ActivityLog() {
   const [open, setOpen] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Folded away until opened (it's long); 30 rows a page.
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!fold);
   const [page, setPage] = useState(0);
   const PAGE = 30;
 
@@ -102,10 +102,14 @@ export default function ActivityLog() {
 
   return (
     <section className="admin-section">
-      <button type="button" className="al-toggle" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
-        <h2 style={{ margin: 0 }}>Activity log</h2>
-        <span className="al-toggle-hint">{expanded ? "Hide ▴" : "Show ▾"}</span>
-      </button>
+      {fold ? (
+        <button type="button" className="al-toggle" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+          <h2 style={{ margin: 0 }}>Activity log</h2>
+          <span className="al-toggle-hint">{expanded ? "Hide ▴" : "Show ▾"}</span>
+        </button>
+      ) : (
+        <h2>Activity log</h2>
+      )}
       {!expanded ? (
         <p className="field-hint" style={{ margin: "0.4rem 0 0" }}>Every change made in the dashboard, with who did it and what changed. Open it to search or filter.</p>
       ) : (

@@ -128,6 +128,10 @@ http.createServer((req, res) => {
       const saw = hist.includes("[Shown with this reply — recorded by the site:") && hist.includes("CONFIRMED") ? "yes" : "no";
       return reply(res, { content: `saw:${saw} rule:${sys.includes("Trust it over your own memory") ? "yes" : "no"}\n\n[Shown with this reply — recorded by the site:\n- card "Fake": waiting for staff to confirm]` });
     }
+    if (String((j.messages || [])[0]?.content || "").includes("HOUSE FORMAT")) {
+      if (lastUser.includes("staff guidance for this rewrite") && lastUser.includes("say-guided")) return reply(res, { content: "Guided rewrite.\n\nHow to use: as directed." });
+      return reply(res, { content: "A calming daily blend of reishi and ashwagandha for slow mornings.\n\nMade in small batches with organic roots and fruiting bodies. Earthy and a little sweet, it sits well in coffee or warm milk.\n\n- Reishi dual extract\n- Ashwagandha root\n\nHow to use: one dropper in a warm drink." });
+    }
     if (lastUser.includes("sayforbidden")) return reply(res, { content: "Our illegal blend is lovely." });
     if (lastUser.includes("freetier")) { res.writeHead(403); return res.end(JSON.stringify({ error: { message: "Free tier users do not have access to this model. Upgrade to paid credits at https://vercel.com/d?to=x for unrestricted access." } })); }
     if (lastUser.includes("fail500")) { res.writeHead(500); return res.end(JSON.stringify({ error: { message: "upstream exploded" } })); }

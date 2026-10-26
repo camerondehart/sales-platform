@@ -28,6 +28,7 @@ export const FLAG_KEYS = [
   "analytics_v2",
   "versioned_catalog",
   "concierge_learning",
+  "ai_product_copy",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -95,6 +96,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     label: "Automatic payment reminders",
     description: "Emails unpaid invoices at 24 h, 48 h, 1 week and 2 weeks, then moves them to Expired (still pending, one click to revive). Only orders placed after this is switched on. Timing and wording: Settings → Payment reminders.",
     defaults: off,
+    built: true,
+  },
+  ai_product_copy: {
+    label: "Concierge tidies product descriptions",
+    description: "Adds a “Tidy with Concierge” button to the product form that rewrites the description in the house format (lede, short paragraphs, ingredient bullets, How to use). Staff read it and press Save; nothing changes until then. Needs the AI master switch; a cent or two per rewrite, counted toward the monthly limit.",
+    defaults: on,
     built: true,
   },
   analytics_v2: {

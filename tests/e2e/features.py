@@ -274,4 +274,18 @@ _act=[x for x in req("/api/admin/subscribers", method="GET")[1]["subscribers"] i
 check("campaign: 'Subscribers' (the default for now) reaches the mailing list only", _s0==200 and _r0["sent"]==len(_act)==len(_b0), (_s0,_r0,len(_act),len(_b0)))
 _s0,_r0=req("/api/admin/campaigns", {"subject":"No audience given","body":"Hi"})
 check("campaign: no audience given = subscribers only", _s0==200 and _r0["sent"]==len(_act), (_s0,_r0,len(_act)))
+
+# ---------------- Products → Tidy with Concierge
+_s,_r=req("/api/admin/products/rewrite", {"name":"Harmony Blend Extract","category":"Extracts","description":"calming blend reishi ashwagandha organic small batch one dropper in coffee"})
+check("tidy: returns a house-format description", _s==200 and _r.get("text","").startswith("A calming daily blend") and "- Reishi" in _r["text"] and "How to use:" in _r["text"], (_s,_r))
+_s,_r=req("/api/admin/products/rewrite", {"name":"Harmony Blend Extract","description":"calming blend","guidance":"say-guided please"})
+check("tidy: staff guidance reaches the Concierge", _s==200 and _r.get("text","").startswith("Guided rewrite."), (_s,_r))
+_s,_r=req("/api/admin/products/rewrite", {"name":"X","description":"   "})
+check("tidy: refuses an empty description", _s==400, (_s,_r))
+_s,_r=req("/api/admin/products/rewrite", {"name":"X","description":"hello"}, cookie=None)
+check("tidy: staff only", _s==401, _s)
+req("/api/admin/flags", {"key":"ai_product_copy","on":False})
+_s,_r=req("/api/admin/products/rewrite", {"name":"X","description":"hello"})
+check("tidy: switch off = 404", _s==404, (_s,_r))
+req("/api/admin/flags", {"key":"ai_product_copy","on":True})
 print(f"\n{sum(res)}/{len(res)} passed")

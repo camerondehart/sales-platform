@@ -20,6 +20,8 @@ import ProductQr from "./ProductQr";
 import CampaignHistory from "./CampaignHistory";
 import RemindersPanel from "./RemindersPanel";
 import StaffPanel from "./StaffPanel";
+import SettingsTiles from "./SettingsTiles";
+import { useAdminTheme } from "./useAdminTheme";
 import MediaUpload from "./MediaUpload";
 import BundlesPanel from "./BundlesPanel";
 import TodayBulletin from "./TodayBulletin";
@@ -186,6 +188,11 @@ export default function AdminDashboard({
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  // "Tidy with Concierge": which form is being rewritten, and the text to undo back to.
+  const [tidying, setTidying] = useState<"add" | "edit" | null>(null);
+  const [tidyMsg, setTidyMsg] = useState<{ form: "add" | "edit"; ok: boolean; text: string } | null>(null);
+  const [tidyUndo, setTidyUndo] = useState<{ form: "add" | "edit"; text: string } | null>(null);
+  const [tidyGuide, setTidyGuide] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editSalePrice, setEditSalePrice] = useState("");
   const [editPromoType, setEditPromoType] = useState<"none" | "percent" | "bogo">("none");
@@ -2339,6 +2346,56 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     };
   }, []);
 
+  const theme = useAdminTheme();
+
+  async function tidyDescription(form: "add" | "edit") {
+    const current = form === "add" ? description : editDescription;
+    const payload = form === "add"
+      ? { name, category, description: current, guidance: tidyGuide }
+      : { name: editName, category: editCategory, description: current, guidance: tidyGuide };
+    if (!current.trim()) { setTidyMsg({ form, ok: false, text: "Write a rough description first — the Concierge tidies what's there." }); return; }
+    setTidying(form); setTidyMsg(null);
+    try {
+      const r = await fetch("/api/admin/products/rewrite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.text) throw new Error(d.error || "Couldn't tidy it just now.");
+      setTidyUndo({ form, text: current });
+      if (form === "add") setDescription(d.text); else setEditDescription(d.text);
+      setTidyMsg({ form, ok: true, text: "Tidied into the house format. Read it over, edit anything you like, then Save." });
+    } catch (err) {
+      setTidyMsg({ form, ok: false, text: err instanceof Error ? err.message : "Couldn't tidy it just now." });
+    }
+    setTidying(null);
+  }
+  function undoTidy() {
+    if (!tidyUndo) return;
+    if (tidyUndo.form === "add") setDescription(tidyUndo.text); else setEditDescription(tidyUndo.text);
+    setTidyUndo(null); setTidyMsg(null);
+  }
+  const tidyControls = (form: "add" | "edit") => (
+    <>
+      {/* A div, not a <label>: a button that disappears inside a label passes its click to the next button. */}
+      <div className="desc-label">
+        <span className="desc-label-text">Description</span>
+        <span className="desc-tools">
+          {tidyUndo?.form === form && <button type="button" className="ap-linkbtn esc-quiet" onClick={undoTidy}>Undo</button>}
+          <button type="button" className="esc-btn tidy-btn" disabled={tidying === form} onClick={() => tidyDescription(form)} title="Rewrite this description in the house format — you still read it and press Save">
+            {tidying === form ? "Tidying…" : "✦ Tidy with Concierge"}
+          </button>
+        </span>
+      </div>
+      <input
+        className="tidy-guide"
+        id={`tidy-guide-${form}`}
+        value={tidyGuide}
+        maxLength={300}
+        onChange={(e) => setTidyGuide(e.target.value)}
+        placeholder="Optional guidance for the Concierge, e.g. “shorter”, “mention it's vegan”, “lead with the flavour”"
+        aria-label="Optional guidance for the Concierge rewrite"
+      />
+    </>
+  );
+
   return (
     <div className="admin-shell">
       <AssistantWidget mode="admin" />
@@ -2368,6 +2425,9 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         <nav>
           <a href="/help">📖 Staff guide</a>
           <a href="/gallery" target="_blank">View site ↗</a>
+          <button type="button" className="theme-switch" onClick={theme.cycle} title={theme.title} aria-label={theme.title}>
+            {theme.label}
+          </button>
           <button onClick={handleLogout}>Sign out</button>
         </nav>
       </header>
@@ -3556,59 +3616,10 @@ We just finished a new run and wanted you to hear it first.
       </section>
       )}
 
-      {/* Sales & loyalty rules */}
       {tab === "analytics" && <AnalyticsDashboard />}
       {tab === "assistant" && <AssistantPanel />}
 
-      {tab === "settings" && (
-      <section className="admin-section">
-        <h2>Sales &amp; loyalty rules</h2>
-        <div className="notice">
-          The bundle rule applies automatically at checkout. Loyalty settings control how points are
-          earned and redeemed.
-        </div>
-        <form className="admin-form" onSubmit={saveSettingsForm}>
-          <div className="field full">
-            <label>
-              <input type="checkbox" checked={stBundleEnabled} onChange={(e) => setStBundleEnabled(e.target.checked)} />
-              {" "}Enable “bundle &amp; save” cart discount
-            </label>
-          </div>
-          <div className="field">
-            <label>Minimum items</label>
-            <input type="number" min="2" value={stBundleMin} onChange={(e) => setStBundleMin(parseInt(e.target.value) || 3)} />
-          </div>
-          <div className="field">
-            <label>Discount (%)</label>
-            <input type="number" min="1" max="90" value={stBundlePct} onChange={(e) => setStBundlePct(parseInt(e.target.value) || 10)} />
-          </div>
-          <div className="field full" style={{ borderTop: "1px solid var(--rule-soft)", paddingTop: "1rem" }}>
-            <label>
-              <input type="checkbox" checked={stLoyaltyEnabled} onChange={(e) => setStLoyaltyEnabled(e.target.checked)} />
-              {" "}Enable loyalty points
-            </label>
-          </div>
-          <div className="field">
-            <label>Points earned per $1</label>
-            <input type="number" min="0" step="0.1" value={stPointsPerDollar} onChange={(e) => setStPointsPerDollar(parseFloat(e.target.value) || 1)} />
-          </div>
-          <div className="field">
-            <label>Points needed for $1 credit</label>
-            <input type="number" min="1" value={stPointsPerDollarRedeemed} onChange={(e) => setStPointsPerDollarRedeemed(parseInt(e.target.value) || 100)} />
-          </div>
-          <div className="field">
-            <label>Minimum points to redeem</label>
-            <input type="number" min="0" value={stMinRedeem} onChange={(e) => setStMinRedeem(parseInt(e.target.value) || 0)} />
-          </div>
-          <div className="full">
-            <button type="submit" className="submit" disabled={stSaving}>{stSaving ? "Saving…" : "Save rules"}</button>
-            {stMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{stMsg}</span>}
-          </div>
-        </form>
-      </section>
-      )}
 
-      {/* Announcement banner */}
       {tab === "marketing" && (
       <section className="admin-section">
         <h2>Announcement banner</h2>
@@ -3669,8 +3680,60 @@ We just finished a new run and wanted you to hear it first.
       </section>
       )}
 
-      {/* Change steward password */}
       {tab === "settings" && (
+        <SettingsTiles
+          tiles={[
+            { key: "rules", icon: "🏷️", title: "Sales & loyalty rules", summary: "Bundle-and-save discount and loyalty points.", render: () => (
+      <section className="admin-section">
+        <h2>Sales &amp; loyalty rules</h2>
+        <div className="notice">
+          The bundle rule applies automatically at checkout. Loyalty settings control how points are
+          earned and redeemed.
+        </div>
+        <form className="admin-form" onSubmit={saveSettingsForm}>
+          <div className="field full">
+            <label>
+              <input type="checkbox" checked={stBundleEnabled} onChange={(e) => setStBundleEnabled(e.target.checked)} />
+              {" "}Enable “bundle &amp; save” cart discount
+            </label>
+          </div>
+          <div className="field">
+            <label>Minimum items</label>
+            <input type="number" min="2" value={stBundleMin} onChange={(e) => setStBundleMin(parseInt(e.target.value) || 3)} />
+          </div>
+          <div className="field">
+            <label>Discount (%)</label>
+            <input type="number" min="1" max="90" value={stBundlePct} onChange={(e) => setStBundlePct(parseInt(e.target.value) || 10)} />
+          </div>
+          <div className="field full" style={{ borderTop: "1px solid var(--rule-soft)", paddingTop: "1rem" }}>
+            <label>
+              <input type="checkbox" checked={stLoyaltyEnabled} onChange={(e) => setStLoyaltyEnabled(e.target.checked)} />
+              {" "}Enable loyalty points
+            </label>
+          </div>
+          <div className="field">
+            <label>Points earned per $1</label>
+            <input type="number" min="0" step="0.1" value={stPointsPerDollar} onChange={(e) => setStPointsPerDollar(parseFloat(e.target.value) || 1)} />
+          </div>
+          <div className="field">
+            <label>Points needed for $1 credit</label>
+            <input type="number" min="1" value={stPointsPerDollarRedeemed} onChange={(e) => setStPointsPerDollarRedeemed(parseInt(e.target.value) || 100)} />
+          </div>
+          <div className="field">
+            <label>Minimum points to redeem</label>
+            <input type="number" min="0" value={stMinRedeem} onChange={(e) => setStMinRedeem(parseInt(e.target.value) || 0)} />
+          </div>
+          <div className="full">
+            <button type="submit" className="submit" disabled={stSaving}>{stSaving ? "Saving…" : "Save rules"}</button>
+            {stMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{stMsg}</span>}
+          </div>
+        </form>
+      </section>
+            ) },
+            { key: "flags", icon: "🎛️", title: "Feature switches", summary: "Turn features on or off without a redeploy.", render: () => <FlagsPanel fold={false} /> },
+            { key: "reminders", icon: "⏰", title: "Payment reminders", summary: "Timing and wording of the automatic reminder emails.", badge: expiredCount, render: () => <RemindersPanel fold={false} /> },
+            { key: "staff", icon: "🔑", title: "Staff sign-in", summary: "Who can get a one-time sign-in link by email.", render: () => <StaffPanel /> },
+            { key: "password", icon: "🔒", title: "Steward password", summary: "Change the shared admin password.", render: () => (
       <section className="admin-section">
         <h2>Change steward password</h2>
         <div className="notice">This is your admin sign-in. Member access is managed through the sections above — there is no longer a shared site password.</div>
@@ -3679,22 +3742,19 @@ We just finished a new run and wanted you to hear it first.
           <div className="full"><button type="submit" className="submit">Update password</button>{pwMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{pwMsg}</span>}</div>
         </form>
       </section>
-      )}
-
-      {/* Email data export */}
-      {tab === "settings" && (
+            ) },
+            { key: "export", icon: "📧", title: "Email data export", summary: "Send tonight's report and CSV backups now.", render: () => (
       <section className="admin-section">
         <h2>Email Data Export</h2>
         <div className="notice">Sends the nightly report: revenue figures, what needs attention, top sellers, customer trends, plus CSV backups of revenue, orders, members, products and inquiries. Runs automatically each night — use this to send one now.</div>
         <button className="submit" onClick={handleEmailExport} disabled={exporting} style={{ width: "auto", padding: "0.75rem 1.5rem" }}>{exporting ? "Sending…" : "📧 Email export now"}</button>
         {exportMsg && <div style={{ marginTop: "1rem", fontStyle: "italic", color: "var(--mint)" }}>{exportMsg}</div>}
       </section>
+            ) },
+            { key: "activity", icon: "📜", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
+          ]}
+        />
       )}
-
-      {tab === "settings" && <FlagsPanel />}
-      {tab === "settings" && <RemindersPanel />}
-      {tab === "settings" && <StaffPanel />}
-      {tab === "settings" && <ActivityLog />}
 
       {/* Inquiry History Modal */}
       {historyUser && (
@@ -4018,7 +4078,7 @@ We just finished a new run and wanted you to hear it first.
                     <span>This is a bundle</span>
                   </label>
                 </div>
-                <div className="field"><label>Description</label><textarea required rows={4} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
+                <div className="field">{tidyControls("add")}<textarea required rows={6} value={description} onChange={(e) => setDescription(e.target.value)} />{tidyMsg?.form === "add" && <div className={tidyMsg.ok ? "ap-ok" : "ap-bad"} style={{ marginTop: "0.4rem" }}>{tidyMsg.text}</div>}</div>
                 <button type="submit" className="submit" disabled={adding}>{adding ? "Adding…" : "Add product"}</button>
                 {addMsg && <div className="field-hint" style={{ textAlign: "center" }}>{addMsg}</div>}
               </form>
@@ -4089,7 +4149,7 @@ We just finished a new run and wanted you to hear it first.
                     <span>This is a bundle</span>
                   </label>
                 </div>
-                <div className="field"><label>Description</label><textarea required rows={4} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} /></div>
+                <div className="field">{tidyControls("edit")}<textarea required rows={6} value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />{tidyMsg?.form === "edit" && <div className={tidyMsg.ok ? "ap-ok" : "ap-bad"} style={{ marginTop: "0.4rem" }}>{tidyMsg.text}</div>}</div>
                 <button type="submit" className="submit" disabled={editSubmitting}>{editSubmitting ? "Saving…" : "Save changes"}</button>
                 {editMsg && <div style={{ padding: "0.85rem 1rem", background: "rgba(200, 97, 100, 0.1)", borderLeft: "3px solid var(--red)", borderRadius: "0 4px 4px 0", fontSize: "0.92rem", color: "var(--ink)", lineHeight: 1.5 }}>{editMsg}</div>}
               </form>
