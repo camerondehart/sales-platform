@@ -8622,3 +8622,24 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .fid-list button:hover { color: var(--red); border-color: var(--red); }
 .fid-empty { margin: 0 0 0.9rem; font-size: 0.86rem; color: var(--ink-soft); }
 .home-hero .gate-card .gate-kicker { align-self: center; justify-self: center; width: auto; }
+
+/* Homepage: the small staff sign-in icon in the sign-in card's top corner */
+.home-staff-link {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  animation: none !important;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--rule-soft);
+  backdrop-filter: blur(4px);
+  opacity: 0.75;
+  transition: opacity 0.18s, color 0.18s, border-color 0.18s, background 0.18s;
+}
+.home-staff-link:hover, .home-staff-link:focus-visible { opacity: 1; color: var(--accent-strong); border-color: var(--green); background: var(--white); }

@@ -27,6 +27,14 @@ export default async function Home() {
     <div id="top" className="gate gate-scene home-hero">
       {/* 👇 Wider card */}
       <div className="gate-card" style={{ maxWidth: "560px" }}>
+        {/* Staff sign-in: a quiet icon in the corner (staff use Face ID, an emailed link or the daily password). */}
+        <a href="/admin" className="home-staff-link" aria-label="Staff sign-in" title="Staff sign-in">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="5" y="10.5" width="14" height="10" rx="2.2" />
+            <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+            <circle cx="12" cy="15.3" r="1.2" />
+          </svg>
+        </a>
         <div className="gate-kicker">Member Access</div>
         <h1 className="gate-title">{brand.members}</h1>
         <div className="gate-ornament" aria-hidden="true">

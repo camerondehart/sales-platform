@@ -996,5 +996,6 @@ check("member faceid: switch off = closed", _s==404 and _s2==404, (_s,_s2))
 req("/api/admin/flags", {"key":"member_passkeys","on":True})
 _s,_h=page("/")
 check("member faceid: the sign-in box no longer shows the big notice", _s==200 and "Shopped with us before?" in _h and "Welcome to our new home" not in _h, _s)
+check("homepage: a small staff sign-in link to /admin in the corner", 'class="home-staff-link"' in _h and 'href="/admin"' in _h and 'aria-label="Staff sign-in"' in _h, _s)
 
 print(f"\n{sum(res)}/{len(res)} passed")
