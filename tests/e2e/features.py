@@ -998,4 +998,14 @@ _s,_h=page("/")
 check("member faceid: the sign-in box no longer shows the big notice", _s==200 and "Shopped with us before?" in _h and "Welcome to our new home" not in _h, _s)
 check("homepage: a small staff sign-in link to /admin in the corner", 'class="home-staff-link"' in _h and 'href="/admin"' in _h and 'aria-label="Staff sign-in"' in _h, _s)
 
+# =============== Staff sign-in lockout is per device, not site-wide
+_s,_x=req("/api/admin/staff-phrase")
+_ph=_x.get("phrase","")
+for _i in range(12):
+    req("/api/login", {"role":"admin","password":"wrong-guess-%d" % _i}, cookie=None, headers={"x-forwarded-for":"10.90.0.1"})
+_s1,_=req("/api/login", {"role":"admin","password":_ph}, cookie=None, headers={"x-forwarded-for":"10.90.0.1"})
+check("lockout: 12 wrong staff passwords block that device, even with the right one", _s1==401, _s1)
+_s2,_=req("/api/login", {"role":"admin","password":_ph}, cookie=None, headers={"x-forwarded-for":"10.90.0.2"})
+check("lockout: …but staff on another device still sign in", _s2==200, _s2)
+
 print(f"\n{sum(res)}/{len(res)} passed")

@@ -35,6 +35,8 @@ echo "Passkey signatures readable (unit): $(node "$REPO/tests/unit/passkey-signa
 node "$REPO/tests/unit/passkey-signature.cjs" >/dev/null 2>&1 || { echo "Passkey signature check failed (run npm ci)"; exit 1; }
 echo "Daily staff password (unit): $(node "$REPO/tests/unit/staff-phrase.cjs" | tail -1)"
 node "$REPO/tests/unit/staff-phrase.cjs" >/dev/null 2>&1 || { echo "Daily staff password unit check failed"; exit 1; }
+echo "Staff sign-in lockout per device (unit): $(node "$REPO/tests/unit/rate-limit.cjs" | tail -1)"
+node "$REPO/tests/unit/rate-limit.cjs" >/dev/null 2>&1 || { echo "Rate limit unit check failed"; exit 1; }
 echo "Cash pickup deals (unit): $(node "$REPO/tests/unit/cash-pricing.cjs" | tail -1)"
 node "$REPO/tests/unit/cash-pricing.cjs" >/dev/null 2>&1 || { echo "Cash pickup pricing unit check failed"; exit 1; }
 echo "Backorders & restock needs (unit): $(node "$REPO/tests/unit/stock-math.cjs" | tail -1)"

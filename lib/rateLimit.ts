@@ -13,7 +13,7 @@ const ipAttempts = new Map<string, RateLimitRecord>();
 const MAX_ATTEMPTS = 12;          // maximum failed attempts (changed to 12)
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-function isRateLimited(key: string, map: Map<string, RateLimitRecord>): boolean {
+function isRateLimited(key: string, map: Map<string, RateLimitRecord>, max = MAX_ATTEMPTS): boolean {
   const now = Date.now();
   const record = map.get(key);
   if (!record) return false;
@@ -24,7 +24,7 @@ function isRateLimited(key: string, map: Map<string, RateLimitRecord>): boolean 
     return false;
   }
 
-  return record.count >= MAX_ATTEMPTS;
+  return record.count >= max;
 }
 
 function recordAttempt(key: string, map: Map<string, RateLimitRecord>): void {
@@ -52,4 +52,26 @@ export function checkRateLimit(email: string, ip: string): { blocked: boolean } 
 export function recordFailedAttempt(email: string, ip: string): void {
   recordAttempt(email.toLowerCase(), emailAttempts);
   recordAttempt(ip, ipAttempts);
+}
+
+// Shared sign-ins (the staff password, staff Face ID, staff email links) have
+// no per-person key. Counting their failures under one site-wide key let anyone
+// lock every staff member out of that sign-in by failing 12 times. Now each
+// device (IP) gets its own 12 tries, and a much higher site-wide ceiling stays
+// as a backstop against guessing from many devices at once.
+const SHARED_SITE_MAX = 200;
+
+export function checkSharedLimit(scope: string, ip: string): { blocked: boolean } {
+  return {
+    blocked:
+      isRateLimited(`${scope}:${ip}`, emailAttempts) ||
+      isRateLimited(ip, ipAttempts) ||
+      isRateLimited(scope, emailAttempts, SHARED_SITE_MAX),
+  };
+}
+
+export function recordSharedFailure(scope: string, ip: string): void {
+  recordAttempt(`${scope}:${ip}`, emailAttempts);
+  recordAttempt(ip, ipAttempts);
+  recordAttempt(scope, emailAttempts);
 }

@@ -8,7 +8,7 @@ import {
 } from "@/lib/auth";
 import { getAdminPassword } from "@/lib/storage";
 import { verifyPassword } from "@/lib/users";
-import { checkRateLimit, recordFailedAttempt } from "@/lib/rateLimit";
+import { checkRateLimit, checkSharedLimit, recordFailedAttempt, recordSharedFailure } from "@/lib/rateLimit";
 import { auditSystem } from "@/lib/audit";
 import { isEnabled } from "@/lib/flags";
 import { matchesPhrase, oldPasswordStatus } from "@/lib/staffPhrase";
@@ -24,9 +24,11 @@ export async function POST(req: Request) {
   const forwardedFor = req.headers.get("x-forwarded-for");
   const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown";
   const emailForRateLimit = body.email?.toLowerCase() || "unknown";
+  // The staff password has no email: its tries are counted per device (lib/rateLimit.ts).
+  const sharedScope = body.role === "admin" ? "admin-password" : !body.email ? "no-email" : null;
 
   // Check rate limit before any processing
-  const { blocked } = checkRateLimit(emailForRateLimit, ip);
+  const { blocked } = sharedScope ? checkSharedLimit(sharedScope, ip) : checkRateLimit(emailForRateLimit, ip);
   if (blocked) {
     // Still add a delay to avoid revealing rate limit status
     await new Promise((r) => setTimeout(r, 600));
@@ -37,7 +39,8 @@ export async function POST(req: Request) {
   const fail = async (code: string, status = 401) => {
     await new Promise((r) => setTimeout(r, 600));
     // Record the failed attempt
-    recordFailedAttempt(emailForRateLimit, ip);
+    if (sharedScope) recordSharedFailure(sharedScope, ip);
+    else recordFailedAttempt(emailForRateLimit, ip);
     return NextResponse.json({ error: code }, { status });
   };
 

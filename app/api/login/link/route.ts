@@ -6,7 +6,7 @@ import { findAdmin } from "@/lib/admins";
 import { issue, useAdminLink } from "@/lib/loginCodes";
 import { sendAdminLink } from "@/lib/authEmails";
 import { auditSystem } from "@/lib/audit";
-import { checkRateLimit, recordFailedAttempt } from "@/lib/rateLimit";
+import { checkSharedLimit, recordSharedFailure } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +45,14 @@ export async function POST(req: Request) {
   }
 
   if (body.action === "verify") {
-    if (checkRateLimit("admin-link", ip).blocked) {
+    if (checkSharedLimit("admin-link", ip).blocked) {
       await new Promise((r) => setTimeout(r, 600));
       return NextResponse.json({ error: "invalid" }, { status: 401 });
     }
     const email = await useAdminLink(String(body.token || ""));
     const admin = email ? await findAdmin(email) : null;
     if (!admin) {
-      recordFailedAttempt("admin-link", ip);
+      recordSharedFailure("admin-link", ip);
       await new Promise((r) => setTimeout(r, 600));
       return NextResponse.json({ error: "invalid" }, { status: 401 });
     }

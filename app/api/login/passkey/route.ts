@@ -5,7 +5,7 @@ import { ADMIN_COOKIE, signAdminToken } from "@/lib/auth";
 import { isEnabled } from "@/lib/flags";
 import { findAdmin } from "@/lib/admins";
 import { auditSystem } from "@/lib/audit";
-import { checkRateLimit, recordFailedAttempt } from "@/lib/rateLimit";
+import { checkSharedLimit, recordSharedFailure } from "@/lib/rateLimit";
 import { CHALLENGE_COOKIE, getPasskeys, packChallenge, relyingParty, touchPasskey, unpackChallenge } from "@/lib/passkeys";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +33,12 @@ export async function POST(req: Request) {
 
   if (body?.action === "verify" && body.response && typeof body.response === "object") {
     const fail = async (why: string) => {
-      recordFailedAttempt("admin-passkey", ip);
+      recordSharedFailure("admin-passkey", ip);
       await auditSystem({ action: "admin.signin", actor: "unknown", actorType: "admin", source: "human", targetType: "admin", targetId: "passkey", ok: false, note: `Face ID sign-in refused: ${why}`, ...meta }).catch(() => {});
       await new Promise((r) => setTimeout(r, 500));
       return NextResponse.json({ error: "That didn't work. Try again, or use your email link or the password." }, { status: 401 });
     };
-    if (checkRateLimit("admin-passkey", ip).blocked) return fail("too many tries");
+    if (checkSharedLimit("admin-passkey", ip).blocked) return fail("too many tries");
     const ch = unpackChallenge(cookies().get(CHALLENGE_COOKIE)?.value, "auth");
     cookies().delete({ name: CHALLENGE_COOKIE, path: "/api/login/passkey" });
     if (!ch) return fail("the request expired");
