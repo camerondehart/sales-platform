@@ -74,6 +74,69 @@ const check = (name, ok, d = "") => { if (!ok) fails++; console.log(`${ok ? "PAS
   } catch (err) {
     check("flow ran", false, err && err.message);
   }
+
+  // ---------------- Members: one-click popup after signing in, then one-tap sign-in
+  const mctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const mp = await mctx.newPage();
+  const mcdp = await mctx.newCDPSession(mp);
+  await mcdp.send("WebAuthn.enable");
+  const { authenticatorId: mAuth } = await mcdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+  });
+  // As if they'd just signed in with their password (the entrance already played this visit).
+  const justSignedIn = () => mp.addInitScript(() => { if (!sessionStorage.getItem("__seen")) { sessionStorage.setItem("__seen", "1"); sessionStorage.setItem("fp_member_signin", "password"); sessionStorage.setItem("fp_entered", "1"); } });
+  try {
+    await mctx.addCookies([{ name: "gallery_visitor", value: T.member, url: BASE }]);
+    await justSignedIn();
+    await mp.goto(BASE + "/gallery");
+    const pop = mp.locator(".fid-card");
+    await pop.waitFor({ timeout: 10000 }).catch(() => {});
+    check("members: right after signing in, the one-click Face ID popup appears", (await pop.count()) === 1);
+    await mp.screenshot({ path: "/tmp/harness/member-faceid-popup.png" }).catch(() => {});
+    await pop.locator(".fid-primary").click();
+    await mp.locator(".fid-ok").waitFor({ timeout: 10000 }).catch(() => {});
+    check("members: one click adds Face ID for this device", /All set/.test(await mp.locator(".fid-card").innerText().catch(() => "")));
+    const { credentials } = await mcdp.send("WebAuthn.getCredentials", { authenticatorId: mAuth });
+    check("members: the device holds their passkey", credentials.length === 1 && credentials[0].isResidentCredential);
+    const mine = await mp.evaluate(() => fetch("/api/account/passkeys").then((r) => r.json()));
+    check("members: it's listed under their account (no key material)", mine.passkeys.length === 1 && !("publicKey" in mine.passkeys[0]), JSON.stringify(mine));
+
+    // Signed out: one tap signs them back in.
+    await mctx.clearCookies();
+    await mp.goto(BASE + "/");
+    const fbtn = mp.locator("button.auth-faceid");
+    await fbtn.waitFor({ timeout: 10000 }).catch(() => {});
+    check("members: the sign-in box offers Sign in with Face ID", (await fbtn.count()) === 1);
+    await fbtn.click();
+    await mp.waitForURL(/\/gallery/, { timeout: 10000 }).catch(() => {});
+    check("members: Face ID signs them in to the gallery", /\/gallery/.test(mp.url()));
+    const after = await mp.evaluate(() => fetch("/api/account/passkeys").then((r) => r.json()));
+    check("members: …as themselves, and it notes when it was last used", after.passkeys.length === 1 && after.passkeys[0].lastUsedAt > 0, JSON.stringify(after));
+    await mp.waitForTimeout(1500);
+    check("members: no popup after signing in with Face ID", (await mp.locator(".fid-card").count()) === 0);
+  } catch (err) {
+    check("members flow ran", false, err && err.message);
+  }
+  // "Not now" is remembered on this device.
+  try {
+    const dctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+    const dp = await dctx.newPage();
+    const dcdp = await dctx.newCDPSession(dp);
+    await dcdp.send("WebAuthn.enable");
+    await dcdp.send("WebAuthn.addVirtualAuthenticator", { options: { protocol: "ctap2", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true } });
+    await dctx.addCookies([{ name: "gallery_visitor", value: T.member, url: BASE }]);
+    await dp.addInitScript(() => { sessionStorage.setItem("fp_member_signin", "password"); sessionStorage.setItem("fp_entered", "1"); });
+    await dp.goto(BASE + "/gallery");
+    await dp.locator(".fid-card").waitFor({ timeout: 10000 }).catch(() => {});
+    await dp.locator(".fid-quiet").click();
+    check("members: Not now closes it", (await dp.locator(".fid-card").count()) === 0);
+    await dp.goto(BASE + "/gallery");
+    await dp.waitForTimeout(2500);
+    check("members: …and it isn't asked again on this device", (await dp.locator(".fid-card").count()) === 0);
+    await dctx.close();
+  } catch (err) {
+    check("members decline flow ran", false, err && err.message);
+  }
   await b.close();
   process.exit(0);
 })();

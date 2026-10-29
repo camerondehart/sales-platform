@@ -11,7 +11,7 @@ free_ports() {
 free_ports
 python3 /tmp/harness/seed.py >/dev/null
 rm -rf /tmp/final/data/transcripts /tmp/final/data/traffic-*.json /tmp/final/data/campaigns.json /tmp/final/data/reminder-*.json /tmp/final/data/assistant-sources.json
-rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/staff-phrase.json /tmp/final/data/email-templates.json /tmp/final/data/stores.json /tmp/final/data/geocode-cache.json /tmp/final/data/stock.json /tmp/final/data/venmo-payments.json /tmp/final/data/inbound-setup.json /tmp/final/data/voice-settings.json /tmp/final/data/voice-usage.json; rm -rf /tmp/final/data/voice-cache; rm -rf /tmp/final/data/venmo-raw /tmp/harness/venmo
+rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/staff-phrase.json /tmp/final/data/member-passkeys.json /tmp/final/data/email-templates.json /tmp/final/data/stores.json /tmp/final/data/geocode-cache.json /tmp/final/data/stock.json /tmp/final/data/venmo-payments.json /tmp/final/data/inbound-setup.json /tmp/final/data/voice-settings.json /tmp/final/data/voice-usage.json; rm -rf /tmp/final/data/voice-cache; rm -rf /tmp/final/data/venmo-raw /tmp/harness/venmo
 python3 - <<'PY'
 import json,time
 D="/tmp/final/data/"; now=int(time.time()*1000)

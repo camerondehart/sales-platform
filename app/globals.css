@@ -8531,3 +8531,94 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .cash-only-tick { display: flex; gap: 0.55rem; align-items: flex-start; margin-top: 0.6rem; font-size: 0.88rem; cursor: pointer; }
 .cash-only-tick input { width: auto; min-height: 0; margin-top: 0.2rem; }
 .cash-only-tick small { display: block; color: var(--ink-soft); font-size: 0.78rem; }
+
+/* =========================================================
+   Member sign-in box (AuthForms) — calmer layout, 2026-10-29:
+   slim segmented tabs, Face ID first, show/hide password, quiet links
+   on one row, and the old-shop note as one tappable line.
+   ========================================================= */
+.auth { text-align: left; }
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin: 0 auto clamp(0.8rem, 1.8dvh, 1.4rem);
+  border-radius: 12px;
+  background: rgba(97, 103, 109, 0.08);
+}
+.auth-tab {
+  padding: clamp(0.5rem, 1.1dvh, 0.65rem) 0.6rem;
+  border-radius: 9px;
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-soft);
+  background: transparent;
+  min-height: 0;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.auth-tab:hover:not(.active) { color: var(--ink); }
+.auth-tab.active { background: var(--white); color: var(--dark-grey); box-shadow: 0 1px 3px rgba(43, 47, 39, 0.12); }
+.auth .gate-input { border-radius: 10px; }
+.auth .gate-input + .gate-input, .auth .gate-input + .auth-pw, .auth .gate-input + .gate-textarea { margin-top: 0.55rem; }
+.auth .gate-button { border-radius: 10px; letter-spacing: 0.14em; }
+.auth-faceid { display: flex; align-items: center; justify-content: center; gap: 0.55rem; margin-top: 0; }
+.auth-secondary { background: transparent; color: var(--dark-grey); border: 1px solid var(--rule); }
+.auth-secondary:hover { background: rgba(133, 186, 69, 0.1); color: var(--accent-strong); border-color: var(--green); }
+.auth-or { display: flex; align-items: center; gap: 0.75rem; margin: clamp(0.6rem, 1.4dvh, 1rem) 0; color: var(--ink-soft); font-size: 0.78rem; }
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--rule-soft); }
+.auth-pw { position: relative; margin-top: 0.55rem; }
+.auth-pw .gate-input { padding-right: 4.2rem; }
+.auth-eye {
+  position: absolute; right: 0.45rem; top: 50%; transform: translateY(-50%);
+  min-height: 0; padding: 0.3rem 0.55rem; border-radius: 7px;
+  font-family: var(--font-sans); font-size: 0.74rem; font-weight: 600; color: var(--ink-soft); background: transparent;
+}
+.auth-eye:hover { color: var(--accent-strong); background: rgba(133, 186, 69, 0.1); }
+.auth-links { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem 1rem; margin-top: 0.55rem; }
+.auth-link {
+  min-height: 0; padding: 0.15rem 0; background: none; border: none;
+  font-family: var(--font-sans); font-size: 0.82rem; font-weight: 500; color: var(--ink-soft);
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+.auth-link:hover { color: var(--accent-strong); text-decoration-color: currentColor; }
+.auth-form .gate-button { margin-top: clamp(0.7rem, 1.4dvh, 1rem); }
+.auth-form .auth-faceid { margin-top: 0; }
+.auth-oldshop {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; width: 100%;
+  margin-top: clamp(0.8rem, 1.6dvh, 1.2rem); padding: 0.7rem 0.9rem; min-height: 0;
+  border-radius: 10px; border: 1px dashed rgba(162, 164, 52, 0.55); background: rgba(162, 164, 52, 0.07);
+  font-family: var(--font-sans); font-size: 0.82rem; line-height: 1.4; text-align: left; color: var(--ink);
+}
+.auth-oldshop strong { color: var(--dark-grey); }
+.auth-oldshop > span:last-child { color: var(--accent-strong); font-weight: 700; }
+.auth-oldshop:hover { border-style: solid; background: rgba(162, 164, 52, 0.12); }
+.auth-hint { margin: 0 0 0.7rem; font-size: 0.86rem; line-height: 1.5; color: var(--ink-soft); }
+.auth .gate-error { text-align: center; }
+
+/* Member Face ID: popup after sign-in, and Account → Face ID */
+.fid-backdrop { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 1rem; background: rgba(32, 36, 30, 0.45); backdrop-filter: blur(3px); animation: fade-rise 0.35s ease both; }
+.fid-card { width: min(380px, 100%); padding: 1.6rem 1.4rem 1.3rem; border-radius: 18px; background: var(--white); color: var(--ink); text-align: center; box-shadow: 0 18px 50px rgba(20, 24, 18, 0.28); }
+.fid-mark { width: 58px; height: 58px; margin: 0 auto 0.8rem; display: grid; place-items: center; border-radius: 16px; background: rgba(133, 186, 69, 0.14); color: var(--accent-strong); }
+.fid-card h2 { margin: 0 0 0.45rem; font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 1.5rem; color: var(--dark-grey); }
+.fid-card p { margin: 0 0 1rem; font-size: 0.9rem; line-height: 1.5; color: var(--ink-soft); }
+.fid-actions { display: grid; gap: 0.45rem; }
+.fid-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 0.8rem 1rem; border-radius: 10px; background: var(--green); color: #fff; font-family: var(--font-sans); font-weight: 700; font-size: 0.9rem; }
+.fid-primary:hover { background: var(--accent-strong); }
+.fid-primary:disabled { opacity: 0.6; cursor: wait; }
+.fid-quiet { padding: 0.65rem 1rem; border-radius: 10px; background: transparent; color: var(--ink-soft); font-family: var(--font-sans); font-weight: 600; font-size: 0.88rem; }
+.fid-quiet:hover { color: var(--ink); background: rgba(97, 103, 109, 0.08); }
+.fid-ok { margin: 0.6rem 0; color: var(--accent-strong); font-size: 0.88rem; }
+.fid-bad { margin: 0.6rem 0; color: var(--red); font-size: 0.88rem; }
+.fid-devices .fid-lede { margin: 0 0 0.9rem; font-size: 0.9rem; line-height: 1.55; color: var(--ink-soft); }
+.fid-list { list-style: none; margin: 0 0 0.9rem; padding: 0; display: grid; gap: 0.4rem; }
+.fid-list li { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.6rem 0.8rem; border: 1px solid var(--rule-soft); border-radius: 10px; }
+.fid-list li span { display: grid; gap: 0.1rem; }
+.fid-list small { color: var(--ink-soft); font-size: 0.78rem; }
+.fid-list button { min-height: 0; padding: 0.35rem 0.7rem; border-radius: 8px; background: transparent; color: var(--ink-soft); font-size: 0.8rem; border: 1px solid var(--rule-soft); }
+.fid-list button:hover { color: var(--red); border-color: var(--red); }
+.fid-empty { margin: 0 0 0.9rem; font-size: 0.86rem; color: var(--ink-soft); }
+.home-hero .gate-card .gate-kicker { align-self: center; justify-self: center; width: auto; }

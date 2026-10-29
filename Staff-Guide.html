@@ -1118,6 +1118,7 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Store locator</strong>, <strong>Stock counts</strong>, <strong>Venmo payment matching</strong>, <strong>Concierge voice</strong>, <strong>Concierge photos</strong> and <strong>Ambassador pages</strong>: each has its own section in this guide. Stores and stock counts can be set up while their switch is off. Customers only see them once it's on.</li>
 <li><strong>Cash pickup deals &amp; public-shop pickup</strong>: the <em>Cash pickup only</em> tick on sales, and Local pickup (invoice or cash) in the public shop. Off = the public shop is ship-only.</li>
 <li><strong>Daily staff password</strong> (on): the staff password changes every day (see <em>Signing in</em>). Switching it off goes back to the old fixed password. Only do that if your developer asks.</li>
+<li><strong>Member sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Members get the one-tap sign-in and the popup offering it after they sign in. Off hides both; saved devices stay saved.</li>
 <li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>
 </ul>
@@ -1358,6 +1359,11 @@ It shows the same products as /retail, which means anything set to <strong>Both<
 If someone answers <strong>No</strong> to being 21 or over, they cannot send a request at all. The site tells them so and stops there, and it checks again on our side so the answer cannot be faked. Nobody under 21 can get into the member area.
 </div>
 <p>When you look at a waiting request you will see <strong>"✓ Confirmed 21 or over"</strong> on their card, so you can check it at the moment you approve them rather than digging through the email.</p>
+
+<h3>Signing in</h3>
+<p>The sign-in box has <strong>Sign in</strong> and <strong>Join {{MEMBERS}}</strong> tabs. Members type their email and password; <strong>Show</strong> reveals what they typed, and <strong>Forgot password?</strong> and <strong>Email me a code instead</strong> (when switched on) sit just under the password. People from the old shop tap the <strong>Shopped with us before?</strong> line to get a set-password link.</p>
+<h3>Face ID, Touch ID and fingerprint for members</h3>
+<p>With <strong>Member sign-in with Face ID / Touch ID / fingerprint</strong> on (it is by default), a member who signs in with their password, a code or a set-password link sees a small popup: <strong>Sign in faster next time?</strong> One tap on <kbd>Use Face ID</kbd> (Touch ID on a Mac, fingerprint on Android) sets it up for that phone or computer. After that, the sign-in box shows <kbd>Sign in with Face ID</kbd> at the top and they're in with one tap. If they choose <kbd>Not now</kbd>, that device never asks again. They can still set it up, or remove a device, under <strong>Account → Face ID &amp; Touch ID</strong>. Their face or fingerprint never leaves their device, and passwords and codes keep working. It's set up on each device separately, and never offered when staff use <strong>Log in as</strong>.</p>
 
 <h3>On a phone</h3>
 <p>Products show <strong>two across</strong> so more of the shop fits on screen. There's a small button beside the category picker that switches to <strong>one big product per row</strong> if they'd rather see larger photos, and the site remembers which they picked.</p>

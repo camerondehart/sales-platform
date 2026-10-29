@@ -38,6 +38,7 @@ export const FLAG_KEYS = [
   "admin_passkeys",
   "rotating_staff_password",
   "cash_pickup",
+  "member_passkeys",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -170,6 +171,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   rotating_staff_password: {
     label: "Daily staff password",
     description: "The staff password becomes a new two-word phrase each day (e.g. maple-otter-42), changing at midnight Pacific. It's in the nightly report email and always shown in Settings → Steward password. Yesterday's still works until noon. The old fixed password keeps working for 7 days after this first runs, then stops. Face ID and the emailed link keep working. Off = back to the fixed password.",
+    defaults: on,
+    built: true,
+  },
+  member_passkeys: {
+    label: "Member sign-in with Face ID / Touch ID / fingerprint",
+    description: "Members can sign in with one tap (a passkey on their phone or computer). Right after a member signs in another way, a one-click popup offers to set it up on that device; \"Not now\" isn't asked again on that device. They can add or remove devices under Account → Face ID. Passwords and email codes keep working. Off = the button and popup are hidden and passkeys can't be used (they stay saved).",
     defaults: on,
     built: true,
   },

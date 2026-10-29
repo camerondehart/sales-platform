@@ -130,7 +130,8 @@ const CHALLENGE_MS = 5 * 60 * 1000;
 const secret = () => process.env.AUTH_SECRET || "dev-secret-please-change-in-production-12345";
 const sign = (data: string) => crypto.createHmac("sha256", `passkey:${secret()}`).update(data).digest("base64url");
 
-export type Challenge = { c: string; k: "reg" | "auth"; email?: string; e: number };
+/** k: staff add / staff sign-in / member add / member sign-in. u: the member adding one. */
+export type Challenge = { c: string; k: "reg" | "auth" | "mreg" | "mauth"; email?: string; u?: string; e: number };
 
 export function packChallenge(ch: Omit<Challenge, "e">): string {
   const body = Buffer.from(JSON.stringify({ ...ch, e: Date.now() + CHALLENGE_MS })).toString("base64url");

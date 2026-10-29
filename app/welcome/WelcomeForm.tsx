@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { markSignedIn } from "@/app/components/MemberFaceId";
 
 export default function WelcomeForm({ t, email }: { t: string; email: string }) {
   const [pw, setPw] = useState("");
@@ -21,6 +22,7 @@ export default function WelcomeForm({ t, email }: { t: string; email: string }) 
     setBusy(false);
     if (!r.ok) return setError(d.error || "Something went wrong — please try again.");
     setDone(true);
+    markSignedIn("link");
     setTimeout(() => window.location.assign("/gallery"), 1200);
   }
 

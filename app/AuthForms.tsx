@@ -2,36 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { browserSupportsWebAuthn, platformAuthenticatorIsAvailable, startAuthentication } from "@simplewebauthn/browser";
 import { track } from "@/lib/track";
 import { brand } from "@/lib/brand";
+import { unlockName } from "@/lib/unlockName";
+import { FaceIdIcon, markSignedIn } from "@/app/components/MemberFaceId";
 
 type Mode = "signin" | "signup" | "forgot" | "code" | "firsttime";
 
-export default function AuthForms({ codeLogin = false, staffLink = false }: { codeLogin?: boolean; staffLink?: boolean }) {
+export default function AuthForms({ codeLogin = false, staffLink = false, faceId = false }: { codeLogin?: boolean; staffLink?: boolean; faceId?: boolean }) {
   const [mode, setMode] = useState<Mode>("signin");
   // The email typed on the password form carries over to "Email me a code".
   const [typedEmail, setTypedEmail] = useState("");
 
   return (
-    <div>
-      <div className="tabs">
+    <div className="auth">
+      <div className="auth-tabs" role="tablist">
         <button
-          className={`tab ${mode === "signin" || mode === "code" ? "active" : ""}`}
+          className={`auth-tab ${mode !== "signup" ? "active" : ""}`}
           onClick={() => setMode("signin")}
           type="button"
+          role="tab"
+          aria-selected={mode !== "signup"}
         >
           Sign in
         </button>
         <button
-          className={`tab ${mode === "signup" ? "active" : ""}`}
+          className={`auth-tab ${mode === "signup" ? "active" : ""}`}
           onClick={() => setMode("signup")}
           type="button"
+          role="tab"
+          aria-selected={mode === "signup"}
         >
           Join {brand.members}
         </button>
       </div>
 
-      {mode === "signin" && <SignInForm staffLink={staffLink} onForgot={() => setMode("forgot")} onCode={codeLogin ? (email: string) => { setTypedEmail(email); setMode("code"); } : undefined} onFirstTime={() => setMode("firsttime")} />}
+      {mode === "signin" && <SignInForm faceId={faceId} staffLink={staffLink} onForgot={() => setMode("forgot")} onCode={codeLogin ? (email: string) => { setTypedEmail(email); setMode("code"); } : undefined} onFirstTime={() => setMode("firsttime")} />}
       {mode === "firsttime" && <FirstTimeForm onBack={() => setMode("signin")} />}
       {mode === "code" && <CodeSignInForm initialEmail={typedEmail} onBack={() => setMode("signin")} />}
       {mode === "signup" && <SignUpForm />}
@@ -79,6 +86,7 @@ function CodeSignInForm({ onBack, initialEmail = "" }: { onBack: () => void; ini
       body: JSON.stringify({ action: "verify", email, code }),
     });
     if (res.ok) {
+      markSignedIn("code");
       router.push("/gallery");
       router.refresh();
       return;
@@ -133,10 +141,54 @@ function CodeSignInForm({ onBack, initialEmail = "" }: { onBack: () => void; ini
   );
 }
 
-function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false }: { onForgot: () => void; onCode?: (email: string) => void; onFirstTime?: () => void; staffLink?: boolean }) {
+function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId = false }: { onForgot: () => void; onCode?: (email: string) => void; onFirstTime?: () => void; staffLink?: boolean; faceId?: boolean }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  // Face ID / Touch ID: only on devices that have one built in.
+  const [unlock, setUnlock] = useState<string | null>(null);
+  useEffect(() => {
+    if (!faceId || !browserSupportsWebAuthn()) return;
+    let live = true;
+    platformAuthenticatorIsAvailable()
+      .then((yes) => live && yes && setUnlock(unlockName()))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [faceId]);
+
+  async function signInWithFaceId() {
+    if (!unlock) return;
+    setLoading(true);
+    setError("");
+    try {
+      const o = await fetch("/api/login/member-passkey", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "options" }) });
+      const { options } = await o.json();
+      if (!o.ok || !options) throw new Error();
+      const response = await startAuthentication({ optionsJSON: options });
+      const v = await fetch("/api/login/member-passkey", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", response }) });
+      if (v.ok) {
+        markSignedIn("passkey");
+        router.push("/gallery");
+        router.refresh();
+        return;
+      }
+      const d = await v.json().catch(() => ({}));
+      setError(
+        d.error === "pending"
+          ? "Your request is still being reviewed. We will be in touch soon."
+          : d.error === "rejected"
+            ? "This account is not currently active. Please reach out if you have questions."
+            : d.error || "That didn't work. Sign in with your email and password instead."
+      );
+    } catch (err) {
+      const n = (err as { name?: string })?.name;
+      setError(n === "NotAllowedError" ? `Cancelled, or ${unlock} isn't set up on this device yet. Sign in with your email below and we'll offer to set it up.` : `${unlock} isn't available here. Sign in with your email below.`);
+    }
+    setLoading(false);
+  }
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   // Staff email typed? Then no password box — just the same dashboard sign-in
@@ -189,6 +241,7 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false }: { onFo
     });
 
     if (res.ok) {
+      markSignedIn("password");
       router.push("/gallery");
       router.refresh();
       return;
@@ -216,48 +269,60 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false }: { onFo
     );
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="auth-form">
+      {unlock && !staff && (
+        <>
+          <button type="button" className="gate-button auth-faceid" onClick={signInWithFaceId} disabled={loading}>
+            <FaceIdIcon unlock={unlock} />
+            {loading ? "Checking…" : `Sign in with ${unlock}`}
+          </button>
+          <div className="auth-or"><span>or with your email</span></div>
+        </>
+      )}
       <input
         type="email"
         className="gate-input"
         placeholder="Email"
+        aria-label="Email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         autoComplete="email"
         required
       />
       {!staff && (
-        <input
-          type="password"
-          className="gate-input"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          required
-          style={{ marginTop: "0.5rem" }}
-        />
-      )}
-      <button type="submit" className="gate-button" disabled={loading}>
-        {staff ? (loading ? "Sending…" : "Email me a dashboard sign-in link") : loading ? "Signing in..." : "Sign in"}
-      </button>
-      {error && <div className="gate-error">{error}</div>}
-      <div className="gate-forgot-row">
-        <button type="button" onClick={onForgot} className="gate-forgot">
-          Forgot password?
-        </button>
-        {onCode && !staff && (
-          <button type="button" onClick={() => onCode(email)} className="gate-forgot" style={{ marginLeft: "1rem" }}>
-            Email me a code instead
-          </button>
-        )}
-      </div>
-      {onFirstTime && (
-        <div className="gate-forgot-row" style={{ marginTop: "0.35rem" }}>
-          <button type="button" onClick={onFirstTime} className="gate-forgot">
-            First time here since our old shop? Email me a link
+        <div className="auth-pw">
+          <input
+            type={showPw ? "text" : "password"}
+            className="gate-input"
+            placeholder="Password"
+            aria-label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+          <button type="button" className="auth-eye" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Hide password" : "Show password"}>
+            {showPw ? "Hide" : "Show"}
           </button>
         </div>
+      )}
+      {!staff && (
+        <div className="auth-links">
+          <button type="button" onClick={onForgot} className="auth-link">Forgot password?</button>
+          {onCode && (
+            <button type="button" onClick={() => onCode(email)} className="auth-link">Email me a code instead</button>
+          )}
+        </div>
+      )}
+      <button type="submit" className={`gate-button${unlock && !staff ? " auth-secondary" : ""}`} disabled={loading}>
+        {staff ? (loading ? "Sending…" : "Email me a dashboard sign-in link") : loading ? "Signing in…" : "Sign in"}
+      </button>
+      {error && <div className="gate-error">{error}</div>}
+      {onFirstTime && !staff && (
+        <button type="button" onClick={onFirstTime} className="auth-oldshop">
+          <span><strong>Shopped with us before?</strong> Your account is already here. Set your password</span>
+          <span aria-hidden="true">→</span>
+        </button>
       )}
     </form>
   );
@@ -441,6 +506,7 @@ function SignUpForm() {
 
   return (
     <form onSubmit={handleSubmit}>
+      <p className="auth-hint">Request access to the members&rsquo; shop. We review every request personally, usually within 24 hours.</p>
       <input
         type="text"
         className="gate-input"

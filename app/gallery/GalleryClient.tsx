@@ -16,6 +16,7 @@ import { track, sessionCampaign } from "@/lib/track";
 import { AskAboutProduct, AskAssistantLink } from "@/app/components/assistant/AskAssistant";
 import { brand } from "@/lib/brand";
 import StoreHint from "@/app/components/StoreHint";
+import { FaceIdDevices, FaceIdIcon, FaceIdPrompt, useFaceIdPrompt } from "@/app/components/MemberFaceId";
 
 // ------------------------------------------------------------------
 // Cart — persisted in localStorage so it survives refreshes.
@@ -139,6 +140,7 @@ export default function GalleryClient({
   isAdminPreview = false,
   actingAs,
   stores = false,
+  faceId = false,
 }: {
   products: Product[];
   userName: string;
@@ -148,6 +150,8 @@ export default function GalleryClient({
   actingAs?: string;
   /** Store locator switch is on: show "Find us in stores". */
   stores?: boolean;
+  /** member_passkeys switch: Face ID popup after sign-in + Account → Face ID. */
+  faceId?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -234,6 +238,13 @@ export default function GalleryClient({
       return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [isAdminPreview]);
+
+  // Face ID: offer it once the entrance has played (never to staff "Log in as" or previews).
+  const [settled, setSettled] = useState(false);
+  useEffect(() => setSettled(true), []);
+  const faceIdOn = faceId && !isAdminPreview && !actingAs;
+  const faceIdPrompt = useFaceIdPrompt({ email: userEmail, enabled: faceIdOn, ready: settled && !entering });
+  const [faceIdOpen, setFaceIdOpen] = useState(false);
 
   // Lock body scroll while any modal or the cart drawer is open,
   // so scrolling stays inside the overlay content.
@@ -558,6 +569,11 @@ export default function GalleryClient({
                     <button onClick={() => { setMenuOpen(false); openPwModal(); }}>
                       <Icon name="key" /> Change password
                     </button>
+                    {faceIdOn && (
+                      <button onClick={() => { setMenuOpen(false); setFaceIdOpen(true); }}>
+                        <FaceIdIcon unlock="Face ID" size={18} /> Face ID &amp; Touch ID
+                      </button>
+                    )}
                     <div className="account-dropdown-rule" />
                     <button className="account-signout" onClick={handleLogout}>
                       <Icon name="signout" /> Sign out
@@ -998,6 +1014,22 @@ export default function GalleryClient({
       )}
 
       {/* Password change modal */}
+      {faceIdPrompt.show && !faceIdOpen && <FaceIdPrompt email={userEmail} onClose={faceIdPrompt.close} />}
+      {faceIdOpen && (
+        <div className="history-backdrop" onClick={() => setFaceIdOpen(false)}>
+          <div className="history-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="history-close" onClick={() => setFaceIdOpen(false)} aria-label="Close">×</button>
+            <div className="history-header">
+              <div className="history-kicker">Face ID &amp; Touch ID</div>
+              <h2 className="history-name">{userName}</h2>
+              <div className="history-email">{userEmail}</div>
+            </div>
+            <div className="history-body">
+              <FaceIdDevices email={userEmail} />
+            </div>
+          </div>
+        </div>
+      )}
       {pwOpen && (
         <div className="history-backdrop" onClick={() => setPwOpen(false)}>
           <div className="history-modal" onClick={(e) => e.stopPropagation()}>

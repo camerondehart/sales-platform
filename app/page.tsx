@@ -36,19 +36,12 @@ export default async function Home() {
           <span></span>
         </div>
         <p className="gate-subtitle">
-          A private companion to {brand.name}. Sign in to explore our member collection, or request access below.
+          The members&rsquo; shop for {brand.name}. Sign in, or join to request access.
         </p>
-
-        {/* Prominent warning message – now naturally wider */}
-        <div className="gate-notice">
-          <strong>🌿 Welcome to our new home!</strong><br />
-          <strong>Shopped with us before?</strong> Your account is already here — tap <strong>“First time here since our old shop? Email me a link”</strong> below to set your password.<br />
-          New here? Choose <strong>“Join {brand.members}”</strong> to request access. Approval usually takes less than 24 hours.
-        </div>
-
         <AuthForms
           codeLogin={await isEnabled("email_code_login").catch(() => false)}
           staffLink={await isEnabled("admin_magic_link").catch(() => false)}
+          faceId={await isEnabled("member_passkeys").catch(() => false)}
         />
         {shopProducts.length > 0 ? (
           <a className="scroll-cue" href="#shop" aria-label="Scroll down to our shop, open to everyone">
