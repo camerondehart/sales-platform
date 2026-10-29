@@ -5,7 +5,7 @@ import { getInsights, money } from "../analytics";
 import { getDiscounts, normalizeCode } from "../discounts";
 import { requestPasswordReset } from "../passwordReset";
 import { escapeHtml } from "../invoiceEmail";
-import { effectivePrice, formatMoney, lineDiscount, onSale, parsePrice, promoLabel } from "../pricing";
+import { asCash, cashDeal, effectivePrice, formatMoney, lineDiscount, onSale, parsePrice, promoLabel } from "../pricing";
 import { isExternal, isInternal, type Product } from "../storage";
 import { getSettings } from "../settings";
 import { getBanner } from "../banner";
@@ -34,13 +34,20 @@ import {
   TZ,
 } from "./knowledge";
 import type { ActionProposal, Audience, CampaignDraft, ChatMessage } from "./shared";
-import { SUPPORT_EMAIL } from "./shared";
+import { PHOTO_SLOT, SUPPORT_EMAIL } from "./shared";
 import { ADMIN_EXTRA_DEFS, runAdminExtra } from "./adminActions";
+import { AMBASSADOR_DEFS, runAmbassadorTool } from "./ambassadorTools";
 import { resolveSegment, SEGMENT_KEYS } from "../segments";
 import { recipientsFor } from "../campaignSchedule";
 import { splitChased, CHASE_QUIET_DAYS } from "../chased";
 import { isEnabled } from "../flags";
 import { liveBundles } from "../bundleStore";
+import { applyStockFlag, getStock } from "@/lib/stock";
+import { backorders } from "@/lib/stockMath";
+import { inbox as venmoInbox } from "@/lib/venmoInbox";
+import { cachedPublicStores } from "../storesCache";
+import { cleanStore, getStores } from "@/lib/stores";
+import { geocodeCached, milesBetween } from "../geocode";
 import { bundleOfferLabel } from "../bundles";
 import { brand } from "@/lib/brand";
 
@@ -92,6 +99,15 @@ const DEFS: ToolDef[] = [
       name: "list_upcoming_events",
       description: "Upcoming published classes and events with dates, location, price and description.",
       parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    audiences: ["public", "member", "admin"],
+    type: "function",
+    function: {
+      name: "find_stores",
+      description: `Shops that carry ${brand.shortName} in person (read-only). Use for 'where can I buy this in person / near me'. near = a city, zip or place the customer gave; product = a product name (or id) to only list stores that carry it. Point them to /stores for the map.`,
+      parameters: { type: "object", properties: { near: str("City, zip or place (optional)"), product: str("Product name or id (optional)") } },
     },
   },
   // ---------------------------------------------------------- customers
@@ -301,8 +317,68 @@ const DEFS: ToolDef[] = [
     audiences: ["admin"],
     type: "function",
     function: {
+      name: "propose_store",
+      description: `Prepare adding a shop that carries ${brand.shortName} to the store map (Settings → Store locations). Staff must confirm. One card per store — for a pasted list, call this once per store. Put the suite/unit in street (e.g. \"1920 Market Pl, Ste 120\"). Stores marked pending/coming soon: hidden=true (saved but not shown until staff switch them on); a hidden one may have just a city if the street isn't known yet. The pin comes from the address when it's saved.`,
+      parameters: {
+        type: "object",
+        properties: {
+          name: str("Store name"),
+          street: str("Street address, including suite"),
+          city: str("City"),
+          state: str("State, e.g. CA"),
+          zip: str("Zip code"),
+          phone: str("Phone (optional)"),
+          website: str("Website (optional)"),
+          hours: str("Opening hours (optional)"),
+          notes: str("Note shown to customers (optional)"),
+          products: { type: "array", items: { type: "string" }, description: "Product names it carries (optional)" },
+          hidden: { type: "boolean", description: "true = save but don't show yet (pending)" },
+        },
+        required: ["name", "city"],
+      },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
+      name: "propose_stock_count",
+      description: "Prepare setting a product's stock count (Products → Stock counts), e.g. when new stock arrives. Staff must confirm. One card per product. count = how many are on the shelf now (0 or more).",
+      parameters: {
+        type: "object",
+        properties: { product_id: str("Product id"), count: { type: "number", description: "New on-hand count" } },
+        required: ["product_id", "count"],
+      },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
+      name: "venmo_payments",
+      description: "Read-only: Venmo payments from the Venmo inbox (forwarded “paid you” emails), with the unpaid order each one matches (strong = #ref in the note, medium = same amount + name, weak = amount only). Quarantined ones failed the security check and can't be matched.",
+      parameters: { type: "object", properties: { show: str("Which", { enum: ["to_sort", "all"] }) } },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
+      name: "propose_venmo_payment",
+      description: "Prepare marking an unpaid order PAID from a Venmo payment in the Venmo inbox. Staff must confirm. One card per payment. Get ids from venmo_payments (or the Today item).",
+      parameters: {
+        type: "object",
+        properties: { payment_id: str("Venmo payment id (vt_… or vm_…)"), order_id: str("Order id") },
+        required: ["payment_id", "order_id"],
+      },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
       name: "propose_order_status",
-      description: "Prepare changing an order's status (staff must confirm). Get the id from find_orders first.",
+      description: "Prepare changing an order's status, including CANCELLING an order (status cancelled → red card). Staff must confirm. Get the id from find_orders first. One card per order.",
       parameters: {
         type: "object",
         properties: {
@@ -345,6 +421,7 @@ const DEFS: ToolDef[] = [
           max_uses: { type: "number", description: "Total uses allowed; omit for unlimited" },
           expires_in_days: { type: "number", description: "Days until it expires; omit for never" },
           min_order: { type: "number", description: "Minimum order in dollars; omit for none" },
+          public_shop: { type: "boolean", description: "true = also works in the public shop (no account needed); default members only. Ambassadors' linked codes always work there." },
         },
         required: ["type", "value"],
       },
@@ -365,7 +442,7 @@ const DEFS: ToolDef[] = [
     function: {
       name: "propose_sale",
       description:
-        "Prepare putting products on sale or ending a sale (staff must confirm). Modes: percent_off (X% off), bogo (buy one, get one X% off), sale_price (a fixed sale price), end_sale (back to regular price). Sales don't end on their own.",
+        "Prepare putting products on sale or ending a sale (staff must confirm). Modes: percent_off (X% off), bogo (buy one, get one X% off), sale_price (a fixed sale price), end_sale (back to regular price). Sales don't end on their own. cash_pickup_only true = the sale applies only to Local pickup orders paid in cash (everyone else pays the regular price).",
       parameters: {
         type: "object",
         properties: {
@@ -373,6 +450,7 @@ const DEFS: ToolDef[] = [
           mode: str("What to do", { enum: ["percent_off", "bogo", "sale_price", "end_sale"] }),
           percent: { type: "number", description: "For percent_off and bogo: 1-99" },
           sale_price: { type: "number", description: "For sale_price: the sale price in dollars" },
+          cash_pickup_only: { type: "boolean", description: "true: only for Local pickup paid in cash. false: for everyone. Leave out to keep each product's current setting." },
         },
         required: ["product_ids", "mode"],
       },
@@ -549,6 +627,8 @@ const DEFS: ToolDef[] = [
           segment_days: { type: "number", description: "Group window in days (e.g. 60 for lapsed_members)" },
           segment_limit: { type: "number", description: "For top_customers: how many people" },
           segment_product: str("For bought_product: product id or name"),
+          use_photo: { type: "boolean", description: `true to put the photo the staff sent in this chat into the email. Put ${PHOTO_SLOT} on its own line in body where it should go (otherwise it goes at the top)` },
+          photo_alt: str("With use_photo: a short description of the photo (for people who can't see images)"),
         },
         required: ["subject", "body", "audience"],
       },
@@ -560,7 +640,7 @@ const DEFS: ToolDef[] = [
 const isActionTool = (name: string) => name.startsWith("propose_");
 
 export function toolsFor(audience: Audience, opts: { actions?: boolean } = {}): GatewayTool[] {
-  return [...DEFS, ...ADMIN_EXTRA_DEFS].filter((d) => d.audiences.includes(audience))
+  return [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS].filter((d) => d.audiences.includes(audience))
     .filter((d) => opts.actions !== false || !isActionTool(d.function.name))
     .map(({ type, function: fn }) => ({ type, function: fn }));
 }
@@ -681,6 +761,8 @@ const visibilityOf = (p: Product) => p.visibility || (p.retail ? "both" : "inter
 /** What a product would cost after a pricing change — same maths as checkout. */
 function previewPrice(p: Product, change: Partial<Product>): string {
   const next = { ...p, ...change };
+  // A cash-pickup-only sale shows its cash price (the card says it's cash pickup only).
+  if (next.cashOnly) return `${previewPrice(asCash(next), {})} cash pickup only (others ${next.price})`;
   const now = effectivePrice(next);
   const bogo = next.promo?.type === "bogo" ? ` · 2nd ${next.promo.percent}% off (2 for ${formatMoney(parsePrice(now) * 2 - lineDiscount(next, 2))})` : "";
   return `${now}${bogo}`;
@@ -718,7 +800,7 @@ type Result = Record<string, unknown> | string;
 
 export async function runTool(name: string, rawArgs: string, ctx: ToolContext): Promise<Result> {
   // Refuse anything not offered to this audience, whatever the model asks for.
-  const def = [...DEFS, ...ADMIN_EXTRA_DEFS].find((d) => d.function.name === name);
+  const def = [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS].find((d) => d.function.name === name);
   if (!def || !def.audiences.includes(ctx.audience)) return { error: `Tool ${name} is not available.` };
   if (ctx.allowActions === false && isActionTool(name)) {
     return { error: "Preparing changes is switched off right now (Settings → Feature switches). Explain how to do it in the dashboard instead." };
@@ -735,12 +817,61 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
   // The rest of the dashboard's actions live in adminActions.ts.
   const extra = await runAdminExtra(name, args, ctx);
   if (extra) return extra;
+  // Ambassadors: numbers, terms, payouts, progress reports (ambassadorTools.ts).
+  const amb = await runAmbassadorTool(name, args, ctx);
+  if (amb) return amb;
 
   switch (name) {
     // ------------------------------------------------ everyone
+    case "find_stores": {
+      if (!(await isEnabled("store_locator").catch(() => false))) return { available: false, note: "There's no in-store list on the site right now. Offer to pass the question to the team." };
+      let stores = await cachedPublicStores();
+      if (stores.length === 0) return { found: false, note: "No stores are listed yet." };
+      const want = s(args.product, 120);
+      let productName: string | undefined;
+      if (want) {
+        const visible = productsFor(ctx.audience, await cachedProducts());
+        const p = visible.find((x) => x.id === want) || findByName(visible, want)[0];
+        if (!p) return { found: false, note: "No product by that name in this catalog." };
+        productName = p.name;
+        stores = stores.filter((st) => (st.productIds || []).includes(p.id));
+        if (stores.length === 0) return { found: false, product: p.name, note: `No store lists ${p.name} yet. It can be ordered online.` };
+      }
+      const near = s(args.near, 120);
+      let ranked: Array<{ st: (typeof stores)[number]; miles?: number }> = stores.map((st) => ({ st }));
+      if (near) {
+        const n = near.toLowerCase();
+        const text = stores.filter((st) => [st.city, st.zip, st.state, st.name].some((f) => (f || "").toLowerCase().includes(n)));
+        if (text.length) ranked = text.map((st) => ({ st }));
+        else {
+          // Not a listed city/zip: look the place up (cached) and sort by distance.
+          const g = await geocodeCached(near);
+          if (g.point) {
+            ranked = stores
+              .filter((st) => typeof st.lat === "number" && typeof st.lng === "number")
+              .map((st) => ({ st, miles: Math.round(milesBetween(g.point!, { lat: st.lat!, lng: st.lng! }) * 10) / 10 }))
+              .sort((a, b) => a.miles! - b.miles!);
+          }
+        }
+      }
+      return {
+        found: true,
+        product: productName,
+        map: "/stores",
+        stores: ranked.slice(0, 5).map(({ st, miles }) => ({
+          name: st.name,
+          address: [st.street, [st.city, [st.state, st.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")].filter(Boolean).join(", "),
+          miles,
+          hours: st.hours,
+          phone: st.phone,
+          notes: st.notes,
+        })),
+        say: "Shops can sell out, so suggest calling ahead. Link /stores for the map and directions.",
+      };
+    }
     case "get_product_details": {
       const products = productsFor(ctx.audience, await cachedProducts());
-      const hits = findByName(products, s(args.name, 120)).slice(0, 3);
+      const hits = await applyStockFlag(findByName(products, s(args.name, 120)).slice(0, 3));
       if (hits.length === 0) return { found: false, note: "No product by that name in this catalog." };
       const where = ctx.audience === "member" ? "/gallery" : ctx.audience === "public" ? "/retail" : undefined;
       return {
@@ -752,7 +883,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           price: effectivePrice(p),
           regular_price: onSale(p) ? p.price : undefined,
           promotion: promoLabel(p) || undefined,
+          cash_pickup_deal: cashDeal(p) || undefined,
           bundle: p.isBundle || undefined,
+          availability: p.restocking ? "Currently restocking: it can still be ordered as usual and ships as soon as new stock arrives." : undefined,
           description: plainText(p.description, 1500),
           where_to_buy: where,
         })),
@@ -1064,6 +1197,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           price: effectivePrice(p),
           regular_price: onSale(p) ? p.price : undefined,
           promotion: promoLabel(p) || undefined,
+          cash_pickup_deal: cashDeal(p) || undefined,
         })),
       };
     }
@@ -1107,6 +1241,120 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       });
       return { proposed: true, say: "The card is ready for them to confirm. Nothing has changed yet." };
     }
+    case "propose_store": {
+      const input: Record<string, unknown> = {
+        name: s(args.name, 120), street: s(args.street, 160), city: s(args.city, 80), state: s(args.state, 40), zip: s(args.zip, 12),
+        phone: s(args.phone, 30), website: s(args.website, 300), hours: s(args.hours, 400), notes: s(args.notes, 400),
+        active: args.hidden !== true,
+      };
+      // A hidden (pending) store may wait for its street address; a live one needs it.
+      if (!input.street && input.active) return { error: `No street address for ${input.name || "that store"} — ask staff for it, or add it as hidden (pending) for now.` };
+      const c = cleanStore(input);
+      if (!c.ok) return { error: c.error };
+      const existing = (await getStores()).find((x) => x.name.toLowerCase() === c.value.name.toLowerCase() && x.city.toLowerCase() === c.value.city.toLowerCase());
+      if (existing) return { note: `${existing.name} (${existing.city}) is already on the map. Edit it in Settings → Store locations if anything changed.` };
+      const wanted = Array.isArray(args.products) ? args.products.map((x) => s(x, 120)).filter(Boolean).slice(0, 30) : [];
+      const all = await cachedProducts(true);
+      const productIds: string[] = [];
+      const missing: string[] = [];
+      for (const w of wanted) {
+        const hit = all.find((x) => x.id === w) || findByName(all, w)[0];
+        if (hit) productIds.push(hit.id);
+        else missing.push(w);
+      }
+      const addr = [c.value.street, c.value.city, [c.value.state, c.value.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+      ctx.actions.push({
+        id: newId(),
+        kind: "store_create",
+        title: `Add store: ${c.value.name}${input.active ? "" : " (hidden for now)"}`,
+        lines: [
+          addr,
+          [c.value.phone, c.value.website, c.value.hours].filter(Boolean).join(" · "),
+          productIds.length ? `Carries: ${productIds.map((id) => all.find((x) => x.id === id)?.name).join(", ")}` : "",
+          missing.length ? `Not found in the catalog (left off): ${missing.join(", ")}` : "",
+          input.active ? "Shows on the Find us in stores map once saved (the pin comes from the address)." : "Saved as Hidden: switch it on in Settings → Store locations when it's ready.",
+          input.street ? "" : "No street address yet: the pin goes in the middle of the city. Add the address before showing it.",
+        ].filter(Boolean),
+        confirmLabel: "Add store",
+        request: { method: "POST", url: "/api/admin/stores", body: { ...input, productIds } },
+        refresh: [],
+      });
+      return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+    }
+    case "propose_stock_count": {
+      const id = s(args.product_id, 80);
+      const n = Number(args.count);
+      if (!Number.isInteger(n) || n < 0 || n > 99999) return { error: "count must be a whole number from 0 up." };
+      const p = (await cachedProducts(true)).find((x) => x.id === id);
+      if (!p) return { error: "No product with that id. Use list_products first." };
+      if (p.isBundle) return { error: `${p.name} is a bundle: set the counts of the products in it.` };
+      const stock = await getStock();
+      const was = stock.has(id) ? stock.get(id)! : null;
+      const owed = backorders((await cachedOrders(true)).map((o) => ({ ...o, status: normalizeStatus(o.status) })), await cachedProducts()).get(id);
+      ctx.actions.push({
+        id: newId(),
+        kind: "stock_count",
+        title: `Stock count: ${p.name} → ${n}`,
+        lines: [
+          `Now: ${was === null ? "not counted" : `${was} in stock`} → ${n}`,
+          owed ? `${owed.units} on backorder across ${owed.orders} open order${owed.orders === 1 ? "" : "s"}: send those first, and count only what's left after.` : "",
+          n > 0 && (was === null || was <= 0) ? "The shop stops saying “Currently restocking”." : "",
+        ].filter(Boolean),
+        confirmLabel: "Set count",
+        request: { method: "PUT", url: "/api/admin/stock", body: { counts: { [id]: n } } },
+        refresh: ["products"],
+      });
+      return { proposed: true, say: "The card is ready for them to confirm. Nothing has changed yet." };
+    }
+    case "venmo_payments": {
+      if (!(await isEnabled("venmo_matching").catch(() => false))) return { available: false, note: "Venmo payment matching is switched off (Settings → Feature switches)." };
+      const { rows } = await venmoInbox();
+      const pick = String(args.show) === "all" ? rows : rows.filter((r) => r.state === "new");
+      return {
+        payments: pick.slice(0, 25).map((r) => ({
+          id: r.id,
+          received: fmtDate(r.receivedAt),
+          payer: r.payer,
+          amount: r.amount,
+          note: r.note,
+          status: !r.verified ? `quarantined: ${r.reason}` : r.state,
+          match: r.match ? { strength: r.match.strength, order_id: r.match.orderId, why: r.match.why, candidates: r.match.candidates.slice(0, 5) } : undefined,
+          confirmed_order: r.orderId,
+        })),
+        say: "Only strong and medium matches are suggestions. Weak ones need a person to pick the order in Orders → Venmo payments.",
+      };
+    }
+    case "propose_venmo_payment": {
+      const pid = s(args.payment_id, 80);
+      const oid = s(args.order_id, 80);
+      const { rows } = await venmoInbox();
+      const p = rows.find((r) => r.id === pid);
+      if (!p) return { error: "No Venmo payment with that id. Use venmo_payments first." };
+      if (!p.verified) return { error: `That email is quarantined (${p.reason}). It can't be matched.` };
+      if (p.state !== "new") return { note: `That payment is already ${p.state}.` };
+      const o = (await cachedOrders(true)).find((x) => x.id === oid);
+      if (!o) return { error: "No order with that id. Use find_orders first." };
+      if (normalizeStatus(o.status) !== "pending" || o.paidAt) return { note: `Order ${orderRef(o)} is already ${normalizeStatus(o.status)}.` };
+      const strength = p.match?.orderId === o.id ? p.match.strength : "picked by hand";
+      const differs = typeof p.amount === "number" && Math.abs(p.amount - o.total) >= 0.005;
+      ctx.actions.push({
+        id: newId(),
+        kind: "venmo_payment",
+        title: `Mark order ${orderRef(o)} paid (Venmo)`,
+        lines: [
+          `Venmo ${money(p.amount || 0)} from ${p.payer}${p.note ? ` · note “${p.note.slice(0, 80)}”` : ""}`,
+          `Order ${orderRef(o)} · ${o.userName} · ${money(o.total)} · placed ${fmtDate(o.createdAt)}`,
+          `Match: ${strength}${p.match?.orderId === o.id ? ` (${p.match.why})` : ""}`,
+          differs ? `⚠ The amounts differ (paid ${money(p.amount || 0)}, order ${money(o.total)}). Check before confirming.` : "",
+          "Loyalty points are awarded as usual. Payment reminders stop.",
+        ].filter(Boolean),
+        confirmLabel: "Mark paid",
+        danger: differs,
+        request: { method: "POST", url: "/api/admin/venmo", body: { action: "confirm", paymentId: p.id, orderId: o.id } },
+        refresh: ["orders"],
+      });
+      return { proposed: true, say: "The card is ready for them to confirm. Nothing has changed yet." };
+    }
     case "propose_order_status": {
       const id = s(args.order_id, 80);
       const allowed = ["pending", "paid", "completed", "cancelled"];
@@ -1115,22 +1363,37 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const o = (await cachedOrders(true)).find((x) => x.id === id);
       if (!o) return { error: "No order with that id. Use find_orders first." };
       if (normalizeStatus(o.status) === status) return { note: `Order ${orderRef(o)} is already ${status}.` };
+      const cancelling = status === "cancelled";
+      const was = normalizeStatus(o.status);
+      const wasPaid = !!o.paidAt || was === "paid" || was === "completed";
       ctx.actions.push({
         id: newId(),
         kind: "order_status",
-        title: `Mark order ${orderRef(o)} as ${status}`,
+        title: cancelling ? `Cancel order ${orderRef(o)}` : `Mark order ${orderRef(o)} as ${status}`,
         lines: [
           `${o.userName} · ${o.userEmail}`,
           `${money(o.total)} · ${o.items.map((i) => `${i.productName} ×${i.quantity}`).join(", ")}`,
-          `Currently ${normalizeStatus(o.status)} · placed ${fmtDate(o.createdAt)}`,
+          `Currently ${was}${o.expiredAt && was === "pending" ? " (expired)" : ""} · placed ${fmtDate(o.createdAt)}`,
           status === "paid" || status === "completed" ? "Loyalty points are awarded as usual." : "",
+          // Cancelling only changes the status: say plainly what it does and doesn't do.
+          cancelling && !wasPaid ? "Unpaid: it leaves Pending payment and its payment reminders stop." : "",
+          cancelling && wasPaid ? "Already paid: refund them yourself (Venmo, Zelle or cash). The site doesn't move money." : "",
+          cancelling && o.loyaltyPointsEarned ? `The ${o.loyaltyPointsEarned} loyalty points they earned on it stay on their account.` : "",
+          cancelling && o.stockTaken?.length && !o.stockReturnedAt ? "Its items go back into Stock counts." : "",
+          cancelling ? "The customer isn't emailed. Ask me for a note to them if they should know." : "",
+          cancelling ? "You can undo it later by setting the order's status back in Orders." : "",
         ].filter(Boolean),
-        confirmLabel: `Mark ${status}`,
-        danger: status === "cancelled",
+        confirmLabel: cancelling ? "Cancel order" : `Mark ${status}`,
+        danger: cancelling,
         request: { method: "PATCH", url: "/api/admin/orders", body: { id: o.id, status } },
         refresh: ["orders"],
       });
-      return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+      return {
+        proposed: true,
+        say: cancelling
+          ? "The cancel card is ready for them to confirm. Nothing has changed yet. The customer isn't told automatically: offer to prepare a short note to them (propose_order_message)."
+          : "Ready to confirm. Nothing has changed yet.",
+      };
     }
     case "propose_product_visibility": {
       const ids = Array.isArray(args.product_ids) ? args.product_ids.map((x) => s(x, 80)).filter(Boolean).slice(0, 50) : [];
@@ -1166,7 +1429,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const expiresAt = Number.isFinite(days) && days > 0 ? Date.now() + Math.round(days) * 86_400_000 : undefined;
       const maxUses = Number(args.max_uses) > 0 ? Math.floor(Number(args.max_uses)) : undefined;
       const minOrder = Number(args.min_order) > 0 ? Number(args.min_order) : undefined;
-      const body = { code, type, value, label: s(args.label, 80) || undefined, maxUses, expiresAt, minOrderAmount: minOrder, active: true };
+      const body = { code, type, value, label: s(args.label, 80) || undefined, maxUses, expiresAt, minOrderAmount: minOrder, publicShop: args.public_shop === true || undefined, active: true };
       ctx.actions.push({
         id: newId(),
         kind: "discount_code",
@@ -1176,6 +1439,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           expiresAt ? `Expires ${new Date(expiresAt).toLocaleDateString("en-US", { timeZone: TZ })}` : "No expiry",
           minOrder ? `Minimum order ${money(minOrder)}` : "",
           body.label ? `Note: ${body.label}` : "",
+          body.publicShop ? "Works in the public shop too" : "Members only",
         ].filter(Boolean),
         confirmLabel: "Create code",
         request: { method: "POST", url: "/api/admin/discounts", body },
@@ -1234,8 +1498,17 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         change = () => ({ salePrice: undefined, promo: undefined });
         title = "End sale";
       }
+      // Cash pickup only (or not): sent with the sale; left out = each product keeps its setting.
+      if (mode !== "end_sale" && typeof args.cash_pickup_only === "boolean") {
+        const cashOnly = args.cash_pickup_only;
+        pricing = { ...pricing, cashOnly };
+        const base = change;
+        change = (p) => ({ ...base(p), cashOnly: cashOnly || undefined });
+        title += cashOnly ? " (cash pickup only)" : "";
+      }
       const lines = products.slice(0, 10).map((p) => `${p.name}: ${previewPrice(p, {})} → ${previewPrice(p, change(p))}`);
       if (products.length > 10) lines.push(`…and ${products.length - 10} more`);
+      if (mode !== "end_sale" && products.some((p) => ({ ...p, ...change(p) }).cashOnly)) lines.push("Cash pickup only: shipped and invoiced orders pay the regular price.");
       if (mode !== "end_sale") lines.push("Shows on the site right away. It stays on until you end it.");
       ctx.actions.push({
         id: newId(),
@@ -1523,7 +1796,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         });
       // Orders chased in the last few days (staff message, invoice resend or an
       // automatic reminder) are left alone so they don't come back every morning.
-      const { toChase: overdue, quiet } = await splitChased(unpaid.filter((o) => now - o.createdAt > 2 * DAY), now);
+      // Expired orders are left out: the automatic reminders already gave up on
+      // them, so they belong in "close out" (cancel or revive), not another nudge.
+      const { toChase: overdue, quiet } = await splitChased(unpaid.filter((o) => !o.expiredAt && now - o.createdAt > 2 * DAY), now);
       if (overdue.length)
         tasks.push({
           priority: overdue.some((o) => now - o.createdAt > 7 * DAY) ? "now" : "today",
@@ -1652,7 +1927,18 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
     }
     case "prepare_campaign_draft": {
       const subject = s(args.subject, 150);
-      const body = s(args.body, 8000);
+      let body = s(args.body, 8000);
+      // The photo staff sent in this chat (the widget still has it and uploads it when the draft opens).
+      let photo: CampaignDraft["photo"];
+      if (args.use_photo === true) {
+        if (!ctx.transcript.some((m) => m.role === "user" && m.content.startsWith("[Photo]"))) {
+          return { error: "There's no photo in this chat. Ask them to attach it with the camera button, or to use Upload photo in the composer." };
+        }
+        if (!body.includes(PHOTO_SLOT)) body = `${PHOTO_SLOT}\n\n${body}`;
+        photo = { alt: s(args.photo_alt, 120) || "Photo" };
+      } else {
+        body = body.split(PHOTO_SLOT).join("");
+      }
       const audience = args.audience === "members" || args.audience === "nonmembers" || args.audience === "all" ? args.audience : "subscribers";
       if (!subject || !body) return { error: "Need a subject and a body." };
       if (s(args.segment, 40)) {
@@ -1660,7 +1946,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         if ("error" in g) return g;
         if (g.emails.length === 0) return { error: `Nobody is in the group "${g.label}" right now.` };
         const reach = (await recipientsFor("custom", g.emails)).length;
-        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label };
+        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label, ...(photo ? { photo } : {}) };
         return {
           ok: true,
           group: g.label,
@@ -1669,8 +1955,8 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           say: `The draft is shown with a button to open it in the campaign composer, addressed to ${g.label} (${reach} of the ${g.emails.length} in the group will get it). It has NOT been sent.${reach < g.emails.length ? " Mention briefly that the rest have unsubscribed or aren't members/subscribers, so personal notes are the way to reach them." : ""}`,
         };
       }
-      ctx.draft = { subject, body, audience };
-      return { ok: true, say: "The draft is shown with a button to open it in the campaign composer. It has NOT been sent." };
+      ctx.draft = { subject, body, audience, ...(photo ? { photo } : {}) };
+      return { ok: true, say: `The draft is shown with a button to open it in the campaign composer${photo ? ", which adds their photo" : ""}. It has NOT been sent.` };
     }
   }
   return { error: `Unknown tool ${name}` };

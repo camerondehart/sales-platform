@@ -58,6 +58,7 @@ async function POST_handler(req: Request) {
     price: body.price,
     salePrice: body.salePrice?.trim() || undefined,
     promo: cleanPromo(body.promo),
+    cashOnly: body.cashOnly === true || undefined,
     visibility: cleanVisibility(body.visibility),
     isBundle: !!body.isBundle,
     bundleProducts: Array.isArray(body.bundleProducts) ? body.bundleProducts : undefined,
@@ -104,7 +105,7 @@ async function PATCH_handler(req: Request) {
     direction?: "up" | "down";
     ids?: string[];
     visibility?: string;
-    pricing?: { mode?: string; percent?: number; salePrice?: string | number };
+    pricing?: { mode?: string; percent?: number; salePrice?: string | number; cashOnly?: boolean };
     /** Shipping weights: product id → ounces (0 or null clears it). */
     weights?: Record<string, unknown>;
   };
@@ -151,20 +152,26 @@ async function PATCH_handler(req: Request) {
       const salePrice = formatMoney(Math.round(amount * 100) / 100);
       changesFor = (p) => ({ salePrice, promo: p.promo?.type === "bogo" ? p.promo : undefined });
     } else if (mode === "clear") {
-      changesFor = () => ({ salePrice: undefined, promo: undefined });
+      changesFor = () => ({ salePrice: undefined, promo: undefined, cashOnly: undefined });
     } else {
       return NextResponse.json({ error: "Unknown pricing mode." }, { status: 400 });
     }
-    const was: Array<{ id: string; name: string; salePrice?: string; promo?: Promo }> = [];
+    // "Cash pickup only" sent with a sale: the sale applies to Local pickup + cash orders only.
+    if (mode !== "clear" && typeof body.pricing.cashOnly === "boolean") {
+      const base = changesFor;
+      const cashOnly = body.pricing.cashOnly || undefined;
+      changesFor = (p) => ({ ...base(p), cashOnly });
+    }
+    const was: Array<{ id: string; name: string; salePrice?: string; promo?: Promo; cashOnly?: boolean }> = [];
     const updated = await updateProducts(ids, (p) => {
-      was.push({ id: p.id, name: p.name, salePrice: p.salePrice, promo: p.promo });
+      was.push({ id: p.id, name: p.name, salePrice: p.salePrice, promo: p.promo, cashOnly: p.cashOnly });
       return changesFor(p);
     });
     if (updated.length === 0) return NextResponse.json({ error: "not_found" }, { status: 404 });
     auditDetail({
       action: `product.pricing_${mode}`,
       before: was,
-      after: updated.map((p) => ({ id: p.id, name: p.name, salePrice: p.salePrice, promo: p.promo })),
+      after: updated.map((p) => ({ id: p.id, name: p.name, salePrice: p.salePrice, promo: p.promo, cashOnly: p.cashOnly })),
     });
     return NextResponse.json({ ok: true, products: updated });
   }
@@ -224,6 +231,8 @@ async function PUT_handler(req: Request) {
     price: body.price,
     salePrice: body.salePrice?.trim() || undefined,
     promo: cleanPromo(body.promo),
+    // Sale only for Local pickup + cash. Only when sent (older callers don't know about it).
+    ...(body.cashOnly !== undefined ? { cashOnly: body.cashOnly === true || undefined } : {}),
     visibility: cleanVisibility(body.visibility),
     isBundle: !!body.isBundle,
     // Only change these when the request includes them: the dashboard's edit

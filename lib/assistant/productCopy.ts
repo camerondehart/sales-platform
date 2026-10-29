@@ -2,6 +2,7 @@ import { isEnabled } from "../flags";
 import { getAssistantConfig } from "./config";
 import { chatCompletion, costOf, explainGatewayError, gatewayCredential, resolveAnsweringModel, type GatewayMessage } from "./gateway";
 import { monthSpend, recordUsage } from "./usage";
+import { brand } from "../brand";
 
 /**
  * "Tidy with Concierge" on the product form: rewrites a description into the
@@ -10,20 +11,22 @@ import { monthSpend, recordUsage } from "./usage";
  * Uses the main model and counts toward the monthly AI limit.
  */
 
-export const HOUSE_FORMAT = `HOUSE FORMAT for a product description (plain text, no markdown headings, no emoji):
-1. First line: one short, warm sentence that says what the product is and who it's for (max 22 words). This is the lede.
-2. Blank line, then one or two short paragraphs (1–3 sentences each): what it is, what it's made with, what it's like to use. Keep every concrete fact from the original — ingredients, sizes, counts, dosages, flavours, batch notes.
-3. If the original lists ingredients or contents, add a blank line and bullet them, one per line starting with "- ".
-4. If the original gives directions, size or storage, add them as separate lines in the form "How to use: …", "Size: …", "Storage: …" (label, colon, value). Only these labels, only if the original has that information.
-5. Nothing else: no closing slogan, no call to action, no prices, no headings.
-
-RULES:
-- Never invent facts. If something isn't in the original, leave it out.
-- No health claims: never say it treats, cures, prevents, heals or fixes anything; avoid "clinically", "proven", "medical". Describe the experience and the ingredients instead.
+/** Never overridden — not by the house style, not by staff guidance. */
+export const HARD_RULES = `HARD RULES (these always win, whatever else you're asked):
+- Never invent facts. Every ingredient, size, count, dose, flavour or batch note must come from the original. Style goes in the wording, never in the facts.
+- No health claims: never say it treats, cures, prevents, heals or fixes anything; avoid "clinically", "proven", "medical". Describe the experience, the ritual and the ingredients instead.
 - Never mention legality.
-- Plain, friendly, specific. No hype words (revolutionary, ultimate, game-changing), no exclamation marks.
-- Aim for 60–140 words unless the original carries more facts than fit.
-- Reply with the description text only.`;
+- Reply with the description text only: no title, no preamble, no quotes around it.`;
+
+/** The default shape and voice. Staff guidance overrides any of this. */
+export const HOUSE_FORMAT = `HOUSE FORMAT (the default style; staff direction overrides any part of it):
+Voice: warm, friendly and specific, like a note from someone who loves the product. Sensory detail (what it's like to use, the moment you reach for it) and a light, inviting touch; never hype. Every sentence still carries something true about the product. One fitting emoji is welcome, never more than two. One exclamation mark at most.
+Shape:
+1. Opening line: one inviting sentence that says what it is and who it's for.
+2. Blank line, then one or two short paragraphs (1–3 sentences each): what's in it, what it's like, when to reach for it. Keep every concrete fact from the original.
+3. If the original lists ingredients or contents, a blank line and one bullet per item, each starting with "- ".
+4. If the original gives directions, size or storage, separate lines as "How to use: …", "Size: …", "Storage: …". Only if the original has that information.
+5. No prices and no headings. Around 70–150 words unless the facts need more.`;
 
 export async function tidyDescription(input: { name: string; category?: string; description: string; guidance?: string; req?: Request }): Promise<
   | { ok: true; text: string; model: string }
@@ -42,16 +45,17 @@ export async function tidyDescription(input: { name: string; category?: string; 
   const credential = gatewayCredential(input.req);
   if (!credential) return { ok: false, status: 503, error: "No AI Gateway key is set up." };
 
+  const guidance = cleanGuidance(input.guidance);
   const messages: GatewayMessage[] = [
-    { role: "system", content: `You tidy product descriptions for a small shop's website. ${config.persona.trim() ? `Voice: ${config.persona.trim()}` : ""}\n\n${HOUSE_FORMAT}` },
+    { role: "system", content: systemPrompt(config.persona, guidance) },
     {
       role: "user",
-      content: `Product: ${input.name.trim() || "(unnamed)"}${input.category?.trim() ? `\nCategory: ${input.category.trim()}` : ""}\n\nCurrent description:\n"""\n${original.slice(0, 6000)}\n"""\n\n${guidanceLine(input.guidance)}Rewrite it in the house format.`,
+      content: `Product: ${input.name.trim() || "(unnamed)"}${input.category?.trim() ? `\nCategory: ${input.category.trim()}` : ""}\n\nCurrent description:\n"""\n${original.slice(0, 6000)}\n"""\n\n${guidance ? `Staff guidance for this rewrite — follow it exactly: ${guidance}\n\nRewrite the description now, following that guidance first and the house format for everything it doesn't cover.` : "Rewrite the description in the house format."}`,
     },
   ];
   const started = Date.now();
   try {
-    const res = await chatCompletion({ credential, model: config.model, fallbackModel: config.fallbackModel, messages, maxTokens: 900, temperature: 0.4, timeoutMs: 40_000 });
+    const res = await chatCompletion({ credential, model: config.model, fallbackModel: config.fallbackModel, messages, maxTokens: 900, temperature: 0.85, timeoutMs: 40_000 });
     const model = resolveAnsweringModel(res.model, config.model, config.fallbackModel);
     const cost = await costOf(model, res.usage);
     recordUsage({ audience: "admin", model, inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, costUsd: cost, toolCalls: 0, latencyMs: Date.now() - started });
@@ -64,14 +68,27 @@ export async function tidyDescription(input: { name: string; category?: string; 
 }
 
 /**
- * Staff's optional steer ("shorter", "mention it's vegan"). It shapes tone and
- * emphasis only: the house format and the rules above still win, so it can't
- * add facts, health claims or legality talk.
+ * Order matters: hard rules, then staff direction (which overrides the house
+ * style), then the house style as the fallback. Earlier versions put the
+ * guidance under "the rules win", and the style rules were so strict that
+ * almost any guidance counted as a conflict and was ignored.
  */
-function guidanceLine(raw?: string): string {
-  const g = (raw || "").replace(/\s+/g, " ").trim().slice(0, 300);
-  if (!g) return "";
-  return `Staff guidance for this rewrite (follow it where it fits the house format and rules; the rules win if they conflict, and it never adds facts that aren't in the description): ${g}\n\n`;
+function systemPrompt(persona: string, guidance: string): string {
+  const parts = [
+    `You rewrite product descriptions for ${brand.name}, ${brand.description}. Your job is to make each description a delight to read while keeping every fact.`,
+    HARD_RULES,
+  ];
+  if (guidance) {
+    parts.push(`STAFF DIRECTION FOR THIS REWRITE (highest priority after the hard rules). Follow it exactly, even where it contradicts the house format: if it asks for a different length, structure, tone, emphasis, emoji or wording, do that. Only the hard rules outrank it.\nDirection: ${guidance}`);
+  }
+  if (persona.trim()) parts.push(`Shop's general voice note: ${persona.trim()}`);
+  parts.push(HOUSE_FORMAT);
+  return parts.join("\n\n");
+}
+
+/** Staff's optional steer ("shorter", "more playful", "mention it's vegan"). */
+function cleanGuidance(raw?: string): string {
+  return (raw || "").replace(/\s+/g, " ").trim().slice(0, 300);
 }
 
 /** Strip code fences, quotes and stray markdown the model sometimes adds. */

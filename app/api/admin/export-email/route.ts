@@ -12,6 +12,8 @@ import { generateRevenueCSV } from "@/lib/revenueCsv";
 import { escapeHtml } from "@/lib/invoiceEmail";
 import { auditSystem } from "@/lib/audit";
 import { brand } from "@/lib/brand";
+import { isEnabled } from "@/lib/flags";
+import { phraseFor, phraseStartedAt } from "@/lib/staffPhrase";
 
 // ==================== CSV helpers ====================
 function csvCell(value: string | number | undefined | null): string {
@@ -112,7 +114,7 @@ function statCard(label: string, value: string, sub = ""): string {
     </td>`;
 }
 
-function buildEmailHtml(i: Insights, attachments: string[]): string {
+function buildEmailHtml(i: Insights, attachments: string[], phrase: string | null = null): string {
   const actions: string[] = [];
   if (i.pendingOver3Days.length > 0) {
     actions.push(
@@ -165,6 +167,12 @@ function buildEmailHtml(i: Insights, attachments: string[]): string {
       <p style="margin:8px 0 0;opacity:0.85;">Nightly report &amp; backup &middot; ${new Date(i.generatedAt).toLocaleDateString("en-US", { timeZone: brand.timezone, month: "short", day: "numeric", year: "numeric" })} &middot; local time</p>
     </div>
     <div style="padding:24px;">
+      ${phrase ? `
+      <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #d6d8dc;border-radius:8px;">
+        <div style="font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;margin-bottom:6px;">Today&rsquo;s staff password</div>
+        <div style="font-size:1.3rem;font-weight:700;color:#2e3236;font-family:Menlo,Consolas,monospace;">${escapeHtml(phrase)}</div>
+        <p style="margin:6px 0 0;font-size:0.8rem;color:#81858b;">For the admin sign-in until midnight Pacific (yesterday&rsquo;s works until noon). Signed-in staff can always see it in Settings &rarr; Steward password. Don&rsquo;t forward this email.</p>
+      </div>` : ""}
 
       <div style="font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;margin-bottom:12px;">Revenue</div>
       <table style="width:100%;border-collapse:collapse;"><tr>
@@ -353,7 +361,15 @@ async function runExport(req: Request) {
     attachmentLabels.push("<strong>subscribers.csv</strong> — mailing list, active &amp; unsubscribed");
   }
 
-  const emailHtml = buildEmailHtml(insights, attachmentLabels);
+  // Today's staff password goes only to the configured inbox, never to an
+  // address typed in for a one-off "send now".
+  const toConfigured = recipientEmail === (process.env.EXPORT_RECIPIENT_EMAIL ?? process.env.INQUIRY_TO_EMAIL ?? null);
+  let phrase: string | null = null;
+  if (toConfigured && (await isEnabled("rotating_staff_password").catch(() => false))) {
+    await phraseStartedAt();
+    phrase = phraseFor(pacificDay());
+  }
+  const emailHtml = buildEmailHtml(insights, attachmentLabels, phrase);
 
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.INQUIRY_FROM_EMAIL || "onboarding@resend.dev";

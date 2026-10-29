@@ -3,6 +3,7 @@ import { adminActor, isAdmin } from "@/lib/auth";
 import { audited, auditDetail } from "@/lib/audit";
 import { cleanAdmins, getAdmins, saveAdmins } from "@/lib/admins";
 import { forgetAdminsCache } from "@/lib/adminsCache";
+import { prunePasskeys } from "@/lib/passkeys";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,9 @@ async function PUT_handler(req: Request) {
   }
   const { before, after } = await saveAdmins(c.value);
   forgetAdminsCache();
-  auditDetail({ targetId: "staff-list", before: before.map((a) => a.email), after: after.map((a) => a.email) });
+  // Their Face ID passkeys go with them.
+  const gone = await prunePasskeys(after.map((a) => a.email)).catch(() => []);
+  auditDetail({ targetId: "staff-list", before: before.map((a) => a.email), after: after.map((a) => a.email), ...(gone.length ? { note: `Removed ${gone.length} Face ID passkey${gone.length === 1 ? "" : "s"}` } : {}) });
   return NextResponse.json({ ok: true, admins: after });
 }
 

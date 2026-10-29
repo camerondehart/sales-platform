@@ -32,6 +32,8 @@ for i in range(3):
 # Already chased: ord_over_1 by a staff message yesterday (Activity log), ord_over_2 by an automatic reminder
 o[-1]["reminders"]=[{"stage":0,"at":NOW-1*DAYMS,"ok":True}]
 with open(D+"audit.jsonl","a") as f: f.write(json.dumps({"id":"chase1","at":NOW-1*DAYMS,"action":"order.email_sent","actor":"admin","actorType":"admin","source":"ai","targetType":"order","targetId":"ord_over_1","ok":True})+"\n")
+# An expired order (reminders gave up): never chased again, offered for close-out instead
+o.append({**{k:v for k,v in o[-1].items() if k!="reminders"}, "id":"ord_expired_x", "userName":"Ex Pired", "userEmail":"expired@example.com", "createdAt":NOW-25*DAYMS, "expiredAt":NOW-4*DAYMS})
 json.dump(o, open(D+"orders.json","w"))
 u=json.load(open(D+"users.json"))
 for i in range(3):
@@ -61,6 +63,8 @@ check("today: daily to-do included (chase unpaid)", find("Chase") and find("Chas
 _ch=" ".join(find("Chase")["items"]) if find("Chase") else ""
 check("today: orders chased in the last 3 days aren't asked for again", find("Chase") and find("Chase")["task"].startswith("Chase 2 ") and "Over 0" in _ch and "Over 1" not in _ch and "Over 2" not in _ch and "2 more already chased" in _ch, find("Chase"))
 check("today: suggests closing out 30-day-old unpaid orders", find("older than 30 days") and "cancel" in find("older than 30 days")["ask"], names)
+check("today: expired orders aren't chased again", "Ex Pired" not in _ch, _ch)
+check("today: expired orders are offered for close-out (cancel), not reminders", find("older than 30 days") and any("Ex Pired" in i and "expired" in i for i in find("older than 30 days")["items"]), find("older than 30 days"))
 check("today: suggests switching reminders on (3+ overdue, switch off)", find("automatic payment reminders") is not None, names)
 check("today: suggests tidying the expired code", find("finished discount code") and "SUMMEROLD" in " ".join(find("finished discount code")["items"]), names)
 check("today: win-back for quiet members", find("Win back 3 members") is not None, names)

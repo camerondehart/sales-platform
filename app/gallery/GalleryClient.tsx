@@ -1,17 +1,21 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import NavIcon from "@/app/components/NavIcon";
+import ForestEntrance from "@/app/components/ForestEntrance";
+import { ambassadorRef } from "@/lib/ambassadorRef";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/storage";
-import { parsePrice, effectivePrice, promoLabel } from "@/lib/pricing";
+import { parsePrice, effectivePrice, promoLabel, asCash } from "@/lib/pricing";
 import { priceCart, nextBundleHint, type Bundle } from "@/lib/bundles";
-import { ProductFlags, PriceTag } from "@/app/components/ProductPrice";
+import { ProductFlags, PriceTag, RestockNote } from "@/app/components/ProductPrice";
 import FormattedDescription from "@/app/components/FormattedDescription";
 import ProductVideo, { useProductDeepLink } from "@/app/components/ProductVideo";
 import { useChatShopBridge } from "@/app/components/assistant/shopBridge";
 import { track, sessionCampaign } from "@/lib/track";
 import { AskAboutProduct, AskAssistantLink } from "@/app/components/assistant/AskAssistant";
 import { brand } from "@/lib/brand";
+import StoreHint from "@/app/components/StoreHint";
 
 // ------------------------------------------------------------------
 // Cart — persisted in localStorage so it survives refreshes.
@@ -134,6 +138,7 @@ export default function GalleryClient({
   userEmail,
   isAdminPreview = false,
   actingAs,
+  stores = false,
 }: {
   products: Product[];
   userName: string;
@@ -141,6 +146,8 @@ export default function GalleryClient({
   isAdminPreview?: boolean;
   /** Staff "Log in as": who's acting (their email, or "admin"). */
   actingAs?: string;
+  /** Store locator switch is on: show "Find us in stores". */
+  stores?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -211,7 +218,7 @@ export default function GalleryClient({
   const [state, setState] = useState("");
   const [postalCode, setPostalCode] = useState("");
 
-  // Wonderland entrance — plays once per session, right after sign-in
+  // Forest entrance — plays once per session, right after sign-in
   const [entering, setEntering] = useState(false);
   const [arrived, setArrived] = useState(false);
   useEffect(() => {
@@ -220,10 +227,10 @@ export default function GalleryClient({
     if (!reduced && !sessionStorage.getItem("fp_entered")) {
       sessionStorage.setItem("fp_entered", "1");
       setEntering(true);
-      // Five acts in 3.5s. The mist starts clearing at 2.7s; the gallery
-      // sharpens underneath and the overlay unmounts at 3.5s.
-      const t1 = setTimeout(() => setArrived(true), 2700);
-      const t2 = setTimeout(() => setEntering(false), 3500);
+      // The trees part by 2s; the scene fades from 3.25s, the gallery
+      // sharpens underneath, and the overlay unmounts at 4s.
+      const t1 = setTimeout(() => setArrived(true), 3000);
+      const t2 = setTimeout(() => setEntering(false), 4000);
       return () => { clearTimeout(t1); clearTimeout(t2); };
     }
   }, [isAdminPreview]);
@@ -462,173 +469,8 @@ export default function GalleryClient({
 
   return (
     <>
-      {/* Entrance overlay — the night-sky arrival animation */}
-      {entering && (
-        <div className="enter-overlay" aria-hidden="true">
-          {/* Act I — a night sky blinks awake */}
-          {Array.from({ length: 22 }).map((_, i) => (
-            <span
-              key={`st${i}`}
-              className="enter-star"
-              style={{
-                left: `${(i * 47 + 13) % 100}%`,
-                top: `${(i * 29 + 5) % 55}%`,
-                animationDelay: `${0.2 + (i % 11) * 0.18}s`,
-                width: `${1 + (i % 3)}px`,
-                height: `${1 + (i % 3)}px`,
-              }}
-            />
-          ))}
-          <svg className="enter-moon" viewBox="0 0 100 100">
-            <path d="M63,8 C38,12 20,33 20,57 C20,80 38,96 60,95 C45,88 36,73 36,55 C36,35 47,17 63,8 Z" />
-          </svg>
-          <span className="enter-shooting-star" />
-
-          {/* Act II — the ridgeline rises on the horizon */}
-          <svg className="enter-peaks" viewBox="0 0 1440 300" preserveAspectRatio="none">
-            <path className="enter-peaks-fill" d="M0,300 L0,250 C70,242 130,215 195,150 C240,105 268,88 295,115 C340,162 375,205 430,210 C495,216 525,150 590,85 C632,43 662,33 692,70 C745,135 780,196 845,202 C910,208 940,140 1000,82 C1038,45 1068,40 1100,78 C1152,140 1185,192 1250,198 C1315,204 1355,150 1440,120 L1440,300 Z" />
-            <path className="enter-peaks-line" pathLength="1" fill="none" d="M0,250 C70,242 130,215 195,150 C240,105 268,88 295,115 C340,162 375,205 430,210 C495,216 525,150 590,85 C632,43 662,33 692,70 C745,135 780,196 845,202 C910,208 940,140 1000,82 C1038,45 1068,40 1100,78 C1152,140 1185,192 1250,198 C1315,204 1355,150 1440,120" />
-          </svg>
-
-          <div className="enter-rays" />
-          <div className="enter-glow" />
-
-          {/* Moths spiraling toward the light */}
-          {[0, 1, 2].map((i) => (
-            <span key={`mo${i}`} className="enter-moth" style={{ ["--mi" as any]: i }}>
-              <svg viewBox="0 0 40 24">
-                <path className="moth-wing moth-wing-l" d="M19,12 C12,2 4,1 2,7 C0,13 9,17 19,14 Z" />
-                <path className="moth-wing moth-wing-r" d="M21,12 C28,2 36,1 38,7 C40,13 31,17 21,14 Z" />
-                <ellipse cx="20" cy="13" rx="2" ry="5" className="moth-body" />
-              </svg>
-            </span>
-          ))}
-          <svg className="enter-grain" width="100%" height="100%">
-            <filter id="fp-grain">
-              <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="2" stitchTiles="stitch" />
-              <feColorMatrix type="saturate" values="0" />
-            </filter>
-            <rect width="100%" height="100%" filter="url(#fp-grain)" />
-          </svg>
-
-          {/* Fireflies + drifting spores */}
-          {Array.from({ length: 26 }).map((_, i) => (
-            <span
-              key={i}
-              className="enter-firefly"
-              style={{
-                left: `${(i * 43 + 9) % 100}%`,
-                animationDelay: `${(i % 13) * 0.26}s`,
-                animationDuration: `${2.6 + (i % 6) * 0.8}s`,
-                width: `${2 + (i % 4) * 2}px`,
-                height: `${2 + (i % 4) * 2}px`,
-              }}
-            />
-          ))}
-
-          {/* Falling spore-dust catching the light */}
-          {Array.from({ length: 16 }).map((_, i) => (
-            <span
-              key={`sp${i}`}
-              className="enter-spore"
-              style={{
-                left: `${(i * 61 + 17) % 100}%`,
-                animationDelay: `${(i % 8) * 0.55}s`,
-                animationDuration: `${5 + (i % 5) * 1.3}s`,
-              }}
-            />
-          ))}
-
-          {/* Hand-inked ferns curling in from the corners */}
-          <svg className="enter-fern enter-fern-left" viewBox="0 0 200 260" aria-hidden="true">
-            <path className="fern-stem" pathLength="1" d="M18,258 C30,200 42,140 78,86 C100,54 128,32 162,20" fill="none" />
-            {[
-              "M40,214 C22,208 10,194 8,178", "M50,186 C68,180 80,166 84,150",
-              "M62,158 C44,150 34,136 32,120", "M76,132 C94,126 106,112 110,96",
-              "M92,108 C74,100 64,86 62,70", "M112,84 C130,78 142,64 146,48",
-              "M132,62 C114,54 104,42 102,28",
-            ].map((d, i) => (
-              <path key={i} className="fern-frond" pathLength="1" d={d} fill="none" style={{ ["--fd" as any]: `${0.45 + i * 0.06}s` }} />
-            ))}
-          </svg>
-          <svg className="enter-fern enter-fern-right" viewBox="0 0 200 260" aria-hidden="true">
-            <path className="fern-stem" pathLength="1" d="M182,258 C170,200 158,140 122,86 C100,54 72,32 38,20" fill="none" />
-            {[
-              "M160,214 C178,208 190,194 192,178", "M150,186 C132,180 120,166 116,150",
-              "M138,158 C156,150 166,136 168,120", "M124,132 C106,126 94,112 90,96",
-              "M108,108 C126,100 136,86 138,70", "M88,84 C70,78 58,64 54,48",
-            ].map((d, i) => (
-              <path key={i} className="fern-frond" pathLength="1" d={d} fill="none" style={{ ["--fd" as any]: `${0.50 + i * 0.06}s` }} />
-            ))}
-          </svg>
-
-          {/* Grass blades sprouting along the forest floor */}
-          <svg className="enter-grass" viewBox="0 0 1440 70" preserveAspectRatio="none" aria-hidden="true">
-            {Array.from({ length: 24 }).map((_, i) => {
-              const x = 24 + i * 61 + ((i * 37) % 22);
-              const h = 26 + ((i * 29) % 30);
-              const lean = ((i % 5) - 2) * 7;
-              return (
-                <path
-                  key={i}
-                  className="grass-blade"
-                  pathLength="1"
-                  d={`M${x},70 C${x + lean * 0.3},${70 - h * 0.5} ${x + lean},${70 - h * 0.85} ${x + lean + 3},${70 - h}`}
-                  fill="none"
-                  style={{ ["--gd" as any]: `${0.25 + (i % 9) * 0.05}s` }}
-                />
-              );
-            })}
-          </svg>
-
-          {/* Wobbly forest floor */}
-          <svg className="enter-ground" viewBox="0 0 1440 160" preserveAspectRatio="none">
-            <path d="M0,90 C120,60 260,105 420,84 C580,63 700,110 860,92 C1020,74 1130,112 1280,88 C1360,75 1410,84 1440,78 L1440,160 L0,160 Z" />
-            <path className="enter-ground-line" pathLength="1"
-              d="M0,90 C120,60 260,105 420,84 C580,63 700,110 860,92 C1020,74 1130,112 1280,88 C1360,75 1410,84 1440,78"
-              fill="none" />
-          </svg>
-
-          {brand.decor === "meadow" && (<>
-          {/* A hazy row of toadstools deeper in the grove */}
-          <Shroom back variant="button" style={{ left: "17%", width: "min(52px, 6vw)", ["--d" as any]: "0.70s" }} />
-          <Shroom back variant="slim" style={{ left: "36%", width: "min(60px, 7vw)", ["--d" as any]: "0.80s", ["--hue" as any]: "1" }} />
-          <Shroom back variant="toadstool" style={{ left: "58%", width: "min(66px, 8vw)", ["--d" as any]: "0.75s" }} />
-          <Shroom back variant="button" style={{ left: "88%", width: "min(48px, 6vw)", ["--d" as any]: "0.86s", ["--hue" as any]: "1" }} />
-
-          {/* The grove — five hand-drawn toadstools sprouting */}
-          <Shroom variant="toadstool" style={{ left: "9%", width: "min(120px, 15vw)", ["--d" as any]: "0.30s" }} />
-          <Shroom variant="slim" style={{ left: "24%", width: "min(88px, 11vw)", ["--d" as any]: "0.52s" }} />
-          <Shroom variant="toadstool" style={{ left: "44%", width: "min(150px, 19vw)", ["--d" as any]: "0.40s", ["--hue" as any]: "1" }} />
-          <Shroom variant="button" style={{ left: "66%", width: "min(74px, 9vw)", ["--d" as any]: "0.62s" }} />
-          <Shroom variant="slim" style={{ left: "80%", width: "min(104px, 13vw)", ["--d" as any]: "0.46s", ["--hue" as any]: "1" }} />
-          </>)}
-
-          <div className="enter-center">
-            {/* Sparkles winking around the wordmark */}
-            {[
-              { top: "-18%", left: "6%" }, { top: "-30%", left: "82%" },
-              { top: "48%", left: "-8%" }, { top: "16%", left: "104%" },
-              { top: "-42%", left: "38%" }, { top: "88%", left: "88%" },
-            ].map((pos, i) => (
-              <svg key={i} className="enter-sparkle" viewBox="0 0 24 24" style={{ ...pos, ["--sd" as any]: `${1.0 + i * 0.2}s` }} aria-hidden="true">
-                <path d="M12 2 C13 8 16 11 22 12 C16 13 13 16 12 22 C11 16 8 13 2 12 C8 11 11 8 12 2 Z" />
-              </svg>
-            ))}
-            <div className="enter-title" aria-label={brand.members}>
-              {brand.members.split("").map((ch, i) => (
-                <span key={i} className="et" style={{ ["--i" as any]: i }}>
-                  {ch === " " ? "\u00A0" : ch}
-                </span>
-              ))}
-            </div>
-            <svg className="enter-underline" viewBox="0 0 260 20">
-              <path pathLength="1" d="M6,12 C50,6 92,15 132,10 C176,5 216,14 254,9" fill="none" />
-            </svg>
-            <div className="enter-sub">welcome to {brand.members.toLowerCase()}, {userName.split(" ")[0]}</div>
-          </div>
-        </div>
-      )}
+      {/* Entrance: the forest is brushed aside (app/components/ForestEntrance.tsx). Tap skips it. "plain" decor skips it. */}
+      {entering && brand.decor === "meadow" && <ForestEntrance onSkip={() => { setArrived(true); setEntering(false); }} />}
 
       {actingAs && (
         <div className="admin-preview-bar act-as-bar">
@@ -668,12 +510,18 @@ export default function GalleryClient({
           <div className="masthead-meta">
             <nav className="masthead-nav" aria-label="Other pages">
               <a href="/events" className="nav-pill">
-                <span aria-hidden="true">🎟</span> Events
+                <NavIcon name="events" /> <em>Events</em>
               </a>
               <a href="/retail" className="nav-pill">
-                <span aria-hidden="true">🛍</span> <em className="nl-long">Shop</em>
+                <NavIcon name="shop" /> <em className="nl-long">Shop</em>
                 <em className="nl-short">Shop</em>
               </a>
+              {stores && (
+                <a href="/stores" className="nav-pill sn-stores">
+                  <NavIcon name="pin" /> <em className="nl-long">Find us in stores</em>
+                  <em className="nl-short">Find us</em>
+                </a>
+              )}
               <AskAssistantLink className="nav-pill ask-nav" label="Ask our Concierge" shortLabel="Concierge" />
             </nav>
             <div className="masthead-welcome">Welcome, {userName.split(" ")[0]}</div>
@@ -926,6 +774,7 @@ export default function GalleryClient({
               <div className="shipping-reminder">
                 Flat $10 shipping, or free local pickup — you'll choose at checkout.
               </div>
+              <RestockNote product={selected} />
               <button
                 className="submit"
                 onClick={() => {
@@ -937,6 +786,7 @@ export default function GalleryClient({
                 Add to cart
               </button>
               <AskAboutProduct product={selected} onAsk={() => setSelected(null)} />
+              <StoreHint productId={selected.id} />
             </div>
           </div>
         </div>
@@ -964,6 +814,7 @@ export default function GalleryClient({
                       <div className="cart-item-info">
                         <div className="cart-item-name">{product.name}</div>
                         <div className="cart-item-price"><PriceTag product={product} /></div>
+                        <RestockNote product={product} compact />
                         <div className="cart-item-qty">
                           <button onClick={() => setQuantity(product.id, quantity - 1)} aria-label="Decrease">−</button>
                           <span>{quantity}</span>
@@ -1241,81 +1092,10 @@ export default function GalleryClient({
 }
 
 // ============================================================
-// Shroom — hand-drawn toadstools for the entrance grove.
-// Deliberately wobbly paths so they read as inked by hand.
-// ============================================================
-function Shroom({
-  variant,
-  style,
-  back = false,
-}: {
-  variant: "toadstool" | "slim" | "button";
-  style?: React.CSSProperties;
-  back?: boolean;
-}) {
-  const cls = back ? "shroom shroom-back" : "shroom";
-  if (variant === "toadstool") {
-    return (
-      <svg className={cls} viewBox="0 0 120 140" style={style}>
-        {/* stem — slightly bowed, thicker at the base */}
-        <path className="sh-stem" pathLength="1"
-          d="M52,72 C50,90 47,108 44,126 C43,132 49,136 58,136 C67,136 74,133 73,127 C71,109 69,90 68,72"
-        />
-        {/* skirt ring on the stem */}
-        <path className="sh-line" pathLength="1" d="M48,88 C54,92 66,92 71,87" fill="none" />
-        {/* cap — lumpy, hand-inked dome */}
-        <path className="sh-cap" pathLength="1"
-          d="M60,14 C38,15 20,32 14,52 C11,61 15,70 24,72 C48,77 74,76 97,71 C105,69 109,60 106,52 C99,30 82,13 60,14 Z"
-        />
-        {/* gill line under the cap */}
-        <path className="sh-line" pathLength="1" d="M22,70 C46,78 76,77 99,69" fill="none" />
-        {/* spots — uneven blobs, not perfect circles */}
-        <path className="sh-spot" d="M40,34 C36,36 35,42 39,44 C44,46 49,42 47,37 C46,34 43,33 40,34 Z" />
-        <path className="sh-spot" d="M70,26 C67,29 68,34 72,35 C76,36 79,31 77,28 C75,25 72,25 70,26 Z" />
-        <path className="sh-spot" d="M85,48 C81,50 82,56 86,57 C90,58 94,54 92,50 C90,47 87,47 85,48 Z" />
-        <path className="sh-spot" d="M31,55 C28,57 29,61 32,62 C36,63 38,59 36,56 C35,54 32,54 31,55 Z" />
-      </svg>
-    );
-  }
-  if (variant === "slim") {
-    return (
-      <svg className={cls} viewBox="0 0 90 150" style={style}>
-        {/* tall skinny stem with a lean */}
-        <path className="sh-stem" pathLength="1"
-          d="M42,58 C40,82 36,108 34,132 C33,139 39,144 46,144 C53,144 58,140 57,134 C54,109 52,83 52,58"
-        />
-        {/* droopy bell cap */}
-        <path className="sh-cap" pathLength="1"
-          d="M46,8 C32,9 22,24 20,44 C19,53 24,60 32,61 C41,63 54,63 62,60 C70,58 74,51 72,43 C68,23 59,7 46,8 Z"
-        />
-        <path className="sh-line" pathLength="1" d="M26,58 C38,64 56,64 68,57" fill="none" />
-        <path className="sh-spot" d="M38,26 C35,28 36,33 39,34 C43,35 46,31 44,28 C43,25 40,25 38,26 Z" />
-        <path className="sh-spot" d="M55,40 C52,42 53,46 56,47 C59,48 62,44 60,42 C59,40 57,39 55,40 Z" />
-      </svg>
-    );
-  }
-  // button — small, round and cheerful
-  return (
-    <svg className={cls} viewBox="0 0 90 100" style={style}>
-      <path className="sh-stem" pathLength="1"
-        d="M36,58 C35,68 34,78 34,86 C34,92 39,96 45,96 C51,96 56,92 56,87 C56,78 55,68 54,58"
-      />
-      <path className="sh-cap" pathLength="1"
-        d="M45,12 C28,13 15,28 13,44 C12,52 17,58 25,59 C39,61 52,61 65,58 C73,57 78,50 76,43 C72,26 61,11 45,12 Z"
-      />
-      <path className="sh-line" pathLength="1" d="M19,56 C34,62 57,62 71,55" fill="none" />
-      <path className="sh-spot" d="M35,30 C32,32 33,37 36,38 C40,39 43,35 41,32 C40,29 37,29 35,30 Z" />
-      <path className="sh-spot" d="M56,34 C53,36 54,40 57,41 C60,42 63,38 61,36 C60,34 58,33 56,34 Z" />
-    </svg>
-  );
-}
-
-// ============================================================
 // CheckoutModal — address, ship/pickup, note, inquiry flag
 // ============================================================
 function CheckoutModal({
-  items,
-  subtotal,
+  items: cartItems,
   bundles,
   settings,
   loyalty,
@@ -1350,6 +1130,11 @@ function CheckoutModal({
   const [codeChecking, setCodeChecking] = useState(false);
   const [codeError, setCodeError] = useState("");
   const [applied, setApplied] = useState<null | { code: string; amount: number }>(null);
+  // Came through an ambassador's page: their code is ready in the box (press Apply).
+  useEffect(() => {
+    const code = ambassadorRef()?.code;
+    if (code) setCodeInput((v) => v || code);
+  }, []);
 
   async function applyCode() {
     const code = codeInput.trim();
@@ -1393,6 +1178,11 @@ function CheckoutModal({
   const [state, setState] = useState(defaultAddress.state);
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
 
+  // Cash-pickup-only sales apply once Local pickup + Cash at pickup is chosen (same as the server).
+  const cash = shippingMethod === "pickup" && paymentMethod === "cash" && !isInquiry;
+  const items = useMemo(() => (cash ? cartItems.map((i) => ({ ...i, product: asCash(i.product) })) : cartItems), [cartItems, cash]);
+  const subtotal = items.reduce((n, i) => n + parsePrice(effectivePrice(i.product)) * i.quantity, 0);
+  const hasCashDeals = cartItems.some((i) => i.product.cashOnly);
   const itemCount = items.reduce((n, i) => n + i.quantity, 0);
   // Same calculation the server charges (lib/bundles.ts).
   const priced = useMemo(
@@ -1405,6 +1195,22 @@ function CheckoutModal({
     [items, bundles, settings, isInquiry]
   );
   const discount = Math.round((priced.promoSavings + priced.bundleSavings) * 100) / 100;
+  // What paying cash at pickup would save on cash-only sales (shown until they choose it).
+  const cashSaves = useMemo(() => {
+    if (!hasCashDeals || cash || isInquiry) return 0;
+    const rule = settings ? { enabled: settings.bundleRuleEnabled, minItems: settings.bundleRuleMinItems, percent: settings.bundleRulePercent } : null;
+    const now = priceCart(cartItems, bundles, rule);
+    const asCashCart = priceCart(cartItems.map((i) => ({ ...i, product: asCash(i.product) })), bundles, rule);
+    return Math.round((now.subtotal - now.discount - (asCashCart.subtotal - asCashCart.discount)) * 100) / 100;
+  }, [hasCashDeals, cash, isInquiry, cartItems, bundles, settings]);
+  // A code's amount depends on the prices: check it again when cash deals switch on or off.
+  const cashRef = useRef(cash);
+  useEffect(() => {
+    if (cashRef.current === cash) return;
+    cashRef.current = cash;
+    if (applied && hasCashDeals) applyCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cash]);
   const mixSavings = priced.bundleSavings;
   const bundleSavings = priced.ruleSavings; // the "buy N, save X%" rule
   // A bundle OR a discount code, never both.
@@ -1468,6 +1274,7 @@ function CheckoutModal({
           redeemPoints: redeemPoints > 0 ? redeemPoints : undefined,
           note: note.trim() || undefined,
           address: { addressLine1, addressLine2, city, state, postalCode },
+          ambassador: ambassadorRef(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1615,6 +1422,7 @@ function CheckoutModal({
                       <span>🌄 Local pickup<small>Free</small></span>
                     </label>
                   </div>
+                  {cashSaves > 0 && <p className="cash-hint">💵 Choose Local pickup and Cash at pickup to save ${cashSaves.toFixed(2)} with cash pickup deals.</p>}
                 </div>
 
                 {shippingMethod === "pickup" && !isInquiry && (

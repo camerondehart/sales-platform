@@ -11,6 +11,7 @@ import type { Audience, ChatMessage, ChatReply, WidgetMode } from "./shared";
 import { SUPPORT_EMAIL } from "./shared";
 import { getFlags, isEnabled } from "../flags";
 import { productCardsFor } from "./productCards";
+import { brand } from "../brand";
 
 const MAX_STEPS = 6;
 const MAX_HISTORY = 16;
@@ -70,7 +71,7 @@ export function guardReply(text: string, audience: Audience): string {
 
 const OFFLINE_REPLY = `I'm offline at the moment. For anything urgent, email [${SUPPORT_EMAIL}](mailto:${SUPPORT_EMAIL}) and the team will get back to you.`;
 
-async function capReached(config: AssistantConfig): Promise<boolean> {
+export async function capReached(config: AssistantConfig): Promise<boolean> {
   if (!config.monthlyCapUsd || config.monthlyCapUsd <= 0) return false;
   try {
     return (await monthSpend()) >= config.monthlyCapUsd;
@@ -101,7 +102,7 @@ async function alertCapOnce(config: AssistantConfig): Promise<void> {
 }
 
 export async function assistantStatus(req: Request) {
-  const [config, master] = await Promise.all([getAssistantConfig(), isEnabled("ai_assistant")]);
+  const [config, master, voiceOn, photosOn] = await Promise.all([getAssistantConfig(), isEnabled("ai_assistant"), isEnabled("voice_concierge").catch(() => false), isEnabled("concierge_photos").catch(() => false)]);
   const hasKey = !!gatewayCredential(req);
   const capped = hasKey ? await capReached(config) : false;
   const ok = master && hasKey && !capped;
@@ -117,6 +118,8 @@ export async function assistantStatus(req: Request) {
       admin: ok && config.enabledStaff,
     },
     name: config.assistantName,
+    voice: ok && voiceOn,
+    photos: ok && photosOn,
     staffNote,
   };
 }
@@ -153,7 +156,31 @@ function settleCards(actions: ToolContext["actions"], before: number, result: un
   };
 }
 
-export async function handleChat(req: Request, body: { mode?: unknown; messages?: unknown }): Promise<{ status: number; reply: ChatReply; model?: string }> {
+/** A photo sent with the latest message: a data URL, JPEG/PNG/WebP, already shrunk by the widget. */
+const PHOTO_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const PHOTO_MAX_CHARS = 1_600_000; // ~1.2 MB image
+export function cleanPhoto(input: unknown): string | null | "bad" {
+  if (input === undefined || input === null || input === "") return null;
+  if (typeof input !== "string" || input.length > PHOTO_MAX_CHARS || !PHOTO_URL.test(input)) return "bad";
+  return input;
+}
+
+/** Added to the system prompt for a turn with a photo (kept apart from the SAFETY text). */
+const PHOTO_GUIDE = (audience: Audience) =>
+  `PHOTO: The latest message includes a photo the ${audience === "admin" ? "staff member" : "customer"} just took or picked. Look at it and answer about what's actually in it. ` +
+  `If it shows a product, label, bottle or packaging, say what it is and use your product tools to find the matching ${brand.shortName} product before recommending anything. ` +
+  `Never identify pills, powders, mushrooms, plants or other unknown substances from a photo, and never say whether something is safe to take, eat or combine: say you can't tell from a picture and point them to a pharmacist, doctor or the team. ` +
+  `Don't read out or repeat personal details that appear in a photo (names, addresses, card or ID numbers). If the photo is unclear, say what you can see and ask for a closer or brighter one. ` +
+  (audience === "admin" ? "Staff may send photos of products, shelves, invoices or packing slips: describe them, pull out what's useful (names, counts, prices) and offer the usual confirm cards for any change — nothing changes from a photo alone. If they want the photo in an email campaign, call prepare_campaign_draft with use_photo true (put [[PHOTO]] on its own line where it goes); it's added when they open the draft in the composer." : "");
+
+/** Marker the Concierge adds when a spoken conversation is over (stripped by the chat route). */
+export const END_MARK = "[[end]]";
+const CONVERSATION_GUIDE =
+  `CONVERSATION MODE: this person is talking to you out loud and hears your reply read aloud, then the mic listens again. ` +
+  `Talk exactly as you do in text — same personality, phrases and style — just shorter: about half your usual length, often a sentence or two. ` +
+  `When they're clearly finished (they say thanks and that they're good, goodbye, that's all, or similar), reply with one short, warm goodbye and put ${END_MARK} at the very end — that switches their mic off. Never add ${END_MARK} otherwise, and never when they asked another question.`;
+
+export async function handleChat(req: Request, body: { mode?: unknown; messages?: unknown; photo?: unknown; conversation?: unknown }): Promise<{ status: number; reply: ChatReply; model?: string }> {
   const mode: WidgetMode = body.mode === "admin" ? "admin" : "site";
   const who = await resolveAudience(mode);
   if (!who) return { status: 401, reply: { reply: "Please sign in to the dashboard again.", offline: true } };
@@ -161,6 +188,8 @@ export async function handleChat(req: Request, body: { mode?: unknown; messages?
 
   const history = sanitizeHistory(body.messages);
   if (!history) return { status: 400, reply: { reply: "I didn't catch a question there.", degraded: true } };
+  const photo = cleanPhoto((body as { photo?: unknown }).photo);
+  if (photo === "bad") return { status: 400, reply: { reply: "I couldn't open that photo. Try a JPEG or PNG, or a smaller picture.", degraded: true } };
 
   const ip = clientIp(req);
   const [perBurst, perDay] = MESSAGE_LIMITS[audience];
@@ -183,13 +212,25 @@ export async function handleChat(req: Request, body: { mode?: unknown; messages?
     return { status: 200, reply: { reply: OFFLINE_REPLY, offline: true } };
   }
 
+  if (photo) {
+    if (!flags.concierge_photos) return { status: 400, reply: { reply: "Photos aren't switched on right now — please describe it in words.", degraded: true } };
+    const photoKey = audience === "member" && user ? `u:${user.id}` : `ip:${ip}`;
+    if (overLimit(`photo:${audience}:${photoKey}`, audience === "admin" ? 60 : 12, 60 * 60_000)) {
+      return { status: 429, reply: { reply: "That's a lot of photos in a short time — give me a little while and try again, or describe it in words.", degraded: true } };
+    }
+  }
   const allowActions = audience !== "admin" || flags.ai_admin_actions;
   const ctx: ToolContext = { audience, user, ip, config, transcript: history, actions: [], draft: null, allowActions };
   const tools = toolsFor(audience, { actions: allowActions });
   const system = await buildSystemPrompt({ audience, config, user });
   const messages: GatewayMessage[] = [
-    { role: "system", content: system },
-    ...history.map((m) => ({ role: m.role, content: m.content }) as GatewayMessage),
+    { role: "system", content: [system, photo ? PHOTO_GUIDE(audience) : "", body.conversation === true ? CONVERSATION_GUIDE : ""].filter(Boolean).join("\n\n") },
+    ...history.map((m, i) =>
+      // The photo goes with the latest message only; earlier turns keep their "[Photo]" text.
+      (photo && i === history.length - 1
+        ? { role: "user", content: [{ type: "text", text: m.content }, { type: "image_url", image_url: { url: photo } }] }
+        : { role: m.role, content: m.content }) as GatewayMessage
+    ),
   ];
   // A Today-list button: look the item up now and hand it over, so the model
   // goes straight to preparing the cards instead of searching for people.

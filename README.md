@@ -3,8 +3,11 @@
 A complete small-business commerce platform: a public shop, a members-only
 catalogue with approval-based sign-up, invoicing by email, events with
 registration and waitlists, a mailing list with campaigns and templates, loyalty
-points, mix-and-match bundles, discount codes, a staff dashboard with analytics,
-and an AI "Concierge" for customers and staff. Built with Next.js 14, plain CSS,
+points, mix-and-match bundles, discount codes (including cash-pickup-only
+sales), a store-locator map, stock counts, Venmo payment matching, ambassador
+pages with commission tracking, a staff dashboard with analytics, and an AI
+"Concierge" for customers and staff (with photos and voice). Staff can sign in
+with Face ID / Touch ID, an emailed link, or a daily two-word password. Built with Next.js 14, plain CSS,
 Vercel Blob for storage, Resend for email and the Vercel AI Gateway for the
 Concierge. No database to run.
 
@@ -105,7 +108,10 @@ the rest switch features on.
 | `AI_GATEWAY_API_KEY`, `AI_GATEWAY_BASE_URL` | The Concierge (OpenAI-compatible endpoint; Vercel AI Gateway by default). Leave unset to run without AI. |
 | `CRON_SECRET` | Protects the cron endpoints (`vercel.json`). |
 | `SHIPPO_API_KEY`, `SHIPPO_FROM_*` | Optional shipping labels from the Orders tab. |
-| `NEXT_PUBLIC_SITE_URL` | Canonical URL (overrides `brand.siteUrl`). |
+| `NEXT_PUBLIC_SITE_URL` | Canonical URL (overrides `brand.siteUrl`). Its domain is also the passkey (Face ID) domain for the live site. |
+| `AI_GATEWAY_SPEECH_URL` | Optional: the Concierge voice's speech endpoint (defaults to the Vercel AI Gateway, same key). |
+| `NOMINATIM_URL`, `PHOTON_URL` | Optional: address lookup and suggestions for the store map (OpenStreetMap services by default, no key). |
+| `VENMO_ACCOUNT_EMAIL` | Venmo payment matching: the address the business's Venmo emails go to (others are quarantined). |
 
 ## 4. Deploying (Vercel)
 
@@ -125,10 +131,27 @@ the rest switch features on.
 > you give the preview deployment its own. Anything done on a preview
 > deployment happens to live data.
 
+### Features added since the first release
+
+All behind switches in Settings → Feature switches (live-site defaults in brackets):
+
+| Switch | What it does |
+| --- | --- |
+| Store locator [off] | Public `/stores` map and list, Settings → Store locations, Concierge `find_stores` |
+| Stock counts [off] | Products → Stock counts; at 0 a product shows "Currently restocking" and can still be ordered (backorders) |
+| Venmo payment matching [off] | Forward Venmo's "paid you" emails to Resend inbound; they're verified (DKIM) and matched to orders by the `#REF` in the note |
+| Concierge voice / Concierge photos [off] | Read-aloud answers, hands-free conversation mode, and photos in the chat |
+| Ambassador pages [off] | `/<name>` pages for influencers, per-ambassador terms, commission tracking, payouts, emailed progress reports |
+| Staff sign-in with Face ID [on] | Passkeys (WebAuthn) for staff; added per device in Settings → Staff sign-in |
+| Daily staff password [on] | The shared admin password becomes a new two-word phrase daily (nightly email + Settings); the old fixed password stops after 7 days |
+| Cash pickup deals & public-shop pickup [off] | "Cash pickup only" sales, and Local pickup (invoice or cash) in the public shop |
+
+Campaigns can include uploaded photos (composer "Upload photo", or a photo sent to the Concierge). `package.json` pins `@peculiar/asn1-schema` with `overrides` so passkey signatures can be read; run `npm ci` after pulling.
+
 ## 5. Tests
 
 ```bash
-bash tests/e2e/run-all.sh     # builds the app, runs 16 suites + 4 unit checks against mocks
+bash tests/e2e/run-all.sh     # builds the app, runs 16 suites + the unit checks against mocks
 npx tsc --noEmit && npx next build
 ```
 

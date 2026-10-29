@@ -275,6 +275,22 @@ _r=tool("propose_campaign",{"subject":"x","body":"y","segment":"martians"})
 check("groups: unknown group refused with the list of groups", not _r.get("actions") and "lapsed_members" in _r.get("reply",""), _r)
 _r=tool("prepare_campaign_draft",{"subject":"x","body":"y","segment":"bought_product","segment_product":"Harmony Blend"})
 check("groups: 'bought a product' group works by product name", (_r.get("draft") or {}).get("audience")=="custom" and "Harmony Blend" in (_r.get("draft") or {}).get("groupLabel",""), _r)
+# ---------- the photo staff sent in the chat goes into a campaign draft
+def _pt(args, photo=True):
+    msgs=([{"role":"user","content":"[Photo] the new label"},{"role":"assistant","content":"Looks great."}] if photo else [])+[{"role":"user","content":"TOOL:"+json.dumps({"name":"prepare_campaign_draft","args":args})}]
+    return http("POST","/api/assistant/chat",{"mode":"admin","messages":msgs})[1]
+_r=_pt({"subject":"New label","body":"Fresh look.\n\n[[PHOTO]]\n\nSame tincture.","audience":"subscribers","use_photo":True,"photo_alt":"The new Harmony label"})
+_d=_r.get("draft") or {}
+check("campaign photo: draft asks for the chat photo where [[PHOTO]] is", _d.get("photo",{}).get("alt")=="The new Harmony label" and _d.get("body","").count("[[PHOTO]]")==1 and "Same tincture" in _d.get("body",""), _r)
+_r=_pt({"subject":"New label","body":"Fresh look.","audience":"subscribers","use_photo":True})
+_d=_r.get("draft") or {}
+check("campaign photo: no spot given = photo at the top", _d.get("body","").startswith("[[PHOTO]]") and _d.get("photo",{}).get("alt")=="Photo", _r)
+_r=_pt({"subject":"New label","body":"Fresh look.","audience":"subscribers","use_photo":True}, photo=False)
+check("campaign photo: refused when there's no photo in the chat", not _r.get("draft") and "no photo" in _r.get("reply","").lower(), _r)
+_r=_pt({"subject":"New label","body":"Fresh look.\n\n[[PHOTO]]","audience":"subscribers"})
+check("campaign photo: a stray [[PHOTO]] is dropped when no photo was asked for", "[[PHOTO]]" not in (_r.get("draft") or {}).get("body","x[[PHOTO]]") and not (_r.get("draft") or {}).get("photo"), _r)
+_s,_x=http("POST","/api/admin/campaigns",{"subject":"x","body":"Hi\n\n[[PHOTO]]","testOnly":True})
+check("campaign photo: the server won't send an email whose photo was never added", _s==400 and "photo" in _x.get("error","").lower(), (_s,_x))
 # ---------- members get campaigns unless they unsubscribe (Terms §9)
 import hmac, hashlib, base64
 _u=json.load(open(D+"users.json"))
@@ -305,4 +321,13 @@ check("members: after unsubscribing they're skipped", _g2.get("will_receive")==_
 _s,_r=http("POST","/api/signup",{"name":"Nora Nope","email":"nora.nope@example.com","password":"longenough123","ageVerified":True,"subscribe":False}, cookie=None, headers={"x-forwarded-for":"9.9.1.1"})
 _subs=json.load(open(D+"subscribers.json"))
 check("members: unticking 'Keep me posted' at sign-up is remembered as an opt-out", _s==200 and any(x["email"]=="nora.nope@example.com" and x.get("unsubscribedAt") for x in _subs), (_s,_r))
+
+# ================= cancelling orders (card only; nothing changes until confirmed)
+_before=J("orders.json",[])
+c=card(tool("propose_order_status",{"order_id":"ord_2_zzzzzz","status":"cancelled"}))
+check("cancel: unpaid order gets a red 'Cancel order' card", c and c["danger"] and c["title"].startswith("Cancel order") and c["confirmLabel"]=="Cancel order" and c["request"]["body"]=={"id":"ord_2_zzzzzz","status":"cancelled"}, c)
+check("cancel: card says reminders stop and the customer isn't emailed", c and any("reminders stop" in l for l in c["lines"]) and any("isn't emailed" in l for l in c["lines"]) and not any("refund" in l for l in c["lines"]), c and c["lines"])
+c=card(tool("propose_order_status",{"order_id":"ord_1_abc4k9","status":"cancelled"}))
+check("cancel: paid order card says to refund outside the site", c and any("refund them yourself" in l for l in c["lines"]), c and c["lines"])
+check("cancel: proposing changes nothing", J("orders.json",[])==_before)
 print(f"\n{sum(res)}/{len(res)} passed")

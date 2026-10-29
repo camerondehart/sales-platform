@@ -22,9 +22,12 @@ export type GatewayToolCall = {
   function: { name: string; arguments: string };
 };
 
+/** A user turn with a photo: text + image (OpenAI-compatible content parts). */
+export type GatewayUserPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
 export type GatewayMessage =
   | { role: "system"; content: string }
-  | { role: "user"; content: string }
+  | { role: "user"; content: string | GatewayUserPart[] }
   | {
       role: "assistant";
       content: string | null;

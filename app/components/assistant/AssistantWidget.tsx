@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useVoice } from "./useVoice";
 import Markdown from "./Markdown";
 import EmailPreview from "@/app/components/EmailPreview";
 import { rememberChange } from "@/app/admin/recentChanges";
@@ -13,6 +14,7 @@ import {
   EVT_OPEN,
   EVT_OPEN_CART,
   EVT_USE_DRAFT,
+  PHOTO_SLOT,
   EVT_VIEW_PRODUCT,
   SHOP_PATH,
   SUPPORT_EMAIL,
@@ -65,6 +67,10 @@ type Msg = {
   todayKey?: string;
   /** Products the Concierge recommended, shown as cards. */
   products?: ProductCard[];
+  /** Signature that lets this answer be read aloud (voice on). */
+  voiceSig?: string;
+  /** Small preview of a photo sent with this message (the full photo isn't kept). */
+  photoThumb?: string;
   /** Product ids added to the cart from this message's cards. */
   added?: string[];
   error?: boolean;
@@ -157,6 +163,35 @@ function PeaksMark({ light = false }: { light?: boolean }) {
   );
 }
 
+/** Shrink a photo on the phone before sending: longest side ≤ max px, JPEG. */
+async function shrinkPhoto(file: File, max: number, quality: number): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error("unreadable"));
+      i.src = url;
+    });
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const g = c.getContext("2d");
+    if (!g) throw new Error("no canvas");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const PHOTO_TAG = "[Photo]";
+/** Backup for conversation mode: a short, plain goodbye ends it even if the Concierge forgets its marker. */
+const SIGN_OFF = /^(ok(ay)?[, ]+)?(no,? )?(thanks?( you)?( so much)?|thank you|that'?s (all|it)|i'?m (good|all set|done)|bye|goodbye|good ?night|see you|talk (to you )?later)[\s\w',.!]{0,30}$/i;
+
 export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   const [status, setStatus] = useState<(AssistantStatus & { staffNote?: string }) | null>(null);
   const [path, setPath] = useState("");
@@ -171,6 +206,48 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   // Bumped by "new chat" so a reply still in flight can't land in the fresh thread.
   const genRef = useRef(0);
   const loaded = useRef(false);
+
+  // Voice: mic + read aloud (useVoice.ts). Words heard go into the box, not straight to send.
+  const voice = useVoice({
+    enabled: !!status?.voice,
+    mode: mode === "admin" ? "admin" : "site",
+    onText: (t) => {
+      setInput((prev) => `${prev.trim() ? `${prev.trim()} ` : ""}${t}`.slice(0, 2000));
+      setTimeout(() => inputRef.current?.focus(), 30);
+    },
+    // Conversation mode: what they said goes straight to the Concierge.
+    onSend: (t) => sendRef.current(t),
+  });
+  const voiceRef = useRef(voice);
+  voiceRef.current = voice;
+  // Photos: one waiting to go with the next message (full size for the
+  // Concierge, a small preview for the chat).
+  const [photo, setPhoto] = useState<{ full: string; thumb: string } | null>(null);
+  const [photoNote, setPhotoNote] = useState<string | null>(null);
+  const photoRef = useRef(photo);
+  photoRef.current = photo;
+  // The last photo staff sent, kept in this browser only, so a campaign draft can use it.
+  const chatPhotoRef = useRef<{ full: string; thumb: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    setPhotoNote(null);
+    if (!/^image\//.test(file.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
+      setPhotoNote("That isn't a photo. Try a picture from your camera or library.");
+      return;
+    }
+    try {
+      const [full, thumb] = await Promise.all([shrinkPhoto(file, 1280, 0.82), shrinkPhoto(file, 240, 0.7)]);
+      setPhoto({ full, thumb });
+      setTimeout(() => inputRef.current?.focus(), 30);
+    } catch {
+      setPhotoNote("Couldn't open that photo here. Try another, or take a screenshot of it.");
+    }
+  }
+  // Closing the chat stops listening and talking (and ends conversation mode).
+  useEffect(() => {
+    if (!open) voiceRef.current.stopAll();
+  }, [open]);
 
   const audience: "public" | "member" | "admin" =
     mode === "admin" ? "admin" : path.startsWith("/gallery") ? "member" : "public";
@@ -260,9 +337,14 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   // --------------------------------------------------------------- sending
   const send = useCallback(
     async (text: string, base?: Msg[]) => {
-      const content = text.trim();
+      const typed = text.trim();
+      const pic = photoRef.current;
+      // A photo can go on its own; the Concierge sees "[Photo]" in the text.
+      const content = pic ? `${PHOTO_TAG}${typed ? ` ${typed}` : ""}` : typed;
       if (!content || sending) return;
-      const userMsg: Msg = { id: uid(), role: "user", content };
+      const userMsg: Msg = { id: uid(), role: "user", content, photoThumb: pic?.thumb };
+      if (pic) setPhoto(null);
+      if (pic && mode === "admin") chatPhotoRef.current = pic;
       const thread = [...(base ?? messages).filter((m) => !m.error), userMsg];
       setMessages(thread);
       setInput("");
@@ -285,17 +367,27 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
         const res = await fetch("/api/assistant/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode, messages: history, conversationId: conversationId(mode) }),
+          body: JSON.stringify({ mode, messages: history, conversationId: conversationId(mode), ...(pic ? { photo: pic.full } : {}), ...(voiceRef.current.handsFree ? { conversation: true } : {}) }),
           signal: ctrl.signal,
         });
         const data = (await res.json().catch(() => null)) as ChatReply | null;
         if (gen !== genRef.current) return;
         if (!data || typeof data.reply !== "string") throw new Error("bad response");
+        const replyId = uid();
+        const voiceSig = typeof data.voiceSig === "string" ? data.voiceSig : undefined;
+        // "Read answers aloud" or conversation mode is on: read this one (the person chose this).
+        const v = voiceRef.current;
+        // Conversation mode ends when the Concierge says goodbye (or they plainly said bye/thanks, I'm good).
+        const done = v.handsFree && (data.endConversation === true || SIGN_OFF.test(content.trim()));
+        if (done) v.endAfterSpeaking();
+        if (voiceSig && (v.readAloud || v.handsFree)) setTimeout(() => voiceRef.current.speak(replyId, data.reply, voiceSig), 50);
+        else if (v.handsFree) v.setHandsFree(false);
         setMessages((prev) => [
           ...prev,
           {
-            id: uid(),
+            id: replyId,
             role: "assistant",
+            voiceSig,
             content: data.reply,
             actions: data.actions,
             actionState: {},
@@ -307,6 +399,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
         ]);
       } catch (err) {
         if (gen !== genRef.current) return;
+        if (voiceRef.current.handsFree) voiceRef.current.setHandsFree(false);
         const aborted = err instanceof Error && err.name === "AbortError";
         setMessages((prev) => [
           ...prev,
@@ -509,7 +602,8 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   };
 
   const applyDraft = (draft: CampaignDraft) => {
-    window.dispatchEvent(new CustomEvent(EVT_USE_DRAFT, { detail: draft }));
+    const pic = draft.photo ? chatPhotoRef.current : null;
+    window.dispatchEvent(new CustomEvent(EVT_USE_DRAFT, { detail: pic ? { ...draft, photoData: pic.full } : draft }));
     if (window.matchMedia("(max-width: 640px)").matches) setOpen(false);
   };
 
@@ -603,8 +697,23 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                   )}
                   <div className="as-stack">
                     <div className="as-bubble">
-                      {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
+                      {m.photoThumb && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="as-photo" src={m.photoThumb} alt="Your photo" />
+                      )}
+                      {m.role === "assistant" ? <Markdown text={m.content} /> : m.content.startsWith(PHOTO_TAG) ? (m.content.slice(PHOTO_TAG.length).trim() || (m.photoThumb ? "" : "📷 Photo")) : m.content}
                     </div>
+                    {m.role === "assistant" && m.voiceSig && status?.voice && (
+                      <button
+                        type="button"
+                        className={`as-play${voice.playing === m.id ? " is-playing" : ""}`}
+                        onClick={() => voice.speak(m.id, m.content, m.voiceSig!)}
+                        disabled={voice.loadingId === m.id}
+                        aria-label={voice.playing === m.id ? "Stop reading aloud" : "Read this answer aloud"}
+                      >
+                        {voice.loadingId === m.id ? "…" : voice.playing === m.id ? "■ Stop" : "▶ Listen"}
+                      </button>
+                    )}
                     {m.products && m.products.length > 0 && (
                       <div className={`as-prods${m.products.length === 1 ? " is-single" : ""}`} role="list" aria-label="Recommended products">
                         {m.products.map((c, i) => {
@@ -706,8 +815,9 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                           {m.draft.audience === "members" ? "members only" : m.draft.audience === "nonmembers" ? "non-members" : m.draft.audience === "custom" ? m.draft.groupLabel || "a chosen group" : m.draft.audience === "subscribers" ? "subscribers" : "subscribers + all members"}
                         </div>
                         <div className="as-card-title">{m.draft.subject}</div>
-                        <div className="as-draft-body">{m.draft.body}</div>
-                        {isAdmin && <EmailPreview subject={m.draft.subject} body={m.draft.body} />}
+                        {m.draft.photo && chatPhotoRef.current && <img className="as-photo" src={chatPhotoRef.current.thumb} alt={m.draft.photo.alt} />}
+                        <div className="as-draft-body">{m.draft.body.split(PHOTO_SLOT).join("📷 (your photo)")}</div>
+                        {isAdmin && <EmailPreview subject={m.draft.subject} body={m.draft.body.split(PHOTO_SLOT).join("*📷 Your photo from the chat goes here*")} />}
                         <div className="as-card-actions">
                           {isAdmin && (
                             <button className="as-btn as-btn-primary" onClick={() => applyDraft(m.draft!)}>
@@ -747,6 +857,20 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
           </div>
 
           {!staffBlocked && (
+            <>
+            {(photo || photoNote) && (
+              <div className="as-photo-tray">
+                {photo && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photo.thumb} alt="Photo to send" />
+                    <span>Photo ready — add a question, or just send.</span>
+                    <button type="button" className="as-photo-x" onClick={() => setPhoto(null)} aria-label="Remove photo">×</button>
+                  </>
+                )}
+                {!photo && photoNote && <span className="as-photo-note">{photoNote}</span>}
+              </div>
+            )}
             <form
               className="as-compose"
               onSubmit={(e) => {
@@ -768,12 +892,73 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                 rows={1}
                 aria-label="Message"
               />
-              <button className="as-send" type="submit" disabled={!input.trim() || sending} aria-label="Send">
+              {status?.photos && (
+                <>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => {
+                      pickPhoto(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  <button type="button" className="as-cam" onClick={() => fileRef.current?.click()} disabled={sending} aria-label="Add a photo (take one or choose from your library)" title="Add a photo">
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" /><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+                  </button>
+                </>
+              )}
+              {voice.canRecord && (
+                <button
+                  type="button"
+                  className={`as-mic${voice.recording ? " is-on" : ""}`}
+                  onClick={() => voice.micTap()}
+                  disabled={voice.listening || sending}
+                  aria-label={voice.recording ? "Stop and use what I said" : voice.playing ? "Stop the answer and talk" : "Talk instead of typing"}
+                  title={voice.recording ? "Tap to stop" : voice.playing ? "Tap to interrupt" : "Tap to talk"}
+                >
+                  {voice.listening ? (
+                    <span className="as-mic-dots" aria-hidden="true">…</span>
+                  ) : voice.recording ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" /></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-7 9a7 7 0 0 0 14 0M12 19v3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                  )}
+                </button>
+              )}
+              <button className="as-send" type="submit" disabled={(!input.trim() && !photo) || sending} aria-label="Send">
                 <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
                   <path d="M4 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </form>
+            </>
+          )}
+          {(voice.recording || voice.listening || voice.note || (voice.handsFree && voice.playing)) && (
+            <div className={`as-voice-status${voice.recording ? " is-rec" : ""}`} role="status" aria-live="polite">
+              {voice.recording
+                ? voice.handsFree
+                  ? voice.heard ? "Listening… pause when you're done" : "Listening — go ahead"
+                  : `Listening… ${voice.seconds}s — tap ■ when you're done${voice.seconds >= voice.maxSeconds - 10 ? ` (stops at ${voice.maxSeconds}s)` : ""}`
+                : voice.listening
+                  ? "Getting your words…"
+                  : voice.handsFree && voice.playing
+                    ? "Speaking… just start talking (or tap the mic) to interrupt"
+                    : voice.note}
+            </div>
+          )}
+          {status?.voice && (
+            <div className="as-voice-opts">
+              {voice.canRecord && (
+                <label className="as-readaloud">
+                  <input type="checkbox" checked={voice.handsFree} onChange={(e) => voice.setHandsFree(e.target.checked)} /> Conversation mode
+                </label>
+              )}
+              <label className="as-readaloud">
+                <input type="checkbox" checked={voice.readAloud || voice.handsFree} disabled={voice.handsFree} onChange={(e) => voice.setReadAloud(e.target.checked)} /> Read answers aloud
+              </label>
+            </div>
           )}
           <div className="as-foot">
             {isAdmin ? "Changes always wait for your confirmation." : "Automated assistant — can make mistakes. Not medical advice."}

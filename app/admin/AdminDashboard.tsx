@@ -21,15 +21,25 @@ import CampaignHistory from "./CampaignHistory";
 import RemindersPanel from "./RemindersPanel";
 import StaffPanel from "./StaffPanel";
 import SettingsTiles from "./SettingsTiles";
+import RowMenu from "./RowMenu";
+import StoreLocationsPanel from "./StoreLocationsPanel";
+import DiscountCodeList, { codeState } from "./DiscountCodeList";
 import { useAdminTheme } from "./useAdminTheme";
 import MediaUpload from "./MediaUpload";
+import { dataUrlToBlob, imageLine, uploadCampaignImage } from "./campaignImage";
 import BundlesPanel from "./BundlesPanel";
 import TodayBulletin from "./TodayBulletin";
 import ShippingWeights from "./ShippingWeights";
+import StockCounts from "./StockCounts";
+import VenmoInbox from "./VenmoInbox";
+import VoiceSettings from "./VoiceSettings";
+import AmbassadorsPanel from "./AmbassadorsPanel";
+import { backorders } from "@/lib/stockMath";
 import EventOfferPicker from "./EventOfferPicker";
+import StaffPhraseCard from "./StaffPhraseCard";
 import { ShopifyImportButton, InvitePanel } from "./MemberImport";
 import { orderWeight, packagingOzOf, DEFAULT_PACKAGING_OZ } from "@/lib/shippingWeight";
-import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_USE_DRAFT, type CampaignDraft } from "@/lib/assistant/shared";
+import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_USE_DRAFT, PHOTO_SLOT, type CampaignDraft } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
 
 // Extended type – bulk orders have an `items` array
@@ -45,7 +55,7 @@ const SUBS_PER_PAGE = 25;
 // Deprecated screen; flip to true to bring it back temporarily.
 const SHOW_LEGACY_INQUIRY_ARCHIVE = false;
 
-type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "assistant" | "settings";
+type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "ambassadors" | "assistant" | "settings";
 
 const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "overview", label: "Overview", icon: "◧" },
@@ -55,6 +65,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "products", label: "Products", icon: "🏷️" },
   { key: "events", label: "Events", icon: "🎟" },
   { key: "marketing", label: "Marketing", icon: "✦" },
+  { key: "ambassadors", label: "Ambassadors", icon: "★" },
   { key: "assistant", label: "Assistant", icon: "✧" },
   { key: "settings", label: "Settings", icon: "⚙" },
 ];
@@ -197,12 +208,26 @@ export default function AdminDashboard({
   const [editSalePrice, setEditSalePrice] = useState("");
   const [editPromoType, setEditPromoType] = useState<"none" | "percent" | "bogo">("none");
   const [editPromoPercent, setEditPromoPercent] = useState(10);
+  const [editCashOnly, setEditCashOnly] = useState(false);
+  // "Cash pickup only" sales: the tick shows while the cash_pickup switch is on (or the product already has it).
+  const [cashPickupOn, setCashPickupOn] = useState(false);
+  useEffect(() => {
+    fetch("/api/admin/flags", { cache: "no-store" })
+      .then((x) => (x.ok ? x.json() : null))
+      .then((f) => setCashPickupOn(!!f?.flags?.find((x: { key: string; on: boolean }) => x.key === "cash_pickup")?.on))
+      .catch(() => {});
+  }, []);
   const [editVisibility, setEditVisibility] = useState<"internal" | "external" | "both">("internal");
   const [editIsBundleProd, setEditIsBundleProd] = useState(false);
   const [editCategory, setEditCategory] = useState("");
   const [editImage, setEditImage] = useState("");
   const [editVideo, setEditVideo] = useState("");
   const [editWeight, setEditWeight] = useState("");
+  // Stock counts (lib/stock.ts): "" = not counted; null while loading.
+  const [editStock, setEditStock] = useState<string | null>(null);
+  const [editStockWas, setEditStockWas] = useState<string | null>(null);
+  // Stock counts for the product cards (lib/stock.ts); null = not loaded.
+  const [stockMap, setStockMap] = useState<Record<string, number> | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editMsg, setEditMsg] = useState("");
 
@@ -213,6 +238,7 @@ export default function AdminDashboard({
   const [salePrice, setSalePrice] = useState("");
   const [promoType, setPromoType] = useState<"none" | "percent" | "bogo">("none");
   const [promoPercent, setPromoPercent] = useState(10);
+  const [cashOnly, setCashOnly] = useState(false);
   const [visibility, setVisibility] = useState<"internal" | "external" | "both">("internal");
   const [isBundleProd, setIsBundleProd] = useState(false);
   const [category, setCategory] = useState("");
@@ -468,6 +494,18 @@ export default function AdminDashboard({
   const [showSubs, setShowSubs] = useState(false);
   const [campSubject, setCampSubject] = useState("");
   const [campBody, setCampBody] = useState("");
+  const campBodyRef = useRef<HTMLTextAreaElement>(null);
+  const campCursorSet = useRef(false);
+  // Put an uploaded photo where the cursor is in the message (or at the end), on its own line.
+  function insertCampImage(url: string) {
+    const el = campBodyRef.current;
+    setCampBody((body) => {
+      // The cursor stays put when the Upload button takes the focus; untouched box = the end.
+      const at = el && campCursorSet.current ? Math.min(el.selectionStart, body.length) : body.length;
+      const before = body.slice(0, at).replace(/\s+$/, ""), after = body.slice(at).replace(/^\s+/, "");
+      return [before, imageLine(url, "Photo", body), after].filter(Boolean).join("\n\n");
+    });
+  }
   const [campSending, setCampSending] = useState(false);
   const [campMsg, setCampMsg] = useState("");
 
@@ -663,6 +701,10 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       setCampMsg("Add a subject and a message first.");
       return;
     }
+    if (campBody.includes(PHOTO_SLOT)) {
+      setCampMsg("The photo from the chat hasn't been added yet. Use Upload photo, or delete the [[PHOTO]] line.");
+      return;
+    }
     if (!testOnly && campAudience === "groups" && campGroups.length === 0) {
       setCampMsg("Pick at least one group to send to.");
       return;
@@ -783,6 +825,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
   const [dcMaxUses, setDcMaxUses] = useState("");
   const [dcPerCustomer, setDcPerCustomer] = useState("");
   const [dcMinOrder, setDcMinOrder] = useState("");
+  const [dcPublic, setDcPublic] = useState(false);
   const [dcSaving, setDcSaving] = useState(false);
   const [dcMsg, setDcMsg] = useState("");
 
@@ -812,13 +855,14 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           maxUses: dcMaxUses || undefined,
           perCustomerLimit: dcPerCustomer || undefined,
           minOrderAmount: dcMinOrder || undefined,
+          publicShop: dcPublic || undefined,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setDiscounts([data.discount, ...discounts]);
         setDcCode(""); setDcValue(""); setDcLabel(""); setDcExpires("");
-        setDcMaxUses(""); setDcPerCustomer(""); setDcMinOrder("");
+        setDcMaxUses(""); setDcPerCustomer(""); setDcMinOrder(""); setDcPublic(false);
         setDcMsg(`Created ${data.discount.code}.`);
         setTimeout(() => setDcMsg(""), 3000);
       } else {
@@ -836,6 +880,15 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, active }),
+    });
+  }
+
+  async function togglePublicShop(id: string, publicShop: boolean) {
+    setDiscounts(discounts.map((d) => (d.id === id ? { ...d, publicShop } : d)));
+    await adminFetch("/api/admin/discounts", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, publicShop }),
     });
   }
 
@@ -1168,6 +1221,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             name, description, price, salePrice, category, image, video: video.trim(), weightOz: Number(newWeight) > 0 ? Number(newWeight) : undefined,
             visibility, isBundle: isBundleProd,
             promo: promoType !== "none" ? { type: promoType, percent: promoPercent } : undefined,
+            cashOnly: cashOnly && (!!salePrice.trim() || promoType !== "none"),
           }),
         },
         // Only call it saved once the new product reads back.
@@ -1183,6 +1237,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       setSalePrice("");
       setPromoType("none");
       setPromoPercent(10);
+      setCashOnly(false);
       setVisibility("internal");
       setIsBundleProd(false);
       setCategory("");
@@ -1197,6 +1252,19 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setAdding(false);
   }
 
+  function loadStock() {
+    fetch("/api/admin/stock", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d?.stock && setStockMap(d.stock))
+      .catch(() => {});
+  }
+  useEffect(() => {
+    if (tab === "products") loadStock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+  // Units owed to customers, per product (shown on cards + the edit card).
+  const owedByProduct = useMemo(() => backorders(orders.map((o) => ({ ...o, status: normalizeStatus(o.status) })), products), [orders, products]);
+
   function openEditProduct(p: Product) {
     setEditProduct(p);
     setEditName(p.name);
@@ -1205,6 +1273,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setEditSalePrice(p.salePrice || "");
     setEditPromoType(p.promo?.type || "none");
     setEditPromoPercent(p.promo?.percent || 10);
+    setEditCashOnly(!!p.cashOnly);
     setEditVisibility(p.visibility || (p.retail ? "both" : "internal"));
     setEditIsBundleProd(!!p.isBundle);
     setEditCategory(p.category || "");
@@ -1212,6 +1281,16 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setEditVideo(p.video || "");
     setEditWeight(p.weightOz ? String(p.weightOz) : "");
     setEditMsg("");
+    setEditStock(null);
+    setEditStockWas(null);
+    adminFetch("/api/admin/stock", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const v = d?.stock && p.id in d.stock ? String(d.stock[p.id]) : "";
+        setEditStock(v);
+        setEditStockWas(v);
+      })
+      .catch(() => {});
   }
 
   function closeEditProduct() {
@@ -1240,6 +1319,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               price: editPrice.trim(),
               salePrice: editSalePrice.trim() || undefined,
               promo: editPromoType !== "none" ? { type: editPromoType, percent: editPromoPercent } : undefined,
+              cashOnly: editCashOnly && (!!editSalePrice.trim() || editPromoType !== "none") ? true : undefined,
               visibility: editVisibility,
               isBundle: editIsBundleProd,
               category: editCategory.trim() || undefined,
@@ -1266,6 +1346,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         price: editPrice.trim(),
         salePrice: editSalePrice.trim(),
         promo: editPromoType !== "none" ? { type: editPromoType, percent: editPromoPercent } : undefined,
+        cashOnly: editCashOnly && (!!editSalePrice.trim() || editPromoType !== "none"),
         visibility: editVisibility,
         isBundle: editIsBundleProd,
         category: editCategory.trim(),
@@ -1289,6 +1370,24 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       }
       )
     );
+
+    // Stock count: its own store, saved only when it changed.
+    if (res.ok && !editIsBundleProd && editStock !== null && editStockWas !== null && editStock.trim() !== editStockWas) {
+      const sr = await adminFetch("/api/admin/stock", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ counts: { [editedId]: editStock.trim() === "" ? null : Number(editStock) } }),
+      });
+      if (!sr.ok) {
+        const d = await sr.json().catch(() => ({}));
+        setEditSubmitting(false);
+        setEditMsg(`Saved the product, but not the stock count: ${d.error || "please try again."}`);
+        return;
+      }
+      setEditStockWas(editStock.trim());
+      loadStock();
+      window.dispatchEvent(new CustomEvent(EVT_ADMIN_REFRESH, { detail: ["products"] }));
+    }
 
     setEditSubmitting(false);
 
@@ -2315,6 +2414,23 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       );
       setTab("marketing");
       setTimeout(() => document.getElementById("campaign-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+      // The photo staff sent the Concierge: upload it and put it where [[PHOTO]] is.
+      if (d.photo && d.body.includes(PHOTO_SLOT)) {
+        const alt = typeof d.photo.alt === "string" ? d.photo.alt : "Photo";
+        const fill = (line: string) => setCampBody((b) => b.split(PHOTO_SLOT).join(line).replace(/\n{3,}/g, "\n\n").trim());
+        if (typeof d.photoData !== "string" || !d.photoData.startsWith("data:image/")) {
+          setCampMsg("Draft from the assistant. The photo from the chat isn't in this browser any more (the page was reloaded), so use Upload photo below to add it where [[PHOTO]] is.");
+        } else {
+          setCampMsg("Draft from the assistant. Adding the photo from the chat…");
+          dataUrlToBlob(d.photoData)
+            .then((blob) => uploadCampaignImage(blob, alt))
+            .then((url) => {
+              fill(imageLine(url, alt, d.body));
+              setCampMsg("Draft from the assistant, with the photo from the chat. Review it, send yourself a test, then send.");
+            })
+            .catch(() => setCampMsg("Couldn't add the photo from the chat. Use Upload photo below to add it where [[PHOTO]] is."));
+        }
+      }
     };
     window.addEventListener(EVT_ADMIN_REFRESH, onRefresh);
     window.addEventListener(EVT_USE_DRAFT, onDraft);
@@ -2646,6 +2762,8 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       </section>
       )}
 
+      {tab === "orders" && <VenmoInbox onPaid={() => loadOrders()} />}
+
       {/* Orders queue */}
       {tab === "orders" && (
       <section className="admin-section">
@@ -2746,7 +2864,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       )}
                     </div>
                     <div className="email">
-                      {o.items.map((i) => `${i.productName} ×${i.quantity}`).join(", ")}
+                      {o.items.map((i) => `${i.productName} ×${i.quantity}${i.restocking ? " (restocking)" : ""}`).join(", ")}
                     </div>
                     <div className="user-meta">
                       {formatDateTime(o.createdAt)} · {o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
@@ -2960,26 +3078,21 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                         </div>
                       </div>
                       <div className="user-actions">
+                        {/* Everyday actions stay as buttons; the rest sit in More ▾ (same handlers). */}
                         <button onClick={() => openEditMember(u)}>Edit</button>
                         <button onClick={() => openMemberMessage(u)}>Message</button>
-                        <button onClick={() => openLoyalty(u)}>
-                          Points{typeof (u as any).loyaltyPoints === "number" ? ` (${(u as any).loyaltyPoints})` : ""}
-                        </button>
                         <button onClick={() => openHistory(u)}>History</button>
                         {u.needsPassword && <button onClick={() => sendSetupLink(u)}>Send set-password link</button>}
-                        <button onClick={() => handleResetPassword(u)}>Reset password</button>
-                        <button onClick={() => loginAs(u)} title="Open the members' site signed in as them, for up to an hour">Log in as</button>
-                        <button
-                          onClick={() => openShippingModal(u)}
-                          disabled={!u.addressLine1}
-                          title={!u.addressLine1 ? "No address on file" : "Create shipping label"}
-                        >
-                          Ship to Shippo
-                        </button>
-                        <button onClick={() => openInvoiceModal(u)}>Generate invoice</button>
-                        <button className="danger" onClick={() => handleDeleteUser(u.id, u.email)} disabled={pendingActions.has(u.id)}>
-                          Delete
-                        </button>
+                        <RowMenu
+                          items={[
+                            { label: `Points${typeof (u as any).loyaltyPoints === "number" ? ` (${(u as any).loyaltyPoints})` : ""}`, onSelect: () => openLoyalty(u) },
+                            { label: "Generate invoice", onSelect: () => openInvoiceModal(u) },
+                            { label: "Ship to Shippo", onSelect: () => openShippingModal(u), disabled: !u.addressLine1, hint: !u.addressLine1 ? "No address on file" : undefined },
+                            { label: "Log in as", onSelect: () => loginAs(u), title: "Open the members' site signed in as them, for up to an hour" },
+                            { label: "Reset password", onSelect: () => handleResetPassword(u) },
+                            { label: "Delete", onSelect: () => handleDeleteUser(u.id, u.email), danger: true, separated: true, disabled: pendingActions.has(u.id) },
+                          ]}
+                        />
                       </div>
                     </div>
                   ))}
@@ -3190,6 +3303,16 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                         {vis === "internal" ? "Members" : vis === "both" ? "Members + Public" : "Public"}
                       </button>
                       {p.isBundle && <span className="vis-chip vis-bundle">Bundle</span>}
+                      {!p.isBundle && stockMap && p.id in stockMap && (
+                        <span className={`stock-card-chip${stockMap[p.id] <= 0 ? " is-zero" : stockMap[p.id] <= 3 ? " is-low" : ""}`} title="Products → Stock counts">
+                          {stockMap[p.id] <= 0 ? "Restocking" : `${stockMap[p.id]} in stock`}
+                        </span>
+                      )}
+                      {owedByProduct.get(p.id) && (
+                        <span className="stock-card-chip is-owed" title="Ordered while at 0: send these when new stock arrives">
+                          {owedByProduct.get(p.id)!.units} on backorder
+                        </span>
+                      )}
                     </div>
                     <div className="prod-price">
                       {p.salePrice?.trim() ? (
@@ -3201,6 +3324,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       )}
                       {p.promo?.type === "percent" && <span className="prod-promo">{p.promo.percent}% off</span>}
                       {p.promo?.type === "bogo" && <span className="prod-promo">BOGO {p.promo.percent}%</span>}
+                      {p.cashOnly && (p.salePrice?.trim() || p.promo) && <span className="prod-promo">💵 Cash pickup only</span>}
                     </div>
                   </div>
 
@@ -3225,6 +3349,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       {tab === "products" && (
         <ShippingWeights products={products} onSaved={(up) => setProducts((prev) => prev.map((p) => up.find((u) => u.id === p.id) || p))} />
       )}
+      {tab === "products" && <StockCounts products={products} orders={orders} />}
 
       {/* Classes & events */}
       {tab === "events" && (
@@ -3331,8 +3456,10 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           <div className="field full">
             <label>Message</label>
             <textarea
+              ref={campBodyRef}
               rows={10}
               value={campBody}
+              onFocus={() => (campCursorSet.current = true)}
               onChange={(e) => setCampBody(e.target.value)}
               placeholder={`# Fresh batch just landed
 
@@ -3343,11 +3470,13 @@ We just finished a new run and wanted you to hear it first.
 
 [Browse the shop](${brand.siteUrl})`}
             />
+            <MediaUpload kind="image" value="" onUploaded={insertCampImage} />
             <div className="field-hint">
               Just type — it's formatted into the {brand.shortName} template automatically.
               Blank line for a new paragraph, <code>#</code> for a heading,{" "}
               <code>-</code> for bullets, <code>**bold**</code>, and{" "}
               <code>[Button text](https://…)</code> on its own line for a green button.
+              <strong>Upload photo</strong> adds a picture where your cursor is (or <code>![description](https://…)</code> on its own line).
               Pasted HTML is used as-is. <a href="/help#tab-marketing" target="_blank">See examples in the staff guide →</a>
             </div>
           </div>
@@ -3514,12 +3643,13 @@ We just finished a new run and wanted you to hear it first.
 
       {/* Discount codes */}
       {tab === "marketing" && <BundlesPanel products={products} />}
+      {tab === "ambassadors" && <AmbassadorsPanel products={products} />}
       {tab === "marketing" && (
       <section className="admin-section">
         <h2>
           Discount codes
-          {discounts.filter((d) => d.active).length > 0 && (
-            <span className="badge">{discounts.filter((d) => d.active).length}</span>
+          {discounts.filter((d) => codeState(d) === "live").length > 0 && (
+            <span className="badge">{discounts.filter((d) => codeState(d) === "live").length}</span>
           )}
         </h2>
         <div className="notice">
@@ -3563,6 +3693,10 @@ We just finished a new run and wanted you to hear it first.
             <label>Minimum order ($)</label>
             <input type="number" min="0" step="0.01" value={dcMinOrder} onChange={(e) => setDcMinOrder(e.target.value)} placeholder="None" />
           </div>
+          <div className="field full">
+            <label className="check-row"><input type="checkbox" checked={dcPublic} onChange={(e) => setDcPublic(e.target.checked)} /> <span>Also works in the public shop (public products, no account needed)</span></label>
+            <div className="field-hint">Off = members only. Codes linked to an ambassador always work in the public shop too.</div>
+          </div>
           <div className="full">
             <button type="submit" className="submit" disabled={dcSaving}>
               {dcSaving ? "Creating…" : "Create code"}
@@ -3571,53 +3705,15 @@ We just finished a new run and wanted you to hear it first.
           </div>
         </form>
 
-        {discounts.length > 0 && (
-          <div className="admin-list" style={{ marginTop: "1.5rem" }}>
-            {discounts.map((d) => {
-              const revenue = (d.usedBy || []).reduce((n: number, u: any) => n + (u.amount || 0), 0);
-              return (
-                <div key={d.id} className="user-row">
-                  <div className="user-main">
-                    <div className="name" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
-                      <span style={{ fontFamily: "Consolas, monospace", letterSpacing: "0.05em" }}>{d.code}</span>
-                      <span style={{ color: "var(--ink-soft)", fontWeight: 400 }}>
-                        {d.type === "percentage" ? `${d.value}% off` : `$${d.value} off`}
-                      </span>
-                      {!d.active && (
-                        <span style={{ padding: "0.12rem 0.5rem", borderRadius: "999px", fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", background: "var(--grey)", color: "var(--white)" }}>
-                          Inactive
-                        </span>
-                      )}
-                      {d.expiresAt && d.expiresAt < Date.now() && (
-                        <span style={{ padding: "0.12rem 0.5rem", borderRadius: "999px", fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", background: "var(--red)", color: "var(--white)" }}>
-                          Expired
-                        </span>
-                      )}
-                    </div>
-                    {d.label && <div className="email">{d.label}</div>}
-                    <div className="user-meta">
-                      Used {d.uses}{d.maxUses ? ` / ${d.maxUses}` : ""} time{d.uses === 1 ? "" : "s"}
-                      {revenue > 0 ? ` · $${revenue.toFixed(2)} discounted` : ""}
-                      {d.minOrderAmount ? ` · min $${d.minOrderAmount}` : ""}
-                      {d.expiresAt ? ` · expires ${formatDate(d.expiresAt)}` : ""}
-                    </div>
-                  </div>
-                  <div className="user-actions">
-                    <button onClick={() => toggleDiscount(d.id, !d.active)}>
-                      {d.active ? "Deactivate" : "Activate"}
-                    </button>
-                    <button className="danger" onClick={() => deleteDiscount(d.id, d.code)}>Delete</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div style={{ marginTop: "1.5rem" }}>
+          <DiscountCodeList discounts={discounts} onToggle={toggleDiscount} onTogglePublic={togglePublicShop} onDelete={deleteDiscount} formatDate={formatDate} />
+        </div>
       </section>
       )}
 
       {tab === "analytics" && <AnalyticsDashboard />}
       {tab === "assistant" && <AssistantPanel />}
+      {tab === "assistant" && <VoiceSettings />}
 
 
       {tab === "marketing" && (
@@ -3732,15 +3828,19 @@ We just finished a new run and wanted you to hear it first.
             ) },
             { key: "flags", icon: "🎛️", title: "Feature switches", summary: "Turn features on or off without a redeploy.", render: () => <FlagsPanel fold={false} /> },
             { key: "reminders", icon: "⏰", title: "Payment reminders", summary: "Timing and wording of the automatic reminder emails.", badge: expiredCount, render: () => <RemindersPanel fold={false} /> },
-            { key: "staff", icon: "🔑", title: "Staff sign-in", summary: "Who can get a one-time sign-in link by email.", render: () => <StaffPanel /> },
-            { key: "password", icon: "🔒", title: "Steward password", summary: "Change the shared admin password.", render: () => (
+            { key: "staff", icon: "🔑", title: "Staff sign-in", summary: "Who can sign in with an emailed link, and Face ID for their devices.", render: () => <StaffPanel /> },
+            { key: "password", icon: "🔒", title: "Steward password", summary: "Today's staff password.", render: () => (
       <section className="admin-section">
-        <h2>Change steward password</h2>
+        <h2>Steward password</h2>
         <div className="notice">This is your admin sign-in. Member access is managed through the sections above — there is no longer a shared site password.</div>
-        <form className="admin-form" onSubmit={handlePwChange}>
-          <div className="field full"><label>New admin password</label><input type="text" placeholder="New password" value={newAdminPw} onChange={(e) => setNewAdminPw(e.target.value)} /></div>
-          <div className="full"><button type="submit" className="submit">Update password</button>{pwMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{pwMsg}</span>}</div>
-        </form>
+        <StaffPhraseCard
+          fixedPassword={
+            <form className="admin-form" onSubmit={handlePwChange}>
+              <div className="field full"><label>New admin password</label><input type="text" placeholder="New password" value={newAdminPw} onChange={(e) => setNewAdminPw(e.target.value)} /></div>
+              <div className="full"><button type="submit" className="submit">Update password</button>{pwMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{pwMsg}</span>}</div>
+            </form>
+          }
+        />
       </section>
             ) },
             { key: "export", icon: "📧", title: "Email data export", summary: "Send tonight's report and CSV backups now.", render: () => (
@@ -3751,6 +3851,7 @@ We just finished a new run and wanted you to hear it first.
         {exportMsg && <div style={{ marginTop: "1rem", fontStyle: "italic", color: "var(--mint)" }}>{exportMsg}</div>}
       </section>
             ) },
+            { key: "stores", icon: "📍", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
             { key: "activity", icon: "📜", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
           ]}
         />
@@ -3783,7 +3884,7 @@ We just finished a new run and wanted you to hear it first.
                           </div>
                           <div className="history-date">{formatDateTime(o.createdAt)}</div>
                           <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
-                            {o.items.map((i) => `${i.productName} ×${i.quantity}`).join(", ")}
+                            {o.items.map((i) => `${i.productName} ×${i.quantity}${i.restocking ? " (restocking)" : ""}`).join(", ")}
                           </div>
                           <div style={{ fontSize: "0.75rem", color: "var(--accent-strong)", marginTop: "0.35rem", fontWeight: 600 }}>
                             Click to manage →
@@ -4054,6 +4155,12 @@ We just finished a new run and wanted you to hear it first.
                     )}
                     {promoType !== "none" && <span>%</span>}
                   </div>
+                  {cashPickupOn && (salePrice.trim() || promoType !== "none") && (
+                    <label className="cash-only-tick">
+                      <input type="checkbox" checked={cashOnly} onChange={(e) => setCashOnly(e.target.checked)} />
+                      <span>💵 Cash pickup only <small>The sale applies only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
+                    </label>
+                  )}
                 </div>
                 <div className="field">
                   <label>Where it sells</label>
@@ -4122,11 +4229,35 @@ We just finished a new run and wanted you to hear it first.
                   <div style={{ fontSize: "0.75rem", color: "var(--ink-soft)", marginTop: "0.3rem" }}>
                     "% off" discounts the price directly. BOGO discounts every 2nd item in the cart.
                   </div>
+                  {(cashPickupOn || editCashOnly) && (editSalePrice.trim() || editPromoType !== "none") && (
+                    <label className="cash-only-tick">
+                      <input type="checkbox" checked={editCashOnly} onChange={(e) => setEditCashOnly(e.target.checked)} />
+                      <span>💵 Cash pickup only <small>The sale price and promotion apply only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
+                    </label>
+                  )}
                 </div>
                 <div className="field"><label>Category (optional)</label><input value={editCategory} onChange={(e) => setEditCategory(e.target.value)} /></div>
                 <div className="field"><label>Photo</label><input required placeholder="Upload, or paste an image link" value={editImage} onChange={(e) => setEditImage(e.target.value)} /><MediaUpload kind="image" value={editImage} onUploaded={setEditImage} /></div>
                 <div className="field"><label>Video (optional)</label><input placeholder="Upload an MP4, or paste a YouTube / Vimeo link" value={editVideo} onChange={(e) => setEditVideo(e.target.value)} /><MediaUpload kind="video" value={editVideo} onUploaded={setEditVideo} /></div>
                 <div className="field"><label>Shipping weight (oz)</label><input type="number" inputMode="decimal" min="0" step="0.1" placeholder="One packed unit, e.g. 4.5" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} /><div className="field-hint">Used to work out shipping label weights automatically.</div></div>
+                {editIsBundleProd ? (
+                  <div className="field"><label>In stock</label><div className="field-hint">A bundle uses the stock counts of the products in it.</div></div>
+                ) : (
+                  <div className="field">
+                    <label>In stock</label>
+                    <input type="number" inputMode="numeric" min="0" step="1" placeholder={editStock === null ? "Loading…" : "Not counted"} disabled={editStock === null} value={editStock ?? ""} onChange={(e) => setEditStock(e.target.value)} />
+                    {editProduct && owedByProduct.get(editProduct.id) && (
+                      <div className="stock-edit-owed">
+                        <strong>{owedByProduct.get(editProduct.id)!.units} on backorder</strong> from {owedByProduct.get(editProduct.id)!.orders} open order{owedByProduct.get(editProduct.id)!.orders === 1 ? "" : "s"}. When new stock arrives, send those first and count the rest here.
+                      </div>
+                    )}
+                    <div className="field-hint">
+                      {editStock !== null && editStock.trim() !== "" && Number(editStock) <= 0
+                        ? "At 0 the shop shows “Currently restocking” and people can still order."
+                        : "How many are ready to send. Leave blank to not count it."}
+                    </div>
+                  </div>
+                )}
                 {editProduct && <ProductQr id={editProduct.id} name={editProduct.name} />}
                 <div className="field">
                   <label>Where it sells</label>
@@ -4649,6 +4780,7 @@ function OrderDetailModal({
           </div>
           <h2 className="history-name">{order.userName}</h2>
           <div className="history-email">{order.userEmail}</div>
+          {order.ambassador && <div className="history-email" style={{ color: "var(--accent-strong)" }}>Credited to ambassador {order.ambassador.name} ({order.ambassador.via === "code" ? `their code` : `came through /${order.ambassador.slug}`})</div>}
           {order.placedBy && <div className="history-email" style={{ color: "#b4532a" }}>Placed by staff ({order.placedBy === "admin" ? "shared admin login" : order.placedBy}) using “Log in as”</div>}
         </div>
         <div className="history-body">
@@ -4656,7 +4788,7 @@ function OrderDetailModal({
           <div style={{ border: "1px solid var(--rule-soft)", borderRadius: "6px", padding: "0.9rem 1.1rem", marginBottom: "1.25rem" }}>
             {order.items.map((i, idx) => (
               <div key={idx} style={{ display: "flex", justifyContent: "space-between", padding: "0.3rem 0", fontSize: "0.95rem" }}>
-                <span>{i.productName} × {i.quantity}</span>
+                <span>{i.productName} × {i.quantity}{i.restocking && <span className="stock-chip" title="Ordered while at 0 in Stock counts: send when new stock arrives">Restocking</span>}</span>
                 <span>{i.price}</span>
               </div>
             ))}
@@ -4739,7 +4871,7 @@ function OrderDetailModal({
               </div>
               <div style={{ marginTop: "0.75rem" }}>
                 {brand.payments.venmoHandle && (<a
-                  href={`https://venmo.com/${brand.payments.venmoHandle}?txn=pay&amount=${order.total.toFixed(2)}&note=${encodeURIComponent(`Order for ${order.userName.trim().replace(/\s+/g, " ")}`)}`}
+                  href={`https://venmo.com/${brand.payments.venmoHandle}?txn=pay&amount=${order.total.toFixed(2)}&note=${encodeURIComponent(`Order for ${order.userName.trim().replace(/\s+/g, " ")} #${order.id.slice(-6).toUpperCase()}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{ display: "inline-block", background: "#008CFF", color: "#fff", padding: "0.5rem 1rem", borderRadius: "4px", fontSize: "0.78rem", fontWeight: 700 }}

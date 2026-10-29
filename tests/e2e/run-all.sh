@@ -21,6 +21,24 @@ echo "Descriptions keep every word (unit): $(node "$REPO/tests/unit/description-
 node "$REPO/tests/unit/description-split.cjs" >/dev/null 2>&1 || { echo "Description split unit check failed"; exit 1; }
 echo "Pacific date boxes (unit): $(node "$REPO/tests/unit/pacific-time.cjs" | tail -1)"
 node "$REPO/tests/unit/pacific-time.cjs" >/dev/null 2>&1 || { echo "Pacific time unit check failed"; exit 1; }
+echo "Store map styles (unit): $(node "$REPO/tests/unit/map-style.cjs" | tail -1)"
+node "$REPO/tests/unit/map-style.cjs" >/dev/null 2>&1 || { echo "Store map style unit check failed"; exit 1; }
+echo "Venmo emails: reading, signature, matching (unit): $(node "$REPO/tests/unit/venmo.cjs" | tail -1)"
+node "$REPO/tests/unit/venmo.cjs" >/dev/null 2>&1 || { echo "Venmo unit check failed"; exit 1; }
+echo "Read-aloud numbers (unit): $(node "$REPO/tests/unit/sayable.cjs" | tail -1)"
+node "$REPO/tests/unit/sayable.cjs" >/dev/null 2>&1 || { echo "Read-aloud numbers unit check failed"; exit 1; }
+echo "Ambassador numbers (unit): $(node "$REPO/tests/unit/ambassador-stats.cjs" | tail -1)"
+node "$REPO/tests/unit/ambassador-stats.cjs" >/dev/null 2>&1 || { echo "Ambassador numbers unit check failed"; exit 1; }
+echo "Passkey button wording (unit): $(node "$REPO/tests/unit/unlock-name.cjs" | tail -1)"
+node "$REPO/tests/unit/unlock-name.cjs" >/dev/null 2>&1 || { echo "Passkey wording unit check failed"; exit 1; }
+echo "Passkey signatures readable (unit): $(node "$REPO/tests/unit/passkey-signature.cjs" | tail -1)"
+node "$REPO/tests/unit/passkey-signature.cjs" >/dev/null 2>&1 || { echo "Passkey signature check failed (run npm ci)"; exit 1; }
+echo "Daily staff password (unit): $(node "$REPO/tests/unit/staff-phrase.cjs" | tail -1)"
+node "$REPO/tests/unit/staff-phrase.cjs" >/dev/null 2>&1 || { echo "Daily staff password unit check failed"; exit 1; }
+echo "Cash pickup deals (unit): $(node "$REPO/tests/unit/cash-pricing.cjs" | tail -1)"
+node "$REPO/tests/unit/cash-pricing.cjs" >/dev/null 2>&1 || { echo "Cash pickup pricing unit check failed"; exit 1; }
+echo "Backorders & restock needs (unit): $(node "$REPO/tests/unit/stock-math.cjs" | tail -1)"
+node "$REPO/tests/unit/stock-math.cjs" >/dev/null 2>&1 || { echo "Stock maths unit check failed"; exit 1; }
 echo "Safe storage on Blob (unit): $(node "$REPO/tests/unit/versioned-blob.cjs" 2>/dev/null | tail -1)"
 node "$REPO/tests/unit/versioned-blob.cjs" >/dev/null 2>&1 || { echo "Safe storage unit check failed"; exit 1; }
 echo "Building…"

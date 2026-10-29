@@ -3,7 +3,8 @@ import ScrollHint from "@/app/components/ScrollHint";
 import { AskAssistantLink } from "@/app/components/assistant/AskAssistant";
 import RetailClient from "@/app/retail/RetailClient";
 import { getProducts, isExternal, type Product } from "@/lib/storage";
-import { applyVideoFlag } from "@/lib/flags";
+import { applyVideoFlag, isEnabled } from "@/lib/flags";
+import { applyStockFlag } from "@/lib/stock";
 import { offerForEvent } from "@/lib/eventOffers";
 import JoinForm from "./JoinForm";
 import { brand } from "@/lib/brand";
@@ -27,7 +28,7 @@ export default async function JoinPage({ searchParams }: { searchParams: { event
   // If the shop can't load, the sign-up form still works on its own.
   let shopProducts: Product[] = [];
   try {
-    shopProducts = await applyVideoFlag((await getProducts()).filter(isExternal));
+    shopProducts = await applyStockFlag(await applyVideoFlag((await getProducts()).filter(isExternal)));
   } catch (err) {
     console.error("[join] shop products failed to load", err);
   }
@@ -88,7 +89,7 @@ export default async function JoinPage({ searchParams }: { searchParams: { event
             </div>
           </div>
 
-          <RetailClient products={shopProducts} embedded />
+          <RetailClient products={shopProducts} embedded pickup={await isEnabled("cash_pickup").catch(() => false)} />
 
           <footer className="footnotes">
             <div className="footnotes-ornament" aria-hidden="true">

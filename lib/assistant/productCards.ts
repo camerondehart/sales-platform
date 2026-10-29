@@ -1,5 +1,5 @@
 import type { Product } from "../storage";
-import { effectivePrice, onSale, parsePrice, promoLabel } from "../pricing";
+import { cashDeal, effectivePrice, onSale, parsePrice, promoLabel } from "../pricing";
 import { parseVideo } from "../video";
 import { cachedProducts, plainText, productsFor } from "./knowledge";
 import type { Audience, ProductCard } from "./shared";
@@ -18,7 +18,7 @@ function card(p: Product, audience: Audience): ProductCard {
     image: p.image,
     price,
     was: onSale(p) ? p.price : undefined,
-    badge: promoLabel(p) || undefined,
+    badge: promoLabel(p) || cashDeal(p) || undefined,
     blurb: plainText(p.description, 110) || undefined,
     hasVideo: !!parseVideo(p.video) || undefined,
     shop: audience === "member" ? "members" : "public",

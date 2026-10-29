@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   if (!(await isAdmin())) {
-    return <AdminLogin linkLogin={await isEnabled("admin_magic_link").catch(() => false)} />;
+    const [linkLogin, passkeys, dailyPhrase] = await Promise.all([isEnabled("admin_magic_link").catch(() => false), isEnabled("admin_passkeys").catch(() => false), isEnabled("rotating_staff_password").catch(() => false)]);
+    return <AdminLogin linkLogin={linkLogin} passkeys={passkeys} dailyPhrase={dailyPhrase} />;
   }
   const products = await getProducts();
   return <AdminDashboard initialProducts={products} />;

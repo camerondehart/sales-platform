@@ -45,6 +45,7 @@ async function POST_handler(req: Request) {
       ? Math.max(1, Math.floor(Number(body.perCustomerLimit)))
       : undefined,
     minOrderAmount: body.minOrderAmount ? Number(body.minOrderAmount) : undefined,
+    publicShop: body.publicShop ? true : undefined,
     active: body.active !== false,
     uses: 0,
     usedBy: [],
@@ -64,11 +65,13 @@ async function PATCH_handler(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { id, active } = await req.json();
+  // { id, active } switches a code on/off; { id, publicShop } sets whether it works in the public shop.
+  const { id, active, publicShop } = await req.json();
   const discount = await mutateDiscounts((all) => {
     const d = all.find((x) => x.id === id);
     if (!d) return { data: null, result: null };
-    d.active = !!active;
+    if (typeof publicShop === "boolean") d.publicShop = publicShop || undefined;
+    else d.active = !!active;
     return { data: all, result: d };
   });
   if (!discount) return NextResponse.json({ error: "not_found" }, { status: 404 });

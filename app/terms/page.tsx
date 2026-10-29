@@ -1,4 +1,7 @@
 import { brand } from "@/lib/brand";
+import { isEnabled } from "@/lib/flags";
+import SiteNav from "@/app/components/SiteNav";
+
 export const metadata = {
   title: `Terms of Service · ${brand.name}`,
   description: `Terms of Service for ${brand.name} and ${brand.members}.`,
@@ -16,7 +19,10 @@ export const metadata = {
  */
 const LAST_UPDATED = "September 25, 2026";
 
-export default function TermsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function TermsPage() {
+  const stores = await isEnabled("store_locator").catch(() => false);
   return (
     <div className="shell">
       <header className="masthead">
@@ -26,11 +32,7 @@ export default function TermsPage() {
           </div>
           <h1 className="masthead-title">{brand.name}</h1>
         </a>
-        <div className="masthead-meta">
-          <a href="/retail" className="masthead-link">Shop</a>
-          <a href="/about" className="masthead-link">About</a>
-          <a href="/" className="masthead-link">Member sign in</a>
-        </div>
+        <SiteNav stores={stores} />
       </header>
 
       <article className="about terms">

@@ -24,6 +24,8 @@ export type OrderItem = {
   productName: string;
   price: string; // as displayed, e.g. "$68"
   quantity: number;
+  /** Ordered while the product was at 0 in Stock counts: ships when new stock arrives. */
+  restocking?: boolean;
 };
 
 export type OrderAddress = {
@@ -76,10 +78,16 @@ export type Order = {
   remindersOff?: boolean;
   /** Placed by a staff member using "Log in as" (their email, or "admin"). */
   placedBy?: string;
+  /** Credited to an ambassador (their page, or their linked discount code). Never affects the price. */
+  ambassador?: { id: string; slug: string; name: string; via: "page" | "code"; /** Their commission % when the order was placed. */ rate?: number };
   trackingNumber?: string;
   labelUrl?: string;
   shippoTransactionId?: string;
   shippedService?: string;
+  /** Units this order took from Stock counts (put back if it's cancelled). */
+  stockTaken?: Array<{ productId: string; qty: number }>;
+  /** When a cancel put stockTaken back (cleared if the order is un-cancelled and takes it again). */
+  stockReturnedAt?: number;
 };
 
 const DATA_FILE = path.join(process.cwd(), "data", "orders.json");

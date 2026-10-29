@@ -4,6 +4,7 @@ import { getOrders, getOrderById, updateOrder, type OrderStatus } from "@/lib/or
 
 import { awardLoyaltyPoints } from "@/lib/loyalty";
 import { audited, auditDetail } from "@/lib/audit";
+import { returnStock, takeStock } from "@/lib/stock";
 
 const VALID_STATUSES: OrderStatus[] = [
   "inquiry", "pending", "paid", "completed", "cancelled",
@@ -48,6 +49,29 @@ async function PATCH_handler(req: Request) {
     // A completed order is settled, so make sure it's marked paid too.
     if (existing && !existing.paidAt) changes.paidAt = Date.now();
   }
+
+  // Stock counts: a cancel puts the order's units back; un-cancelling takes them again.
+  let stockMoved: "returned" | "retaken" | null = null;
+  if (existing?.stockTaken?.length) {
+    if (nextStatus === "cancelled" && existing.status !== "cancelled" && !existing.stockReturnedAt) {
+      try {
+        await returnStock(existing.stockTaken);
+        changes.stockReturnedAt = Date.now();
+        stockMoved = "returned";
+      } catch (err) {
+        console.error("[orders] couldn't put stock back", err);
+      }
+    } else if (nextStatus !== "cancelled" && existing.stockReturnedAt) {
+      try {
+        await takeStock(existing.stockTaken.map((t) => ({ productId: t.productId, quantity: t.qty })), new Map());
+        changes.stockReturnedAt = undefined;
+        stockMoved = "retaken";
+      } catch (err) {
+        console.error("[orders] couldn't take stock again", err);
+      }
+    }
+  }
+  if (stockMoved) auditDetail({ after: { status: nextStatus, stock: stockMoved, units: existing!.stockTaken } });
 
   const order = await updateOrder(id, changes);
   if (!order) {

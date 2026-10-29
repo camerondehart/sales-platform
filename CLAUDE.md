@@ -25,4 +25,6 @@ npx tsc --noEmit && npx next build
 - Campaign recipients: active mailing-list subscribers plus approved members not on the list, unless they've ever unsubscribed. Members' unsubscribe links use a signed token.
 - Customer emails set Reply-To = `customerReplyTo()` (`lib/replyTo.ts`), so the From address needn't be a real mailbox.
 - Imported customers (`importedFrom`) stay `needsPassword` until they set one; set-password links are signed one-time 30-day tokens (`lib/passwordSetup.ts`).
+- Staff sign-in: Face ID / Touch ID passkeys (`lib/passkeys.ts`, rpID = the domain of `brand.siteUrl` on the live site), the emailed link, or the daily two-word password (`lib/staffPhrase.ts`: in the nightly report and Settings; the old fixed password stops 7 days after first run). Keep the `@peculiar/asn1-schema` override in package.json, or passkey sign-in fails ("Cannot get schema").
+- Cash-pickup-only sales: `lib/pricing.ts` treats `cashOnly` as no sale unless priced `asCash()`; only Local pickup + cash orders do that.
 - If something unclear touches money, sign-in or customer data, stop and ask.

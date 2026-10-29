@@ -1,11 +1,17 @@
 import { brand } from "@/lib/brand";
+import { isEnabled } from "@/lib/flags";
+import SiteNav from "@/app/components/SiteNav";
+
 export const metadata = {
   title: `About Us · ${brand.name}`,
   description: `About ${brand.name}: ${brand.description}.`,
 };
 
 // Public About page. Replace the three sections below with the client's own story.
-export default function AboutPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AboutPage() {
+  const stores = await isEnabled("store_locator").catch(() => false);
   return (
     <div className="shell">
       <header className="masthead">
@@ -15,11 +21,7 @@ export default function AboutPage() {
           </div>
           <h1 className="masthead-title">{brand.name}</h1>
         </a>
-        <div className="masthead-meta">
-          <a href="/retail" className="masthead-link">Shop</a>
-          <a href="/events" className="masthead-link">Events</a>
-          <a href="/" className="masthead-link">Member sign in</a>
-        </div>
+        <SiteNav current="about" stores={stores} />
       </header>
 
       <article className="about">

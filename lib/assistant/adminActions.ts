@@ -101,6 +101,7 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
   admin("propose_edit_product", "Prepare editing a product: name, description, price, sale price (\"\" to clear), category, photo link, video link (\"\" to clear), where it sells.", obj({
     product_id: str("Product id"), name: str("New name"), description: str("New description"), price: str("New regular price"), sale_price: str("Sale price, or \"\" to clear"),
     category: str("Category"), image_url: str("New photo link"), video_url: str("Video link, or \"\" to remove"), visibility: str("internal | external | both"),
+    cash_pickup_only: { type: "boolean", description: "true: its sale price / promotion only applies to Local pickup paid in cash; false: for everyone" },
   }, ["product_id"])),
   admin("propose_delete_product", "Prepare deleting a product (red card).", obj({ product_id: str("Product id") }, ["product_id"])),
   admin("propose_move_product", "Prepare moving a product one place up or down in the shop order.", obj({ product_id: str("Product id"), direction: str("up | down") }, ["product_id", "direction"])),
@@ -629,6 +630,8 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       if ((next.video || "") !== (p.video || "")) diff.push(next.video ? "New video" : "Video removed");
       if (next.visibility !== visOf(p)) diff.push(`Where it sells: ${VIS_LABEL[visOf(p)]} → ${VIS_LABEL[next.visibility]}`);
       if (next.description !== p.description) diff.push("New description");
+      const cashOnly = typeof args.cash_pickup_only === "boolean" ? args.cash_pickup_only : undefined;
+      if (cashOnly !== undefined && cashOnly !== !!p.cashOnly) diff.push(cashOnly ? "Sale: cash pickup only (shipped and invoiced orders pay the regular price)" : "Sale: for everyone (not just cash pickup)");
       if (diff.length === 0) return { note: "Nothing would change." };
       push(ctx, {
         kind: "product_edit",
@@ -640,7 +643,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         request: {
           method: "PUT",
           url: "/api/admin/products",
-          body: { id: p.id, ...next, salePrice: next.salePrice || undefined, video: next.video, promo: p.promo, isBundle: !!p.isBundle },
+          body: { id: p.id, ...next, salePrice: next.salePrice || undefined, video: next.video, promo: p.promo, isBundle: !!p.isBundle, ...(cashOnly !== undefined ? { cashOnly } : {}) },
         },
         refresh: ["products"],
       });

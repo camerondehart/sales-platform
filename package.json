@@ -9,9 +9,13 @@
     "sync:course": "node scripts/sync-course.mjs"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "14.0.0",
+    "@simplewebauthn/server": "14.0.3",
     "@vercel/blob": "2.8.0",
     "bcryptjs": "2.4.3",
     "jose": "5.6.3",
+    "mailauth": "7.3.0",
+    "maplibre-gl": "4.7.1",
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -23,5 +27,8 @@
     "@types/node": "20.14.11",
     "@types/react": "18.3.3",
     "typescript": "5.5.3"
+  },
+  "overrides": {
+    "@peculiar/asn1-schema": "2.11.1"
   }
 }

@@ -1,5 +1,6 @@
 import EventsClient from "./EventsClient";
 import { brand } from "@/lib/brand";
+import { isEnabled } from "@/lib/flags";
 
 export const metadata = {
   title: `Classes & Events · ${brand.name}`,
@@ -8,6 +9,7 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function EventsPage() {
-  return <EventsClient />;
+export default async function EventsPage() {
+  const stores = await isEnabled("store_locator").catch(() => false);
+  return <EventsClient stores={stores} />;
 }

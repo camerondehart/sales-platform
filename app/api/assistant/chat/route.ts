@@ -6,13 +6,16 @@ import { getAssistantConfig } from "@/lib/assistant/config";
 import { sendMail, staffInbox } from "@/lib/assistant/tools";
 import { escapeHtml } from "@/lib/invoiceEmail";
 import type { WidgetMode } from "@/lib/assistant/shared";
+import { isEnabled } from "@/lib/flags";
+import { signSpeech } from "@/lib/voice";
+import { END_MARK } from "@/lib/assistant/engine";
 
 export const dynamic = "force-dynamic";
 // A tool-using turn can take several model calls; leave generous headroom.
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
-  let body: { mode?: unknown; messages?: unknown; conversationId?: unknown };
+  let body: { mode?: unknown; messages?: unknown; conversationId?: unknown; conversation?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -20,8 +23,15 @@ export async function POST(req: Request) {
   }
   try {
     const { status, reply, model } = await handleChat(req, body);
+    // Conversation mode: the Concierge marks a finished chat; the widget then stops listening.
+    if (typeof reply.reply === "string" && reply.reply.toLowerCase().includes(END_MARK)) {
+      reply.reply = reply.reply.split(END_MARK).join("").replace(/\[\[end\]\]/gi, "").trim() || "Bye for now!";
+      reply.endConversation = true;
+    }
     if (status === 200 && !reply.offline) await keepTranscript(req, body, reply.reply, model);
-    return NextResponse.json(reply, { status, headers: { "Cache-Control": "no-store" } });
+    // Voice: a signature so the answer (and only Concierge answers) can be read aloud.
+    const voiceSig = status === 200 && !reply.offline && reply.reply && (await isEnabled("voice_concierge").catch(() => false)) ? signSpeech(reply.reply) : undefined;
+    return NextResponse.json(voiceSig ? { ...reply, voiceSig } : reply, { status, headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     // Last-resort guard: the widget always gets a readable answer.
     console.error("[assistant] unhandled chat error", err);

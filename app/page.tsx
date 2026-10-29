@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getApprovedVisitor } from "@/lib/auth";
 import { getProducts, isExternal } from "@/lib/storage";
 import { applyVideoFlag, isEnabled } from "@/lib/flags";
+import { applyStockFlag } from "@/lib/stock";
 import AuthForms from "./AuthForms";
 import Scene from "./components/Scene";
 import ScrollHint from "./components/ScrollHint";
@@ -16,7 +17,8 @@ export default async function Home() {
 
   // The public shop lives on the homepage below the sign-in hero, so a
   // visitor who isn't a member has something to do rather than a dead end.
-  const shopProducts = await applyVideoFlag((await getProducts()).filter(isExternal));
+  const shopProducts = await applyStockFlag(await applyVideoFlag((await getProducts()).filter(isExternal)));
+  const stores = await isEnabled("store_locator").catch(() => false);
 
   return (
     <>
@@ -75,11 +77,12 @@ export default async function Home() {
           <div className="home-shop-links">
             <a href="/about">Read about us →</a>
             <a href="/events">Classes &amp; events →</a>
+            {stores && <a href="/stores">Find us in stores →</a>}
             <AskAssistantLink label="Not sure where to start? Ask our Concierge" question="I'm new here — what would you recommend to start with?" />
           </div>
         </div>
 
-        <RetailClient products={shopProducts} embedded />
+        <RetailClient products={shopProducts} embedded pickup={await isEnabled("cash_pickup").catch(() => false)} />
 
         <footer className="footnotes">
           <div className="footnotes-ornament" aria-hidden="true">

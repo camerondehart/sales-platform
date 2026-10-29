@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAdminRefresh } from "./useAdminRefresh";
 import type { AdminRefreshKey } from "@/lib/assistant/shared";
+import PasskeysPanel from "./PasskeysPanel";
 
 // Settings → Staff sign-in: who can get an emailed sign-in link.
 // The shared admin password keeps working as a backup.
@@ -97,6 +98,7 @@ export default function StaffPanel() {
         <button type="submit" className="esc-btn primary" disabled={busy}>Add</button>
       </form>
       {msg && <div className={msg.ok ? "ap-ok" : "ap-bad"} style={{ marginTop: "0.5rem" }}>{msg.text}</div>}
+      <PasskeysPanel />
     </section>
   );
 }

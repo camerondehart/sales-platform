@@ -36,6 +36,10 @@ async function POST_handler(req: Request) {
   if (!subject?.trim() || !body?.trim()) {
     return NextResponse.json({ error: "Subject and body are required." }, { status: 400 });
   }
+  // A Concierge draft whose chat photo was never added (lib/assistant/shared.ts PHOTO_SLOT).
+  if (body.includes("[[PHOTO]]")) {
+    return NextResponse.json({ error: "The photo from the chat hasn't been added yet. Use Upload photo, or delete the [[PHOTO]] line." }, { status: 400 });
+  }
 
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.INQUIRY_FROM_EMAIL || "onboarding@resend.dev";

@@ -24,6 +24,12 @@ export type ActionProposal = {
   kind:
     | "member_status"
     | "order_status"
+    | "venmo_payment"
+    | "stock_count"
+    | "store_create"
+    | "ambassador"
+    | "ambassador_payout"
+    | "ambassador_report"
     | "product_visibility"
     | "discount_code"
     | "product_sale"
@@ -84,7 +90,7 @@ export type ActionProposal = {
 export type AdminRefreshKey =
   | "users" | "orders" | "products" | "discounts" | "settings" | "banner"
   | "events" | "subscribers" | "bundles" | "campaigns" | "templates" | "flags"
-  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today";
+  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors";
 
 export type CampaignDraft = {
   subject: string;
@@ -95,7 +101,14 @@ export type CampaignDraft = {
   groupLabel?: string;
   /** The Today-list item this draft came from (ticked off once the campaign is sent). */
   todayKey?: string;
+  /** Use the photo staff sent in the chat: it goes where PHOTO_SLOT is in the body (uploaded when the draft opens in the composer). */
+  photo?: { alt: string };
+  /** Set by the chat widget on the way to the composer: the photo itself (JPEG data URL, kept in this browser only). */
+  photoData?: string;
 };
+
+/** Where the chat photo goes in a draft's body, on its own line. */
+export const PHOTO_SLOT = "[[PHOTO]]";
 
 /** A product the Concierge is recommending, shown as a card with Add to cart / View. */
 export type ProductCard = {
@@ -123,6 +136,10 @@ export type ChatReply = {
   draft?: CampaignDraft;
   /** Set when this reply answers a Today-list button: its item ticks itself off once the cards are dealt with. */
   todayKey?: string;
+  /** Voice on: lets this answer be read aloud (lib/voice.ts signSpeech). */
+  voiceSig?: string;
+  /** Conversation mode: the Concierge judged the chat finished — stop listening after this answer. */
+  endConversation?: boolean;
   /** True when the assistant is unavailable and `reply` explains why. */
   offline?: boolean;
   /** True when something failed mid-conversation; `reply` is a fallback. */
@@ -132,6 +149,10 @@ export type ChatReply = {
 export type AssistantStatus = {
   available: { public: boolean; member: boolean; admin: boolean };
   name: string;
+  /** Voice on (mic + read aloud): the switch is on and a Gateway key is set. */
+  voice?: boolean;
+  /** Photos on: the camera button can send a picture with a message. */
+  photos?: boolean;
   /** Why staff can't use it, when they can't. Only shown in the admin. */
   staffNote?: string;
 };

@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { getProductsForUpdate } from "./storage";
 import { getEventsForUpdate } from "./events";
+import { getAmbassadors } from "./ambassadors";
 
 /**
  * Uploaded photos and videos (Products / Events → "Upload").
@@ -73,13 +74,15 @@ export async function cleanupMedia(candidates: Array<string | undefined | null>)
   if (urls.length === 0) return [];
   try {
     // Strict reads: if the catalog can't be read, nothing is deleted.
-    const [products, events] = await Promise.all([getProductsForUpdate(), getEventsForUpdate()]);
+    const [products, events, ambassadors] = await Promise.all([getProductsForUpdate(), getEventsForUpdate(), getAmbassadors()]);
     const used = new Set<string>();
     for (const p of products) {
       if (p.image) used.add(p.image);
       if (p.video) used.add(p.video);
     }
     for (const e of events) if (e.image) used.add(e.image);
+    // An ambassador's photo may be a product's photo, pasted.
+    for (const a of ambassadors) if (a.photo) used.add(a.photo);
     const unused = urls.filter((u) => !used.has(u));
     if (unused.length === 0) return [];
     if (process.env.BLOB_READ_WRITE_TOKEN) {

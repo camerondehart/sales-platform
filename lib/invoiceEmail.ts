@@ -11,10 +11,12 @@ import { brand } from "@/lib/brand";
 export const VENMO_HANDLE = brand.payments.venmoHandle;
 export const PAYMENT_MEMO = "Order";
 
-// The memo customers send with payment, e.g. "Order for Bailey Gadaffi".
-export function paymentMemo(customerName?: string): string {
+// The memo customers send with payment, e.g. "Order for Bailey Gadaffi #4K9Q2X".
+// The #ref lets the Venmo inbox match the payment to its order.
+export function paymentMemo(customerName?: string, ref?: string): string {
   const name = (customerName || "").trim().replace(/\s+/g, " ");
-  return name ? `Order for ${name}` : PAYMENT_MEMO;
+  const base = name ? `Order for ${name}` : PAYMENT_MEMO;
+  return ref ? `${base} #${ref}` : base;
 }
 
 // Build a Venmo deep link that opens the app (or venmo.com on desktop)
@@ -33,23 +35,23 @@ export function hrefSafe(url: string): string {
   return url.replace(/&/g, "&amp;");
 }
 
-export function venmoLink(amount: number, customerName?: string): string {
+export function venmoLink(amount: number, customerName?: string, ref?: string): string {
   // Note: build the query manually. URLSearchParams encodes spaces as "+",
   // which Venmo renders literally in the memo ("Order+for+Name").
   // encodeURIComponent uses %20, which Venmo decodes correctly.
-  const note = encodeURIComponent(paymentMemo(customerName));
+  const note = encodeURIComponent(paymentMemo(customerName, ref));
   return `https://venmo.com/${VENMO_HANDLE}?txn=pay&amount=${amount.toFixed(2)}&note=${note}`;
 }
 
 // How customers pay. Shown on every invoice.
-export function paymentInstructionsHtml(customerName?: string): string {
+export function paymentInstructionsHtml(customerName?: string, ref?: string): string {
   const ways: string[] = [];
   if (VENMO_HANDLE) ways.push(`<strong>Venmo</strong> (<strong>@${escapeHtml(VENMO_HANDLE)}</strong>)`);
   if (brand.payments.zelle) ways.push(`<strong>Zelle</strong> (<strong>${escapeHtml(brand.payments.zelle)}</strong>)`);
   const via = ways.length ? `via ${ways.join(" or ")}` : "using the payment details we've shared with you";
   return `
   Send your payment ${via},
-  with <strong>&ldquo;${escapeHtml(paymentMemo(customerName))}&rdquo;</strong> in the memo/note line.`;
+  with <strong>&ldquo;${escapeHtml(paymentMemo(customerName, ref))}&rdquo;</strong> in the memo/note line.`;
 }
 
 // Kept for reference/back-compat.
@@ -60,7 +62,7 @@ export function itemsTable(order: Order): string {
     .map(
       (i) => `
       <tr style="border-bottom: 1px solid #e8e5e5;">
-        <td style="padding: 0.6rem 0;">${escapeHtml(i.productName)}</td>
+        <td style="padding: 0.6rem 0;">${escapeHtml(i.productName)}${i.restocking ? `<div style="font-size: 0.78rem; color: #a2a434; margin-top: 2px;">Currently restocking: sent as soon as it's back in</div>` : ""}</td>
         <td style="padding: 0.6rem 0; text-align: center;">${i.quantity}</td>
         <td style="padding: 0.6rem 0; text-align: right;">${escapeHtml(i.price)}</td>
         <td style="padding: 0.6rem 0; text-align: right;">$${(parsePrice(i.price) * i.quantity).toFixed(2)}</td>
@@ -130,9 +132,9 @@ export function buildInvoiceEmail(order: Order, payLink: string, note?: string |
               <span style="display: inline-block; background: #008CFF; color: white; width: 22px; height: 22px; border-radius: 50%; text-align: center; line-height: 22px; font-size: 0.8rem; margin-right: 6px;">1</span>
               Send your payment
             </div>
-            <p style="margin: 0.5rem 0 0; line-height: 1.6; font-size: 0.92rem;">${paymentInstructionsHtml(order.userName)}</p>
+            <p style="margin: 0.5rem 0 0; line-height: 1.6; font-size: 0.92rem;">${paymentInstructionsHtml(order.userName, order.id.slice(-6).toUpperCase())}</p>
             ${VENMO_HANDLE ? `<div style="text-align: center; margin-top: 0.9rem;">
-              <a href="${hrefSafe(venmoLink(order.total, order.userName))}" style="display: inline-block; background: #008CFF; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 0.85rem;">Pay $${order.total.toFixed(2)} with Venmo</a>
+              <a href="${hrefSafe(venmoLink(order.total, order.userName, order.id.slice(-6).toUpperCase()))}" style="display: inline-block; background: #008CFF; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 0.85rem;">Pay $${order.total.toFixed(2)} with Venmo</a>
               <p style="font-size: 0.72rem; color: #81858b; margin: 0.5rem 0 0;">Opens Venmo with the amount and memo filled in. This does <strong>not</strong> notify us on its own.</p>
             </div>` : ""}
           </div>

@@ -10,6 +10,8 @@ import { getAdminPassword } from "@/lib/storage";
 import { verifyPassword } from "@/lib/users";
 import { checkRateLimit, recordFailedAttempt } from "@/lib/rateLimit";
 import { auditSystem } from "@/lib/audit";
+import { isEnabled } from "@/lib/flags";
+import { matchesPhrase, oldPasswordStatus } from "@/lib/staffPhrase";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -40,9 +42,23 @@ export async function POST(req: Request) {
   };
 
   if (body.role === "admin") {
-    const expected = await getAdminPassword();
-    if (body.password !== expected) {
-      return fail("invalid");
+    // With the daily staff password on, today's phrase signs in; the old
+    // fixed password only for its first 7 days (lib/staffPhrase.ts).
+    let how = "Signed in with the shared password";
+    if (await isEnabled("rotating_staff_password")) {
+      const old = await oldPasswordStatus();
+      if (matchesPhrase(body.password || "")) {
+        how = "Signed in with the daily staff password";
+      } else if (old.works && body.password === (await getAdminPassword())) {
+        how = "Signed in with the old fixed password (still allowed for its first 7 days)";
+      } else {
+        return fail("invalid");
+      }
+    } else {
+      const expected = await getAdminPassword();
+      if (body.password !== expected) {
+        return fail("invalid");
+      }
     }
     const token = await signAdminToken();
     cookies().set(ADMIN_COOKIE, token, {
@@ -52,7 +68,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 12,
     });
-    await auditSystem({ action: "admin.signin", actor: "admin", actorType: "admin", source: "human", targetType: "admin", ok: true, note: "Signed in with the shared password", ip, userAgent: (req.headers.get("user-agent") || "").slice(0, 200) || undefined });
+    await auditSystem({ action: "admin.signin", actor: "admin", actorType: "admin", source: "human", targetType: "admin", ok: true, note: how, ip, userAgent: (req.headers.get("user-agent") || "").slice(0, 200) || undefined });
     return NextResponse.json({ ok: true });
   }
 

@@ -29,6 +29,15 @@ export const FLAG_KEYS = [
   "versioned_catalog",
   "concierge_learning",
   "ai_product_copy",
+  "store_locator",
+  "stock_counts",
+  "venmo_matching",
+  "voice_concierge",
+  "concierge_photos",
+  "ambassador_pages",
+  "admin_passkeys",
+  "rotating_staff_password",
+  "cash_pickup",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -104,6 +113,36 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     defaults: on,
     built: true,
   },
+  store_locator: {
+    label: "Store locator (Find us in stores)",
+    description: "The public /stores page with the map, its footer link, “Find it in a store near you” in product pop-ups, and the Concierge answering where to buy in person. Stores are added in Settings → Store locations (works with this off, so you can set them up first).",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  stock_counts: {
+    label: "Stock counts (Currently restocking)",
+    description: "Each order takes its items off the counts in Products → Stock counts. At 0 a product shows “Currently restocking” and can still be ordered; those order lines are marked so you know they wait for new stock. Cancelling an order puts its items back. Products left blank aren't counted. Enter the counts first (that works with this off).",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  venmo_matching: {
+    label: "Venmo payment matching",
+    description: "Orders → Venmo payments: Venmo's “paid you” emails (forwarded from Gmail) are checked, read and matched to unpaid orders. Staff confirm every match; nothing is marked paid on its own. Also adds a Today item and the Concierge's confirm cards. Emails are collected even with this off.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  voice_concierge: {
+    label: "Concierge voice (talk + read aloud)",
+    description: "A mic button in the Concierge chat (tap to talk, see the words before sending) and a play button on answers, plus “Read answers aloud”. Speech goes through the AI Gateway (Assistant → Voice picks the voice). Off hides it everywhere.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  concierge_photos: {
+    label: "Concierge photos",
+    description: "A camera button in the Concierge chat: take a photo or pick one, and the Concierge looks at it (a product, a label, a shelf, a receipt…). Photos are shrunk on the phone first and never saved in transcripts. Needs a model that reads images (the default Claude Haiku does).",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
   analytics_v2: {
     label: "Visitor analytics",
     description: "Cookie-free visit counting for the Analytics tab. Off = stop counting (sales, members and assistant figures still show).",
@@ -114,6 +153,30 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     label: "Concierge learns from chats",
     description: "Every night the Concierge reviews the last week of chats, card decisions and Today ticks, and rewrites its own notes (Assistant tab → Concierge notes). Notes are used straight away by the staff and customer Concierge and the Today list; you can edit, pin or delete any of them. Uses a few cents of AI a night, counted toward the monthly limit.",
     defaults: off,
+    built: true,
+  },
+  ambassador_pages: {
+    label: "Ambassador pages",
+    description: "Each ambassador's own page at yoursite/<their name> (Ambassadors tab), shared only by link or QR code: their photo, a few words, links to their socials and the products they feature, with Add to cart. Orders are credited to them when the shopper came through their page (within their attribution window, remembered in the shopper's own browser, nothing personal) or a member used their linked discount code; commission, payouts and progress reports in the Ambassadors tab. Prices never change. Off = pages are a 404 and no orders are credited; ambassadors can still be set up and previewed.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  admin_passkeys: {
+    label: "Staff sign-in with Face ID / Touch ID / fingerprint",
+    description: "Staff can add Face ID / Touch ID (a passkey) for each of their devices in Settings → Staff sign-in, then sign in with one tap on the admin sign-in page. An extra option: the shared password and the emailed link keep working. Off = the Face ID button is hidden and passkeys can't be used (they stay saved).",
+    defaults: on,
+    built: true,
+  },
+  rotating_staff_password: {
+    label: "Daily staff password",
+    description: "The staff password becomes a new two-word phrase each day (e.g. maple-otter-42), changing at midnight Pacific. It's in the nightly report email and always shown in Settings → Steward password. Yesterday's still works until noon. The old fixed password keeps working for 7 days after this first runs, then stops. Face ID and the emailed link keep working. Off = back to the fixed password.",
+    defaults: on,
+    built: true,
+  },
+  cash_pickup: {
+    label: "Cash pickup deals & public-shop pickup",
+    description: "Products → a sale can be ticked \"Cash pickup only\": it applies only to Local pickup orders paid in cash (members' and public shop), and everyone else pays the regular price. Also adds Local pickup (pay by invoice or cash at pickup) to the public shop checkout. Off = the public shop is ship-only again and the tick is hidden; products already ticked keep their cash-only sale for members' cash pickup orders.",
+    defaults: { production: false, preview: true, development: true },
     built: true,
   },
   versioned_catalog: {

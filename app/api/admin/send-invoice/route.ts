@@ -8,6 +8,7 @@ import { addOrder, parsePrice, type Order } from "@/lib/orders";
 import { buildInvoiceEmail } from "@/lib/invoiceEmail";
 import { audited } from "@/lib/audit";
 import { brand } from "@/lib/brand";
+import { reserveForOrder, returnStock } from "@/lib/stock";
 
 // Admin-generated invoice. Creates a REAL order (so it appears in the
 // orders queue with a payment token) and sends the exact same invoice
@@ -70,11 +71,14 @@ async function POST_handler(req: Request) {
         }
       : undefined;
 
+  // Stock counts (switch on): take the units; lines at 0 are marked restocking.
+  const stock = await reserveForOrder(orderItems, productMap);
   const order = await addOrder({
     userId: user.id,
     userName: user.name,
     userEmail: user.email,
-    items: orderItems,
+    items: stock.items,
+    stockTaken: stock.stockTaken,
     shippingAddress,
     shippingMethod: "ship",
     shippingCost,
@@ -84,6 +88,9 @@ async function POST_handler(req: Request) {
     note: note || undefined,
     isInquiry: false,
     status: "pending",
+  }).catch(async (err) => {
+    if (stock.stockTaken) await returnStock(stock.stockTaken).catch(() => {});
+    throw err;
   });
 
   const siteUrl =

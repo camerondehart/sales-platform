@@ -20,6 +20,8 @@ export type Discount = {
   maxUses?: number;          // total redemptions allowed
   perCustomerLimit?: number; // redemptions allowed per member
   minOrderAmount?: number;
+  /** Also works in the public shop (public products). Ambassadors' linked codes always do. */
+  publicShop?: boolean;
   active: boolean;
   uses: number;              // total redemptions so far
   usedBy: Array<{ userId: string; orderId: string; at: number; amount: number }>;
@@ -223,6 +225,11 @@ export function validateDiscount(
   if (amount <= 0) return { ok: false, error: "That code doesn't apply to this order." };
 
   return { ok: true, discount, amount };
+}
+
+/** Can this code be used in the public shop? (Marked for it, or a live ambassador's code.) */
+export function worksInPublicShop(d: Pick<Discount, "code" | "publicShop">, ambassadorCodes: Set<string>): boolean {
+  return !!d.publicShop || ambassadorCodes.has(d.code);
 }
 
 export async function findDiscountByCode(code: string): Promise<Discount | undefined> {

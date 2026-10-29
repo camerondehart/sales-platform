@@ -1,16 +1,21 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { Product } from "@/lib/storage";
-import { parsePrice, effectivePrice, onSale, promoLabel } from "@/lib/pricing";
+import { parsePrice, effectivePrice, onSale, promoLabel, asCash } from "@/lib/pricing";
 import { priceCart, nextBundleHint, type AppliedBundle, type Bundle } from "@/lib/bundles";
-import { ProductFlags, PriceTag } from "@/app/components/ProductPrice";
+import { ProductFlags, PriceTag, RestockNote } from "@/app/components/ProductPrice";
 import FormattedDescription from "@/app/components/FormattedDescription";
 import ProductVideo, { useProductDeepLink } from "@/app/components/ProductVideo";
 import { useChatShopBridge } from "@/app/components/assistant/shopBridge";
 import { track, sessionCampaign } from "@/lib/track";
 import { AskAboutProduct, AskAssistantLink } from "@/app/components/assistant/AskAssistant";
 import { brand } from "@/lib/brand";
+import StoreHint from "@/app/components/StoreHint";
+import SiteNav from "@/app/components/SiteNav";
+import NavIcon from "@/app/components/NavIcon";
+import { ambassadorRef } from "@/lib/ambassadorRef";
+import { PICKUP_ADDRESS, PICKUP_WHERE } from "@/lib/pickup";
 
 type CartItem = { productId: string; quantity: number };
 const CART_KEY = "fp_retail_cart_v1";
@@ -27,9 +32,21 @@ const SHIPPING_FLAT = 10;
 export default function RetailClient({
   products,
   embedded = false,
+  stores = false,
+  featuredIds,
+  intro,
+  pickup = false,
 }: {
   products: Product[];
   embedded?: boolean;
+  /** Store locator switch is on: show "Find us in stores" in the top nav. */
+  stores?: boolean;
+  /** Ambassador pages: show only these products, in this order (the cart still knows every public product). */
+  featuredIds?: string[];
+  /** Ambassador pages: replaces the shop's intro. */
+  intro?: React.ReactNode;
+  /** cash_pickup switch: Local pickup (invoice or cash at pickup) in checkout. */
+  pickup?: boolean;
 }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   // Phone layout: two per row by default, one per row if they prefer.
@@ -98,6 +115,10 @@ export default function RetailClient({
   }
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const shown = useMemo(
+    () => (featuredIds ? featuredIds.map((id) => productMap.get(id)).filter((p): p is Product => !!p) : products),
+    [featuredIds, productMap, products]
+  );
   const detailed = useMemo(
     () =>
       cart
@@ -133,19 +154,16 @@ export default function RetailClient({
             </div>
             <h1 className="masthead-title">{brand.name}</h1>
           </a>
-          <div className="masthead-meta">
-            <a href="/about" className="masthead-link">About</a>
-            <a href="/events" className="masthead-link">Events</a>
-            <a href="/" className="masthead-link">Member sign in</a>
-            <AskAssistantLink className="masthead-link ask-link" label="Ask our Concierge" />
+          <SiteNav current={intro ? undefined : "shop"} stores={stores} concierge>
             <button className="cart-button" onClick={() => setCartOpen(true)}>
-              🧺 Cart{count > 0 && <span className="cart-count">{count}</span>}
+              <NavIcon name="basket" /> Cart{count > 0 && <span className="cart-count">{count}</span>}
             </button>
-          </div>
+          </SiteNav>
         </header>
         )}
 
-        {!embedded && (
+        {!embedded && intro}
+        {!embedded && !intro && (
         <div className="retail-intro">
           <h2>{brand.name}</h2>
           <p>{brand.tagline}</p>
@@ -153,7 +171,7 @@ export default function RetailClient({
         </div>
         )}
 
-        {products.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="empty">Our shop is being restocked. Please check back soon.</div>
         ) : (
           <>
@@ -172,7 +190,7 @@ export default function RetailClient({
             </button>
           </div>
           <div className={`grid${oneUp ? " grid-one-up" : ""}`}>
-            {products.map((p, idx) => (
+            {shown.map((p, idx) => (
               <article key={p.id} className="card fade-rise" style={{ animationDelay: `${Math.min(idx * 60, 480)}ms` }}>
                 <div className="card-image" onClick={() => setSelected(p)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -251,10 +269,12 @@ export default function RetailClient({
                 )}
               </div>
               <FormattedDescription text={selected.description} />
+              <RestockNote product={selected} />
               <button className="submit" onClick={() => { addToCart(selected.id); setSelected(null); }}>
                 Add to cart
               </button>
               <AskAboutProduct product={selected} onAsk={() => setSelected(null)} />
+              <StoreHint productId={selected.id} />
             </div>
           </div>
         </div>
@@ -279,6 +299,7 @@ export default function RetailClient({
                       <div className="cart-item-info">
                         <div className="cart-item-name">{product.name}</div>
                         <div className="cart-item-price">{effectivePrice(product)}</div>
+                        <RestockNote product={product} compact />
                         <div className="cart-item-qty">
                           <button onClick={() => setQty(product.id, quantity - 1)}>−</button>
                           <span>{quantity}</span>
@@ -307,7 +328,7 @@ export default function RetailClient({
                   )}
                   {bundleHint && <div className="cart-bundle-hint">🌿 {bundleHint}</div>}
                   <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginBottom: "0.9rem" }}>
-                    + $10 shipping
+                    {pickup ? "+ $10 shipping, or free local pickup" : "+ $10 shipping"}
                   </div>
                   <button className="submit" onClick={() => { setCartOpen(false); setCheckoutOpen(true); }}>
                     Checkout
@@ -322,9 +343,8 @@ export default function RetailClient({
       {checkoutOpen && (
         <RetailCheckout
           items={detailed}
-          subtotal={subtotal}
-          discount={cartDiscount}
-          bundleLines={priced.bundles}
+          bundles={bundles}
+          pickup={pickup}
           onClose={() => setCheckoutOpen(false)}
           onComplete={() => persist([])}
         />
@@ -334,20 +354,35 @@ export default function RetailClient({
 }
 
 function RetailCheckout({
-  items,
-  subtotal,
-  discount,
-  bundleLines = [],
+  items: cartItems,
+  bundles,
+  pickup = false,
   onClose,
   onComplete,
 }: {
   items: Array<CartItem & { product: Product }>;
-  subtotal: number;
-  discount: number;
-  bundleLines?: AppliedBundle[];
+  bundles: Bundle[];
+  /** cash_pickup switch: offer Local pickup, paid by invoice or cash at pickup. */
+  pickup?: boolean;
   onClose: () => void;
   onComplete: () => void;
 }) {
+  const [shippingMethod, setShippingMethod] = useState<"ship" | "pickup">("ship");
+  const [paymentMethod, setPaymentMethod] = useState<"invoice" | "cash">("invoice");
+  const isPickup = pickup && shippingMethod === "pickup";
+  // Cash-pickup-only sales apply to Local pickup + cash (the server prices the same way).
+  const cash = isPickup && paymentMethod === "cash";
+  const items = useMemo(() => (cash ? cartItems.map((i) => ({ ...i, product: asCash(i.product) })) : cartItems), [cartItems, cash]);
+  const pricedCart = useMemo(() => priceCart(items, bundles, null), [items, bundles]);
+  const subtotal = items.reduce((n, i) => n + parsePrice(effectivePrice(i.product)) * i.quantity, 0);
+  const discount = pricedCart.discount;
+  const bundleLines: AppliedBundle[] = pricedCart.bundles;
+  const cashSaves = useMemo(() => {
+    if (!pickup || cash || !cartItems.some((i) => i.product.cashOnly)) return 0;
+    const now = priceCart(cartItems, bundles, null);
+    const c = priceCart(cartItems.map((i) => ({ ...i, product: asCash(i.product) })), bundles, null);
+    return Math.round((now.subtotal - now.discount - (c.subtotal - c.discount)) * 100) / 100;
+  }, [pickup, cash, cartItems, bundles]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -360,10 +395,60 @@ function RetailCheckout({
   const [subscribe, setSubscribe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState(false);
+  /** Cash at pickup: the amount to bring. */
+  const [placedCash, setPlacedCash] = useState<number | null>(null);
   const [invoiceEmailed, setInvoiceEmailed] = useState(true);
   const [error, setError] = useState("");
 
-  const total = Math.max(0, subtotal - discount) + SHIPPING_FLAT;
+  // Discount code. Arriving through an ambassador's page fills in their code.
+  const hasBundle = bundleLines.length > 0;
+  const [codeInput, setCodeInput] = useState("");
+  const [codeChecking, setCodeChecking] = useState(false);
+  const [codeError, setCodeError] = useState("");
+  const [applied, setApplied] = useState<null | { code: string; amount: number; fromAmbassador?: boolean }>(null);
+  async function applyCode(raw = codeInput, fromAmbassador = false) {
+    const code = raw.trim();
+    if (!code) return;
+    setCodeChecking(true);
+    setCodeError("");
+    try {
+      const res = await fetch("/api/retail/discount", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal: Math.max(0, subtotal - discount) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.ok) setApplied({ code: data.code, amount: data.amount, fromAmbassador });
+      else {
+        setApplied(null);
+        // An ambassador's code that no longer works stays quiet; one they typed says why.
+        if (!fromAmbassador) setCodeError(data.error || "That code isn't valid.");
+      }
+    } catch {
+      if (!fromAmbassador) setCodeError("Could not check that code. Try again.");
+    }
+    setCodeChecking(false);
+  }
+  useEffect(() => {
+    const code = ambassadorRef()?.code;
+    if (code && !hasBundle) {
+      setCodeInput(code);
+      applyCode(code, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const codeSavings = hasBundle ? 0 : applied?.amount || 0;
+  // A code's amount depends on the prices: check it again when cash deals switch on or off.
+  const cashRef = useRef(cash);
+  useEffect(() => {
+    if (cashRef.current === cash) return;
+    cashRef.current = cash;
+    if (applied && cartItems.some((i) => i.product.cashOnly)) applyCode(applied.code, !!applied.fromAmbassador);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cash]);
+
+  const shippingCost = isPickup ? 0 : SHIPPING_FLAT;
+  const total = Math.max(0, subtotal - discount - codeSavings) + shippingCost;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -376,7 +461,11 @@ function RetailCheckout({
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           name, email, phone, note, subscribe,
-          address: { addressLine1, addressLine2, city, state, postalCode },
+          address: isPickup ? undefined : { addressLine1, addressLine2, city, state, postalCode },
+          shippingMethod: isPickup ? "pickup" : "ship",
+          paymentMethod: cash ? "cash" : "invoice",
+          ambassador: ambassadorRef(),
+          discountCode: codeSavings > 0 ? applied?.code : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -388,6 +477,7 @@ function RetailCheckout({
       track("order_placed", { value: total, shop: "public", campaign: sessionCampaign() });
       onComplete();
       setInvoiceEmailed(data.emailed !== false);
+      setPlacedCash(cash ? total : null);
       setPlaced(true);
     } catch {
       setError("Network error. Please try again.");
@@ -404,7 +494,14 @@ function RetailCheckout({
             <div className="success fade-rise" style={{ textAlign: "center" }}>
               Thank you — your order has been placed! 🌿
               <div style={{ fontSize: "0.9rem", marginTop: "1rem", fontStyle: "normal", color: "var(--ink-soft)" }}>
-                {invoiceEmailed ? (
+                {placedCash !== null ? (
+                  <>
+                    No payment needed now — just bring ${placedCash.toFixed(2)} in cash when you pick up at {PICKUP_ADDRESS}.
+                    {invoiceEmailed
+                      ? " A confirmation with pickup details is on its way to your inbox, with a button to tap once you've collected it."
+                      : " We couldn't email your confirmation just now — our team has been told and will send the pickup details shortly."}
+                  </>
+                ) : invoiceEmailed ? (
                   <>
                     An invoice with payment instructions is on its way to your inbox.
                     Once you've paid, use the link in the email to let us know.
@@ -440,8 +537,42 @@ function RetailCheckout({
                     <span>Promo savings</span><span>−${(discount - bundleLines.reduce((n, b) => n + b.savings, 0)).toFixed(2)}</span>
                   </div>
                 )}
-                <div className="pay-item"><span>Shipping</span><span>${SHIPPING_FLAT.toFixed(2)}</span></div>
+                {codeSavings > 0 && applied && (
+                  <div className="pay-item pay-savings">
+                    <span>Code {applied.code}</span><span>−${codeSavings.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="pay-item"><span>{isPickup ? "Local pickup" : "Shipping"}</span><span>{isPickup ? "Free" : `$${SHIPPING_FLAT.toFixed(2)}`}</span></div>
                 <div className="pay-item pay-total"><span>Total</span><span>${total.toFixed(2)}</span></div>
+              </div>
+
+              <div className="field" style={{ marginBottom: "1.1rem" }}>
+                <label>Discount code (optional)</label>
+                {hasBundle ? (
+                  <div className="field-hint" style={{ margin: 0 }}>Your bundle savings are applied. Discount codes can&apos;t be combined with a bundle.</div>
+                ) : applied ? (
+                  <div className="code-applied">
+                    <span>✓ <strong>{applied.code}</strong> applied, saving ${applied.amount.toFixed(2)}</span>
+                    <button type="button" onClick={() => { setApplied(null); setCodeInput(""); }}>Remove</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="code-row">
+                      <input
+                        type="text"
+                        value={codeInput}
+                        onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                        placeholder="Enter code"
+                        aria-label="Discount code"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyCode(); } }}
+                      />
+                      <button type="button" onClick={() => applyCode()} disabled={codeChecking || !codeInput.trim()}>
+                        {codeChecking ? "Checking…" : "Apply"}
+                      </button>
+                    </div>
+                    {codeError && <div className="code-error">{codeError}</div>}
+                  </>
+                )}
               </div>
 
               <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
@@ -457,16 +588,56 @@ function RetailCheckout({
                   <label>Phone (optional)</label>
                   <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
-                <div className="field">
-                  <label>Shipping address</label>
-                  <input required placeholder="Street address" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} />
-                  <input placeholder="Apt, suite (optional)" value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} style={{ marginTop: "0.5rem" }} />
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "0.5rem", marginTop: "0.5rem" }}>
-                    <input required placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
-                    <input required placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
-                    <input required placeholder="ZIP" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+                {pickup && (
+                  <div className="field">
+                    <label>Delivery</label>
+                    <div className="choice-row">
+                      <label className={`choice ${shippingMethod === "ship" ? "active" : ""}`}>
+                        <input type="radio" name="method" checked={shippingMethod === "ship"} onChange={() => setShippingMethod("ship")} />
+                        <span>📦 Ship to me<small>$10 flat</small></span>
+                      </label>
+                      <label className={`choice ${shippingMethod === "pickup" ? "active" : ""}`}>
+                        <input type="radio" name="method" checked={shippingMethod === "pickup"} onChange={() => setShippingMethod("pickup")} />
+                        <span>🌄 Local pickup<small>Free{brand.city ? ` · ${brand.city}` : ""}</small></span>
+                      </label>
+                    </div>
+                    {cashSaves > 0 && <p className="cash-hint">💵 Choose Local pickup and Cash at pickup to save ${cashSaves.toFixed(2)} with cash pickup deals.</p>}
                   </div>
-                </div>
+                )}
+                {isPickup && (
+                  <div className="field">
+                    <label>How would you like to pay?</label>
+                    <div className="choice-row">
+                      <label className={`choice ${paymentMethod === "invoice" ? "active" : ""}`}>
+                        <input type="radio" name="paymethod" checked={paymentMethod === "invoice"} onChange={() => setPaymentMethod("invoice")} />
+                        <span>✉️ Pay by invoice<small>Venmo or Zelle, emailed to you</small></span>
+                      </label>
+                      <label className={`choice ${paymentMethod === "cash" ? "active" : ""}`}>
+                        <input type="radio" name="paymethod" checked={paymentMethod === "cash"} onChange={() => setPaymentMethod("cash")} />
+                        <span>💵 Cash at pickup<small>Bring ${total.toFixed(2)}</small></span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+                {isPickup && (
+                  <div className="pickup-box">
+                    <div className="pickup-title">Pickup location</div>
+                    <div className="pickup-addr">{PICKUP_ADDRESS}</div>
+                    <p>{PICKUP_WHERE} Full instructions are included in your confirmation email.</p>
+                  </div>
+                )}
+                {!isPickup && (
+                  <div className="field">
+                    <label>Shipping address</label>
+                    <input required placeholder="Street address" value={addressLine1} onChange={(e) => setAddressLine1(e.target.value)} />
+                    <input placeholder="Apt, suite (optional)" value={addressLine2} onChange={(e) => setAddressLine2(e.target.value)} style={{ marginTop: "0.5rem" }} />
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "0.5rem", marginTop: "0.5rem" }}>
+                      <input required placeholder="City" value={city} onChange={(e) => setCity(e.target.value)} />
+                      <input required placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
+                      <input required placeholder="ZIP" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} />
+                    </div>
+                  </div>
+                )}
                 <div className="field">
                   <label>Note (optional)</label>
                   <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />

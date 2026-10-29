@@ -19,6 +19,8 @@ export type Product = {
   price: string;
   salePrice?: string; // fixed sale price, e.g. "$50" — takes precedence over promo "percent"
   promo?: Promo;
+  /** The sale price / promo is only for Local pickup paid in cash (lib/pricing.ts asCash). */
+  cashOnly?: boolean;
   image: string;
   /** Optional video link (YouTube, Vimeo or an https .mp4/.webm) — same pattern as `image`. */
   video?: string;
@@ -36,6 +38,8 @@ export type Product = {
   isBundle?: boolean;
   bundleProducts?: string[]; // product IDs included in the bundle
   bundleDiscount?: number;   // optional % off the combined component price
+  /** Shop pages only (lib/stock.ts applyStockFlag): at 0 in Stock counts. Never saved. */
+  restocking?: boolean;
   createdAt: number;
 };
 
@@ -70,6 +74,8 @@ export {
   onSale,
   discountPercent,
   promoLabel,
+  asCash,
+  cashDeal,
 } from "./pricing";
 
 const DATA_FILE = path.join(process.cwd(), "data", "products.json");

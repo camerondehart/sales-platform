@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { brand } from "@/lib/brand";
 
 // Mirrors paymentMemo() in lib/invoiceEmail.ts.
-function payMemo(customerName: string): string {
+function payMemo(customerName: string, ref?: string): string {
   const name = customerName.trim().replace(/\s+/g, " ");
-  return name ? `Order for ${name}` : "Order";
+  const base = name ? `Order for ${name}` : "Order";
+  return ref ? `${base} #${ref}` : base;
 }
 
 type OrderSummary = {
@@ -204,22 +205,28 @@ export default function PayClient({ token }: { token: string }) {
                       loads venmo.com in Safari, which is why this button worked
                       from the email but not from here. */}
                   {brand.payments.venmoHandle && (
-                    <a
-                      className="venmo-btn"
-                      href={`https://venmo.com/${brand.payments.venmoHandle}?txn=pay&amount=${order.total.toFixed(2)}&note=${encodeURIComponent(payMemo(order.userName))}`}
-                      rel="noopener"
-                    >
-                      Pay ${order.total.toFixed(2)} with Venmo
-                    </a>
+                    <>
+                      <a
+                        className="venmo-btn"
+                        href={`https://venmo.com/${brand.payments.venmoHandle}?txn=pay&amount=${order.total.toFixed(2)}&note=${encodeURIComponent(payMemo(order.userName, order.shortId))}`}
+                        rel="noopener"
+                      >
+                        Pay ${order.total.toFixed(2)} with Venmo
+                      </a>
+                      <div className="pay-ref">
+                        Put <strong>#{order.shortId}</strong> in your Venmo note so we can match your payment.
+                        <CopyRef text={`#${order.shortId}`} />
+                      </div>
+                    </>
                   )}
                   {brand.payments.zelle && (
                     <div className="pay-alt">
                       {brand.payments.venmoHandle ? "or " : ""}Zelle to <strong>{brand.payments.zelle}</strong> with{" "}
-                      <strong>&ldquo;{payMemo(order.userName)}&rdquo;</strong> in the memo
+                      <strong>&ldquo;{payMemo(order.userName, order.shortId)}&rdquo;</strong> in the memo
                     </div>
                   )}
                   {!brand.payments.venmoHandle && !brand.payments.zelle && (
-                    <div className="pay-alt">Follow the payment instructions in your invoice email, with <strong>&ldquo;{payMemo(order.userName)}&rdquo;</strong> in the memo.</div>
+                    <div className="pay-alt">Follow the payment instructions in your invoice email, with <strong>&ldquo;{payMemo(order.userName, order.shortId)}&rdquo;</strong> in the memo.</div>
                   )}
                   <div className="pay-note-warn">
                     Paying {brand.payments.venmoHandle ? "in Venmo " : ""}does <strong>not</strong> notify us on its own.
@@ -247,5 +254,24 @@ export default function PayClient({ token }: { token: string }) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Copies "#4K9Q2X" for the Venmo note. */
+function CopyRef({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="pay-ref-copy"
+      onClick={() => {
+        navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        }).catch(() => {});
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
   );
 }

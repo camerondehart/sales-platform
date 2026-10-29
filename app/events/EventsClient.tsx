@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { track } from "@/lib/track";
 import { brand } from "@/lib/brand";
+import SiteNav from "@/app/components/SiteNav";
 
 type PublicEvent = {
   id: string;
@@ -38,7 +39,7 @@ function formatDate(ts: number): string {
   });
 }
 
-export default function EventsClient() {
+export default function EventsClient({ stores = false }: { stores?: boolean }) {
   const [events, setEvents] = useState<PublicEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<PublicEvent | null>(null);
@@ -73,11 +74,7 @@ export default function EventsClient() {
             </div>
             <h1 className="masthead-title">Classes &amp; Events</h1>
           </a>
-          <div className="masthead-meta">
-            <a href="/about" className="masthead-link">About</a>
-            <a href="/retail" className="masthead-link">Shop</a>
-            <a href="/" className="masthead-link">Member sign in</a>
-          </div>
+          <SiteNav current="events" stores={stores} />
         </header>
 
         <div className="retail-intro">

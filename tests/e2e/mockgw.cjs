@@ -2,6 +2,8 @@
 // last user message so each test can drive a specific path.
 const http = require("http");
 const log = [];
+const geoCalls = [];
+const speechCalls = [];
 const mails = [];
 let reviewProse = false;
 let mailFail = false;
@@ -33,6 +35,51 @@ http.createServer((req, res) => {
       for (const m of arr) { mails.push({ ...m, batch: true }); ids.push({ id: "mail_" + mails.length }); }
       res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify({ data: ids }));
     }
+    // Fake Nominatim geocoder for the store locator: counts calls so tests can prove caching.
+    if (req.url.startsWith("/nominatim/search")) {
+      const q = decodeURIComponent((req.url.match(/[?&]q=([^&]*)/) || [])[1] || "").toLowerCase();
+      geoCalls.push({ q, ua: req.headers["user-agent"] || "" });
+      if (q.includes("geofail")) { res.writeHead(503); return res.end("down"); }
+      // Like OpenStreetMap: suite numbers and spelled-out street numbers don't match; "unknownst" streets don't exist.
+      if (/ ste |suite|eighth|unknownst/.test(q)) { res.writeHead(200, { "content-type": "application/json" }); return res.end("[]"); }
+      if (q.includes("nowhere")) { res.writeHead(200, { "content-type": "application/json" }); return res.end("[]"); }
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify([{ lat: q.includes("chico") ? "39.7285" : "34.0211", lon: q.includes("chico") ? "-121.8375" : "-118.3965", display_name: "Mock place" }]));
+    }
+    // Resend receiving: the received email points at its raw message (written by venmo-sign.cjs).
+    if (req.url.startsWith("/emails/receiving/") && req.method === "GET") {
+      const id = decodeURIComponent(req.url.split("/").pop());
+      if (!require("fs").existsSync(`/tmp/harness/venmo/${id}.eml`)) { res.writeHead(404, { "content-type": "application/json" }); return res.end(JSON.stringify({ name: "not_found" })); }
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ object: "email", id, raw: { download_url: `http://127.0.0.1:4555/__raw/${id}`, expires_at: new Date(Date.now() + 3600e3).toISOString() } }));
+    }
+    if (req.url.startsWith("/__raw/")) {
+      const f = `/tmp/harness/venmo/${decodeURIComponent(req.url.slice(7))}.eml`;
+      if (!require("fs").existsSync(f)) { res.writeHead(404); return res.end("gone"); }
+      res.writeHead(200, { "content-type": "message/rfc822" }); return res.end(require("fs").readFileSync(f));
+    }
+    // Fake Photon (address suggestions): one US match, one non-US that must be dropped.
+    if (req.url.startsWith("/photon/api")) {
+      geoCalls.push({ photon: true, ua: req.headers["user-agent"] || "" });
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ type: "FeatureCollection", features: [
+        { geometry: { coordinates: [-121.8434, 39.7299] }, properties: { osm_key: "shop", name: "Chico Natural Foods", housenumber: "818", street: "Main Street", city: "Chico", state: "California", postcode: "95928", countrycode: "US" } },
+        { geometry: { coordinates: [-122.4103, 47.2701] }, properties: { housenumber: "5336", street: "Frances Avenue", city: "Tacoma", state: "Washington", postcode: "98422", countrycode: "US" } },
+        { geometry: { coordinates: [-123.1, 49.2] }, properties: { housenumber: "5336", street: "Frances Street", city: "Vancouver", state: "British Columbia", postcode: "V5K", countrycode: "CA" } },
+      ] }));
+    }
+    // Fake AI Gateway speech (Concierge voice): records each call so tests can check headers + caching.
+    if (req.url === "/v4/ai/speech-model" || req.url === "/v4/ai/transcription-model") {
+      const j = JSON.parse(body || "{}");
+      speechCalls.push({ kind: req.url.includes("speech") ? "speech" : "transcription", model: req.headers["ai-model-id"], auth: req.headers["authorization"], text: j.text, voice: j.voice, mediaType: j.mediaType });
+      if (req.url.includes("speech") && j.voice === "goneVoice123") { res.writeHead(404, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: { message: "A voice with voice_id 'goneVoice123' was not found. (voice_not_found)" } })); }
+      if (!req.url.includes("speech") && Buffer.from(j.audio || "", "base64").toString().startsWith("FAIL")) { res.writeHead(500, { "content-type": "application/json" }); return res.end(JSON.stringify({ error: { message: "boom" } })); }
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url.includes("speech")) return res.end(JSON.stringify({ audio: Buffer.from(`ID3fake-mp3:${j.voice}:${(j.text || "").length}`).toString("base64") }));
+      return res.end(JSON.stringify({ text: "What helps with sleep?", durationInSeconds: 3.2 }));
+    }
+    if (req.url === "/__speech") { res.writeHead(200); return res.end(JSON.stringify(speechCalls)); }
+    if (req.url === "/__geo") { res.writeHead(200); return res.end(JSON.stringify(geoCalls)); }
     // A tiny fake website for "Learn from web pages"
     if (req.url === "/site/faq.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end("<html><head><title>FAQ</title><script>var x=1</script></head><body><nav>Home Shop</nav><main><h1>FAQ</h1><p>Local pickup is on Tuesdays &amp; Fridays.</p><ul><li>Shipping takes 3–5 days</li></ul></main><footer>© footer</footer></body></html>"); }
     if (req.url === "/site/about.html") { res.writeHead(200, { "content-type": "text/html" }); return res.end("<html><head><title>About us</title></head><body><p>Founded in the mountains.</p></body></html>"); }
@@ -44,7 +91,9 @@ http.createServer((req, res) => {
     if (req.url === "/__reviewprose") { reviewProse = true; res.writeHead(200); return res.end("ok"); }
     if (req.url === "/__reset") { log.length = 0; failCount = 0; res.writeHead(200); return res.end("ok"); }
     const j = JSON.parse(body);
-    log.push({ auth: req.headers.authorization, model: j.model, models: j.models, max_tokens: j.max_tokens, tool_choice: j.tool_choice, tools: (j.tools || []).map((t) => t.function.name), system: j.messages[0].content, messages: j.messages });
+    log.push({ auth: req.headers.authorization, model: j.model, models: j.models, max_tokens: j.max_tokens, tool_choice: j.tool_choice, tools: (j.tools || []).map((t) => t.function.name), system: j.messages[0].content, messages: JSON.parse(JSON.stringify(j.messages)) });
+    // A turn with a photo has text + image parts; the canned replies below read plain text.
+    for (const m of j.messages) if (Array.isArray(m.content)) m.content = m.content.filter((x) => x.type === "text").map((x) => x.text).join(" ") + (m.content.some((x) => x.type === "image_url") ? " [IMAGE]" : "");
     // ---- The Concierge's nightly notes review: a JSON list of notes, including
     // some the site must refuse (personal data, rule-changing, unknown Today key).
     if (String(j.messages[0].content || "").startsWith('You keep the "learned notes"')) {
@@ -129,7 +178,9 @@ http.createServer((req, res) => {
       return reply(res, { content: `saw:${saw} rule:${sys.includes("Trust it over your own memory") ? "yes" : "no"}\n\n[Shown with this reply — recorded by the site:\n- card "Fake": waiting for staff to confirm]` });
     }
     if (String((j.messages || [])[0]?.content || "").includes("HOUSE FORMAT")) {
-      if (lastUser.includes("staff guidance for this rewrite") && lastUser.includes("say-guided")) return reply(res, { content: "Guided rewrite.\n\nHow to use: as directed." });
+      const tidySys = String((j.messages || [])[0]?.content || "");
+      // Guidance must reach the system prompt as the top-priority direction, not just the user turn.
+      if (lastUser.includes("staff guidance for this rewrite") && lastUser.includes("say-guided") && /STAFF DIRECTION FOR THIS REWRITE[\s\S]*say-guided[\s\S]*HOUSE FORMAT/.test(tidySys)) return reply(res, { content: "Guided rewrite.\n\nHow to use: as directed." });
       return reply(res, { content: "A calming daily blend of reishi and ashwagandha for slow mornings.\n\nMade in small batches with organic roots and fruiting bodies. Earthy and a little sweet, it sits well in coffee or warm milk.\n\n- Reishi dual extract\n- Ashwagandha root\n\nHow to use: one dropper in a warm drink." });
     }
     if (lastUser.includes("sayforbidden")) return reply(res, { content: "Our illegal blend is lovely." });
@@ -219,6 +270,8 @@ http.createServer((req, res) => {
     if (lastUser.includes("snapshot")) return reply(res, { content: null, tool_calls: [call("business_snapshot", {})] });
     if (lastUser.includes("badjson")) return reply(res, { content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "get_product_details", arguments: "{not json" } }] });
     if (lastUser.includes("many")) return reply(res, { content: null, tool_calls: Array.from({ length: 8 }, () => call("list_upcoming_events", {})) });
+    // Conversation mode: a goodbye gets the end marker (the site strips it and stops listening).
+    if (String(j.messages[0].content || "").includes("CONVERSATION MODE") && lastUser.includes("good for now")) return reply(res, { content: "You're so welcome, love. Have a magical day! [[end]]" });
     return reply(res, { content: "Hello from the mock. **Bold** and [a link](/retail)." });
   });
 }).listen(4555, () => console.log("mock gateway on 4555"));

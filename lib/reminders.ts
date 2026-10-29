@@ -122,6 +122,7 @@ function reminderHtml(o: Order, message: string, payLink: string): string {
     <div style="text-align:center;margin-top:1.2rem;">
       <a href="${payLink}" style="display:inline-block;background:#85ba45;color:white;padding:0.85rem 1.6rem;border-radius:6px;text-decoration:none;font-weight:700;">View &amp; pay — $${o.total.toFixed(2)}</a>
     </div>
+    <div style="margin-top:1.2rem;text-align:center;font-size:0.88rem;">Paying by Venmo? Put <strong>#${ref}</strong> in your Venmo note so we can match it.</div>
     <div style="margin-top:1.5rem;font-size:0.8rem;color:#81858b;">Already paid? Thank you — tap the button and choose "I've sent my payment" so we know. Questions? Just reply to this email.</div>
   </div>`;
 }

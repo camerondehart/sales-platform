@@ -173,6 +173,7 @@
   <a class="nav-link" href="#tab-products"><span class="nav-ico">{{EMOJI}}</span>Products</a>
   <a class="nav-link" href="#tab-events"><span class="nav-ico">🎟</span>Events</a>
   <a class="nav-link" href="#tab-marketing"><span class="nav-ico">✦</span>Marketing</a>
+  <a class="nav-link" href="#tab-ambassadors"><span class="nav-ico">★</span>Ambassadors</a>
   <a class="nav-link" href="#tab-analytics"><span class="nav-ico">📈</span>Analytics</a>
   <a class="nav-link" href="#tab-assistant"><span class="nav-ico">✧</span>Assistant</a>
   <a class="nav-link" href="#tab-settings"><span class="nav-ico">⚙</span>Settings</a>
@@ -244,18 +245,35 @@ Statuses can be changed back. Products can be edited. Emails only send when a se
 <section id="signin">
 <h2 class="sec">Signing in</h2>
 <ol class="steps">
-<li>Go to <strong>{{HOST}}/admin</strong>.</li>
-<li>Enter the staff password and press <kbd>Sign in</kbd>. <em>Or</em>, if you're on the staff list and sign-in links are switched on, choose <strong>Email me a sign-in link</strong>, enter your email, and tap the button in the email, then <kbd>Sign in to the dashboard</kbd>. The link works once, for 15 minutes.</li>
+<li>Go to <strong>{{HOST}}/admin</strong>. (The sign-in page has a link back to the homepage.)</li>
+<li>Enter <strong>today&rsquo;s staff password</strong> and press <kbd>Sign in</kbd> (see <em>The daily staff password</em> below). <em>Or</em>, if you're on the staff list and sign-in links are switched on, choose <strong>Email me a sign-in link</strong>, enter your email, and tap the button in the email, then <kbd>Sign in to the dashboard</kbd>. The link works once, for 15 minutes.</li>
 <li><em>Shortcut:</em> on the normal member sign-in page, type your staff email. The password box disappears; press <strong>Email me a dashboard sign-in link</strong> and tap the button in the email, the same link as above. It signs you in to the dashboard only, so <strong>Preview store</strong> still shows the admin preview. This needs <strong>Admin sign-in link by email</strong> switched on.</li>
+<li><em>Fastest:</em> once you've set it up on your phone or computer (below), just tap the button at the top of the sign-in page: <strong>Sign in with Face ID</strong> on an iPhone, <strong>Touch ID</strong> on a Mac, <strong>fingerprint</strong> on Android, <strong>Windows Hello</strong> on Windows. Look at the phone or touch the sensor and you're in.</li>
 <li>You stay signed in for about 12 hours, then it asks again.</li>
 </ol>
+
+<h3>The daily staff password</h3>
+<p>The staff password changes every day at midnight Pacific. It's two words and two numbers, like <code>maple-otter-42</code>. You'll find it in two places:</p>
+<ul>
+<li>At the top of each morning's <strong>nightly report email</strong>, under <em>Today's staff password</em>.</li>
+<li>In <strong>Settings → Steward password</strong> whenever you're signed in (with Face ID or the email link, say). It's always there, so a missing email never locks anyone out.</li>
+</ul>
+<p>Capitals and spaces don't matter. Yesterday's password still works until noon, in case you haven't opened the new email yet. The old fixed password kept working for one week after the change, then stopped. Settings → Steward password says until when. Face ID and the email link work as always, and they're the quickest way in.</p>
+
+<h3>Setting up Face ID, Touch ID or fingerprint</h3>
+<ol class="steps">
+<li>Sign in the usual way on the device you want to use (your iPhone, Mac…).</li>
+<li>Open <strong>Settings → Staff sign-in</strong>. Under <strong>Face ID, Touch ID &amp; fingerprint</strong>, press <kbd>Add Face ID for this device</kbd> (it says Touch ID, fingerprint or Windows Hello on those devices). If you signed in with the shared password, first choose who it's for.</li>
+<li>Your device asks for your face or fingerprint once. That's it: from now on, tap the <strong>Sign in with …</strong> button.</li>
+</ol>
+<p>Do this once per device. It works with Face ID and Touch ID on iPhone, iPad and Mac (with iCloud Keychain, setting it up on your iPhone also covers your Mac and iPad), fingerprint or face unlock on Android phones (Chrome), and Windows Hello. Your face or fingerprint never leaves your device: the site only keeps a lock that your phone's key fits. The live site and stage are set up separately. The list shows each person's devices and when they last signed in. <kbd>Remove</kbd> one if a phone is lost or replaced, and anyone taken off the staff list loses their Face ID too. The password and the email link always keep working.</p>
 <div class="callout tip">
 <strong>Make it one tap</strong>
 Bookmark {{HOST}}/admin. On a phone, use "Add to Home Screen" and it opens like an app.
 </div>
 <div class="callout danger">
 <strong>Never share the staff password</strong>
-It reveals every customer, order, and address. Members have their own separate passwords — unrelated to this one.
+It reveals every customer, order, and address. Don&rsquo;t forward the nightly report email either, since it carries the day&rsquo;s password. Members have their own separate passwords — unrelated to this one.
 </div>
 <div class="callout tip">
 <strong>Why use the email link</strong>
@@ -490,7 +508,7 @@ Anyone whose email is already in the system is skipped, so nothing gets overwrit
 <li>Enter the <strong>Name</strong>.</li>
 <li>Press <kbd>⬆ Upload photo</kbd> and pick a picture from the computer or phone, or paste a link to one. The preview updates instantly so you can check it. Big phone photos are shrunk automatically so pages stay fast.</li>
 <li>Enter the <strong>Price</strong> — "$120", or even "Inquire" if you'd rather people ask.</li>
-<li>Optionally add a <strong>Sale price</strong>. The original shows crossed out.</li>
+<li>Optionally add a <strong>Sale price</strong>. The original shows crossed out. Tick <strong>💵 Cash pickup only</strong> to make it a cash pickup deal (see <em>Run a sale</em>).</li>
 <li>Add a <strong>Category</strong> — this creates the filter buttons customers use, so keep spelling consistent.</li>
 <li>Choose <strong>Where it sells</strong>.</li>
 <li>Write a <strong>Description</strong>. Short paragraphs and lines starting with "-" format themselves.</li>
@@ -543,6 +561,26 @@ If you switch tabs, close the page, or click away while changes are still gather
 <div class="callout warn">
 <strong>The arrows only appear sometimes</strong>
 They show when sorting is "Display order" with no filters or search active. Moving item three above item seven is meaningless in a filtered list, so they hide themselves.
+</div>
+
+<h3>Stock counts and backorders</h3>
+<p>Under the product list, open <strong>Stock counts</strong>. Type how many of each product you have ready to send and press <kbd>Save</kbd>. You can also see and change a product's count in its edit window. Leave a box <strong>blank</strong> if you don't want that product counted. Bundles use the counts of the products inside them.</p>
+<ul>
+<li><strong>Every order takes its items off</strong> the count. Cancelling an order puts them back.</li>
+<li><strong>At 0</strong> the shop shows <strong>Currently restocking</strong>, and people can <strong>still order</strong>. Those order lines are marked “restocking” so you know they're waiting for new stock.</li>
+<li><strong>On backorder</strong> means units customers have ordered that the shelf didn't cover. The rust-coloured <strong>“… on backorder”</strong> label next to <em>Stock counts</em> shows the total. Tap it to see each product, with the orders waiting for it and how many each one needs. Send those first when stock arrives.</li>
+</ul>
+<ol class="steps">
+<li><strong>When a delivery comes in:</strong> open Stock counts, type the new totals and press <kbd>Save</kbd>. Or tell the Concierge (“we now have 24 Harmony Blend”) and confirm its card.</li>
+<li>Pack the backordered orders first. The list under the rust-coloured label tells you which ones.</li>
+</ol>
+<div class="callout tip">
+<strong>The Today list warns you before you run out</strong>
+When a product is running low or owed to customers, <strong>Overview → Today</strong> shows <em>Restock …</em> with what's on hand, what's on backorder and 30 days of sales. <kbd>Plan the restock</kbd> asks the Concierge how much to order.
+</div>
+<div class="callout warn">
+<strong>The shop only uses the counts once the switch is on</strong>
+Enter the counts first, then turn on <strong>Stock counts</strong> in Settings → Feature switches. Until then the numbers are saved but customers never see “Currently restocking”.
 </div>
 
 <h3>Shipping weights</h3>
@@ -639,8 +677,10 @@ Deleting an event throws away everyone who signed up. If a date moves or a price
 <tr><td>Per-customer limit</td><td>Times one person can use it</td></tr>
 <tr><td>Minimum order</td><td>Cart must reach this first</td></tr>
 <tr><td>Rep / source</td><td>A label to track where it came from</td></tr>
+<tr><td>Also works in the public shop</td><td>Off = members only (the default). On = anyone can use it in the public shop too, on public products, without an account</td></tr>
 </table>
-<p>The dashboard tracks every use, so you can see what's working.</p>
+<p>The dashboard tracks every use, so you can see what's working. Codes that work in the public shop show a <strong>Public shop too</strong> chip. Switch one either way with the <kbd>Public shop too</kbd> / <kbd>Members only</kbd> button in the list. A code linked to an ambassador always works in the public shop.</p>
+<p>The list files codes by state: <strong>Live</strong> (on and still working), <strong>Inactive</strong> (you pressed Deactivate) and <strong>Ended</strong> (past its last day, or every allowed use taken). Ended is the archive: codes move there by themselves and keep their history. Use the search box to find a code or a rep's label, and <strong>Show more</strong> for older ones. A live code within a week of its last day shows an <em>Ends in…</em> tag.</p>
 
 <h3>The announcement banner</h3>
 <p>A coloured strip across the top of every customer page. Good for sales, holiday cut-offs, or closures.</p>
@@ -687,7 +727,11 @@ Anyone on the mailing list whose email also has an approved {{MEMBERS}} account.
 <tr><td><kbd>[our shop](https://{{HOST}})</kbd></td><td>A link, when it's inside a sentence</td></tr>
 <tr><td><kbd>---</kbd></td><td>A dividing line</td></tr>
 <tr><td>Any web address</td><td>Becomes a clickable link on its own</td></tr>
+<tr><td><kbd>![Our new label](https://…)</kbd></td><td>A photo, if it's alone on its own line</td></tr>
 </table>
+
+<h3>Adding a photo</h3>
+<p>Click in the message where the photo should go, then press <kbd>⬆ Upload photo</kbd> under the message box and pick a JPEG, PNG, WebP or GIF. It uploads and the message gets a <kbd>![Photo](https://…)</kbd> line, which shows as the picture in the email. If you haven't clicked in the message, the photo goes at the end. Change the word <em>Photo</em> in the brackets to a short description for people who can't see images. Use <strong>Preview email</strong> or send yourself a test to check how it looks. Big phone photos are shrunk first. iPhone HEIC photos need sharing as JPEG (or set iPhone Settings → Camera → Formats → <strong>Most Compatible</strong>).</p>
 
 <div class="card">
 <h4 style="margin-top:0">A complete example</h4>
@@ -777,6 +821,84 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
 
 <h3>How a campaign did</h3>
 <p>The <strong>Campaigns</strong> list under the composer shows each one: when it went, how many it reached, the percentage who opened and clicked, and the visits, orders and sales that came from its links. <kbd>Duplicate</kbd> copies it back into the composer. Anyone who marks a campaign as spam is unsubscribed automatically.</p>
+</section>
+
+<!-- ===== AMBASSADORS TAB ===== -->
+<section id="tab-ambassadors">
+<h2 class="sec">Ambassadors</h2>
+<span class="where">Dashboard → Ambassadors</span>
+<p class="lede">Influencers and friends of the brand who share {{SHORT}}. Each one gets their own page, their own terms, and a running tally of what they’ve sold and earned.</p>
+
+<h3>What an ambassador gets</h3>
+<ul>
+<li><strong>Their own page</strong> at <strong>{{HOST}}/their-name</strong>: their photo, a few words, links to their socials and the products they pick, each with Add to cart. It isn’t in the site’s menus or on Google. People only reach it through their link or QR code.</li>
+<li><strong>Credit for sales</strong>: orders from people who came through their page (within their attribution window) or members who used their code.</li>
+<li><strong>Commission</strong> on those sales, worked out for you, and a <strong>progress report</strong> you can email them any time.</li>
+</ul>
+
+<h3>Adding an ambassador</h3>
+<ol class="steps">
+<li>Open the <strong>Ambassadors</strong> tab and press <kbd>+ Add an ambassador</kbd>.</li>
+<li><strong>Their page</strong>: name, page address (fills itself in), optional headline, a few words in their voice, a photo (<kbd>Upload photo</kbd>), the <strong>featured products</strong> in order (↑ ↓; public-shop products only; none = whole shop) and their <strong>social links</strong> (each gets its icon).</li>
+<li><strong>Their terms</strong>, copied from their agreement:
+  <ul>
+  <li><strong>Their email</strong>: where progress reports go.</li>
+  <li><strong>Their discount code</strong>: make the code first under Marketing → Discount codes (e.g. 10% off), then pick it here. It works for their community in the public shop and the members’ shop, and anyone who opens their page finds it already filled in at checkout.</li>
+  <li><strong>Commission %</strong> (e.g. 15) and <strong>community discount %</strong> (e.g. 10).</li>
+  <li><strong>Room to grow</strong>: the higher rate (e.g. 20) and the goals that earn it. Tick <em>Goals met</em> when they get there. New orders then earn the higher rate, and earlier orders keep the rate they were placed at.</li>
+  <li><strong>Started on</strong> and <strong>trial</strong> length (e.g. 90 days; 0 = none).</li>
+  <li><strong>Attribution window</strong>: how many days after visiting their page an order still counts (e.g. 30). Untick <em>Repeat purchases count</em> if only each customer’s first order should.</li>
+  <li><strong>Payouts</strong>: monthly, quarterly or on request.</li>
+  <li><strong>Other terms &amp; notes</strong>: complimentary products sent, content permissions, exclusivity… (staff only).</li>
+  </ul>
+</li>
+<li>Press <kbd>Create</kbd>. Open their card, then <kbd>Copy link</kbd> or <kbd>QR code ⬇</kbd> / <kbd>Print QR</kbd> and send it to them.</li>
+</ol>
+<div class="callout warn">
+<strong>Share links and QR codes from the live dashboard</strong>
+On stage the link and QR code point at stage. The panel warns you when that’s the case.
+</div>
+
+<h3>Reading the numbers</h3>
+<p>The top of the tab shows everyone together: live pages, page visits, orders, sales, commission earned and <strong>owed now</strong>. Sort the cards by <em>Most owed</em>, <em>Most sales</em>, <em>Newest</em> or <em>Name</em>. Tap a card for one ambassador:</p>
+<table>
+<tr><th>Number</th><th>What it means</th></tr>
+<tr><td>Page visits</td><td>Times their page was opened (and how many came from the QR code). Counted without cookies or personal data.</td></tr>
+<tr><td>Orders</td><td>Orders credited to them, and what share of visits became an order. Cancelled orders aren’t counted.</td></tr>
+<tr><td>Sales (paid)</td><td>Product sales after discounts, without shipping, on paid orders. Unpaid ones are shown separately.</td></tr>
+<tr><td>Earned</td><td>Their commission on paid orders. Unpaid orders show what they’ll earn once paid.</td></tr>
+<tr><td>Paid to them</td><td>Every payout you’ve recorded.</td></tr>
+<tr><td>Owed now</td><td>Earned minus paid. This is what to pay them next.</td></tr>
+</table>
+<p>Below that: their <strong>trial</strong> (day 29 of 90, or <em>review due</em> once it’s over; press <kbd>Mark review done</kbd> after you talk), <strong>month by month</strong>, their <strong>top products</strong>, their <strong>terms</strong>, and every <strong>order</strong> credited to them with what it earned.</p>
+
+<h3>Paying an ambassador</h3>
+<ol class="steps">
+<li>Check <strong>Owed now</strong> on their page in the dashboard.</li>
+<li>Pay them the usual way (Zelle, Venmo…). The site never moves money.</li>
+<li>Under <strong>Payouts</strong>, type the amount, date and a note (“Zelle, October commission”) and press <kbd>Record payout</kbd>. <strong>Owed now</strong> goes down. Entered one by mistake? Press <kbd>Remove</kbd>.</li>
+</ol>
+
+<h3>Emailing a progress report</h3>
+<ol class="steps">
+<li>Open the ambassador and press <kbd>✉ Email a progress report</kbd>.</li>
+<li>Pick what it covers: <em>This month so far</em>, <em>Last month</em>, <em>The last 30 days</em> or <em>Since they started</em>.</li>
+<li>Add your own note and sign-off, or leave them blank for a warm thank-you from the team. The preview on the right updates as you type.</li>
+<li>Type your own email and press <kbd>Send test</kbd> to see it in your inbox first.</li>
+<li>Press <kbd>Send to …</kbd>. It goes to the email in their terms, and their replies go to the support inbox.</li>
+</ol>
+<p>The report shows their page visits, orders, sales and commission for that period, what they’ve earned, been paid and are still owed since they started, their community’s favorite products, where their trial stands and their link and code. It <strong>never</strong> shows customers’ names or details.</p>
+
+<h3>Asking the Concierge</h3>
+<p>The staff Concierge knows all of this. Ask it things like <em>“How is Alex doing this month?”</em>, <em>“Who do we owe commission to?”</em> or <em>“Which ambassador sold the most?”</em> and it pulls back the same numbers as this tab. It can also prepare cards for you to confirm: adding an ambassador or changing their terms (<em>“Toni hit her goals, move her to 20%”</em>), recording a payout you’ve made (<em>“I paid Toni $42.50 by Zelle”</em>), and emailing a progress report. Nothing changes until you press the card’s button.</p>
+<p>The Overview’s <strong>Today</strong> list also reminds you when ambassador payouts are due (the first week of the month, or of the quarter for quarterly payouts) and when someone’s trial is over and ready for review.</p>
+
+<h3>Turning a page off</h3>
+<p><kbd>Turn off</kbd> takes their page down without losing anything: the link stops working for customers and new orders stop being credited. Their numbers and payouts stay. You can still open the page while signed in to the dashboard to preview it. <kbd>Delete</kbd> removes them for good, including their payout history (credited orders keep their name).</p>
+<div class="callout tip">
+<strong>Before the switch is on</strong>
+Everything here works with the <strong>Ambassador pages</strong> switch off, so you can set people up and preview their pages first. Customers can only open the pages, and orders are only credited, once it’s on in Settings → Feature switches.
+</div>
 </section>
 
 <!-- ===== ANALYTICS TAB ===== -->
@@ -893,6 +1015,35 @@ Deleting something, sending a campaign, buying postage and changing who can sign
 The top of the tab shows what it has cost this month, how many messages it answered, and anything it handed to the team. The figures can trail by a few minutes. Your exact bill is the AI Gateway balance in Vercel.
 </div>
 
+<h3>Talking to the Concierge (voice)</h3>
+<p>With the <strong>Concierge voice</strong> switch on, the chat has a microphone, for customers and for staff:</p>
+<table>
+<tr><th>Button</th><th>What it does</th></tr>
+<tr><td>Mic</td><td>Tap, talk, tap ■. Your words appear in the box so you can check them before sending.</td></tr>
+<tr><td>▶ Listen</td><td>Under any answer. Reads that answer out loud. Tap ■ Stop to stop.</td></tr>
+<tr><td>Read answers aloud</td><td>Tick it and every new answer is read out automatically.</td></tr>
+<tr><td>Conversation mode</td><td>Like a phone call. See below.</td></tr>
+</table>
+
+<h3>Conversation mode</h3>
+<p>Tick <strong>Conversation mode</strong> and just talk. When you pause, what you said is sent. The Concierge answers out loud, then listens again. Answers are shorter than in typed chat, with the same personality.</p>
+<ul>
+<li><strong>Interrupt it</strong> any time by talking over it. It stops and listens.</li>
+<li><strong>To finish</strong>, say goodbye (“that's all, thanks!”). The Concierge says bye and conversation mode switches itself off. Unticking it also works.</li>
+<li>Money and dates are read out properly (“four thousand one hundred sixty-four dollars”). The text on screen stays as written.</li>
+</ul>
+<div class="callout tip">
+<strong>Best in a quiet spot</strong>
+Background chatter or music can count as talking and interrupt the answer. Headphones help a lot.
+</div>
+
+<h3>Choosing the voice</h3>
+<p><strong>Assistant → Concierge voice</strong>: pick a <strong>Speech model</strong> (ElevenLabs, Google or Microsoft) and a <strong>Voice</strong>. Press <kbd>▶ Play</kbd> to hear a sample, then <kbd>Save voice</kbd>. Faster models start talking sooner; the more natural ones cost more. The panel also shows each day's voice use. The voice's estimated cost is part of the Assistant's monthly spend and limit.</p>
+
+<h3>Photos in the chat</h3>
+<p>With the <strong>Concierge photos</strong> switch on, the chat has a 📷 button. Take a photo or pick one, add a question if you like, and send. The Concierge looks at it: a product, a label, a shelf, a packing slip or an invoice. Staff can photograph a delivery note and ask it to prepare the stock counts. Photos are shrunk on the phone first and are never kept in the saved chats.</p>
+<p><strong>A photo for a campaign:</strong> send the photo and ask, for example, "make a campaign about our new label with this photo". The draft card shows your photo and where it goes. Press <kbd>Open in composer</kbd> and the photo is uploaded into the message for you. Then review it, send yourself a test and send as usual. The photo is only kept in your browser until then, so if you reload the page first, the composer leaves a <kbd>[[PHOTO]]</kbd> line. Use <kbd>⬆ Upload photo</kbd> to add it there (and delete the line). A campaign with a <kbd>[[PHOTO]]</kbd> line left in won't send.</p>
+
 <h3>Replying to customers it handed to the team</h3>
 <p>When the Concierge can't solve something, the customer's request lands in <strong>Handed to the team</strong> at the bottom of the Assistant tab, and the tab shows a number until it's dealt with. Each one shows the customer's summary; press <strong>Show the conversation</strong> to read the whole chat.</p>
 <ul>
@@ -938,8 +1089,24 @@ Flags are deliberately sensitive, so expect the odd false alarm. <strong>Red</st
 <p>With those values, $100 spent earns 100 points, worth $1 off — a deliberately conservative 1%. Raise "points per dollar" to be more generous.</p>
 <p>Members see their balance and history under <strong>Points &amp; rewards</strong> in their account menu, and can slide points onto an order at checkout. Points are awarded automatically when an order becomes Paid or Completed, and never twice for the same order. You can also add or subtract points by hand with a reason, which is recorded in their history.</p>
 
+<h3>Store locations (the “Find us in stores” map)</h3>
+<p>Open <strong>Settings → Store locations</strong>. These are the shops that carry {{SHORT}}. They appear on the public <strong>/stores</strong> map once the <strong>Store locator</strong> switch is on.</p>
+<ol class="steps">
+<li>Press <kbd>+ Add a store</kbd>.</li>
+<li>Start typing the <strong>Store name</strong>. Pick the business from the list and its address fills in. If it isn't listed, start typing the <strong>Street</strong> and pick the address instead. Use ↑ ↓ and Enter, or tap.</li>
+<li>Check the pin on the map. If it's off, <strong>drag it</strong> or tap the right spot. You can also paste coordinates from Google Maps (right-click the spot → copy “38.91876, -119.99515”) into either the Latitude or Longitude box.</li>
+<li>Add phone, website, hours and a note customers see (“On the wellness shelf by the register”).</li>
+<li>Optionally tick the <strong>products it carries</strong>. Those products then show <strong>📍 Find it in a store near you</strong> in their pop-up.</li>
+<li>Press <kbd>Add store</kbd>.</li>
+</ol>
+<p>In the list: <kbd>↑</kbd> <kbd>↓</kbd> set the order on the page, <kbd>Hide</kbd> takes a store off the map without deleting it, and <kbd>Edit</kbd> / <kbd>Delete</kbd> do what they say. A hidden store only needs a name and a city. The Concierge can add stores too (“add Main Street Market”) and answers customers asking where to buy in person.</p>
+<div class="callout tip">
+<strong>“Pin approximate”</strong>
+If an address can't be found exactly, the pin goes to the middle of the town and the store is marked <em>Pin approximate</em>. Drag the pin to the right spot and save. A pin you placed by hand is always kept.
+</div>
+
 <h3>Change the staff password</h3>
-<p>Enter the new password twice and click <kbd>Update password</kbd>. Everyone using the admin needs the new one from then on — tell them before you change it.</p>
+<p>The top of <strong>Settings → Steward password</strong> shows <strong>today's staff password</strong> with a <kbd>Copy</kbd> button. It changes by itself every night, so there's nothing to change. The old fixed password only signs in during the first week after the daily password started, and it can't be changed while the daily password is on. If <strong>Daily staff password</strong> is ever switched off under Feature switches, this section shows a box to set the fixed password again: enter it and click <kbd>Update password</kbd>.</p>
 
 <h3>Feature switches</h3>
 <p>Turn parts of the site on or off without calling anyone. It takes effect within about 15 seconds. The live site and stage have separate switches, except any marked <strong>Stage + live</strong>.</p>
@@ -948,6 +1115,10 @@ Flags are deliberately sensitive, so expect the odd false alarm. <strong>Red</st
 <li><strong>Assistant can prepare changes</strong>: switch off to make the staff Concierge look-up-only.</li>
 <li><strong>Email template library</strong> and <strong>Product videos</strong>: hide those features without losing anything you saved.</li>
 <li><strong>Automatic payment reminders</strong>, <strong>Sign in with an email code</strong> (members), <strong>Admin sign-in link by email</strong> and <strong>Mix-and-match bundle discounts</strong> start off. Switch each on when you're ready.</li>
+<li><strong>Store locator</strong>, <strong>Stock counts</strong>, <strong>Venmo payment matching</strong>, <strong>Concierge voice</strong>, <strong>Concierge photos</strong> and <strong>Ambassador pages</strong>: each has its own section in this guide. Stores and stock counts can be set up while their switch is off. Customers only see them once it's on.</li>
+<li><strong>Cash pickup deals &amp; public-shop pickup</strong>: the <em>Cash pickup only</em> tick on sales, and Local pickup (invoice or cash) in the public shop. Off = the public shop is ship-only.</li>
+<li><strong>Daily staff password</strong> (on): the staff password changes every day (see <em>Signing in</em>). Switching it off goes back to the old fixed password. Only do that if your developer asks.</li>
+<li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>
 </ul>
 
@@ -955,7 +1126,8 @@ Flags are deliberately sensitive, so expect the odd false alarm. <strong>Red</st
 <p>Set when each reminder goes (in hours) and what it says. <code>{name}</code>, <code>{ref}</code> and <code>{total}</code> fill themselves in. <strong>Move to Expired after</strong> sets when unpaid orders leave the Pending list. <kbd>Run now</kbd> checks straight away instead of waiting up to 15 minutes. Only orders placed after you switch reminders on are ever chased.</p>
 
 <h3>Staff sign-in</h3>
-<p>The people who can sign in with an emailed link. Add a name and email and press <kbd>Add</kbd>. <kbd>Remove</kbd> signs them out within a minute. You can't remove yourself, and at least one person has to stay on the list.</p>
+<p>The people who can sign in with an emailed link (and with Face ID). Add a name and email and press <kbd>Add</kbd>. <kbd>Remove</kbd> signs them out within a minute and removes their Face ID too. You can't remove yourself, and at least one person has to stay on the list.</p>
+<p>Below the list, <strong>Face ID / Touch ID</strong> shows every device set up for Face ID sign-in, with <kbd>Add Face ID for this device</kbd> and <kbd>Remove</kbd> (see <em>Signing in → Setting up Face ID</em>).</p>
 
 <h3>Activity log</h3>
 <p>Every change made in the dashboard, newest first: order statuses, approvals, product edits, sales, emails sent, codes, switches and more. Click a row to see what it was before and what it changed to. <strong>Concierge</strong> means the assistant prepared it and someone pressed the button. <strong>Scheduled</strong> is the nightly report. Tick <strong>Failed only</strong> to see anything that didn't save, and any “access denied” alerts: someone asked the Concierge about an order that wasn't theirs. Nothing was shown to them.</p>
@@ -974,7 +1146,18 @@ It arrives automatically every night with revenue for today, 7 days, 30 days and
 <span class="where">Dashboard → Orders → open an order</span>
 
 <h3>How money reaches you</h3>
-<p>The invoice offers Venmo or Zelle, and the memo always reads <strong>Order for</strong> followed by the customer's name. Pickup customers can also choose cash.</p>
+<p>The invoice offers Venmo or Zelle, and the memo always reads <strong>Order for</strong> followed by the customer's name and the order number (e.g. <strong>#4K9Q2X</strong>). Pickup customers can also choose cash.</p>
+
+<h3>Venmo payments, matched for you</h3>
+<p><span class="where" style="display:inline">Orders tab → Venmo payments</span> (when the <strong>Venmo payment matching</strong> switch is on). Venmo's “paid you” emails show up here, already checked and matched to the unpaid order they pay for. The invoice's Venmo button fills the note with the order number (e.g. <strong>#4K9Q2X</strong>), so most payments match by themselves.</p>
+<table>
+<tr><th>You see</th><th>Means</th><th>Do</th></tr>
+<tr><td><strong>Sure</strong></td><td>The Venmo note had the order number, and the amount fits</td><td>Tap <kbd>Mark paid</kbd></td></tr>
+<tr><td><strong>Likely</strong></td><td>Same amount and a similar name, but no order number</td><td>Check the name and order, then <kbd>Mark paid</kbd> or <kbd>Not a match</kbd></td></tr>
+<tr><td><strong>No sure match</strong></td><td>Couldn't tell which order</td><td>Pick the order it pays for, or dismiss it if it isn't for an order</td></tr>
+<tr><td><strong>Quarantined</strong></td><td>Failed the security check (may not really be from Venmo)</td><td>Check the Venmo app itself before marking anything paid</td></tr>
+</table>
+<p>Nothing is ever marked paid until someone taps. The Today list shows Venmo payments waiting, and the Concierge can prepare the same confirm cards. One-time setup (forwarding the Venmo emails from the inbox that receives them) is under <strong>Setup</strong> at the bottom of that panel.</p>
 
 <h3>When a customer reports paying</h3>
 <p>Every order email carries a confirmation button, and what it does depends on how they're paying:</p>
@@ -1047,7 +1230,7 @@ Almost always an unpaid Shippo balance — they block new labels until it's sett
 </ol>
 
 <h3>Cash at pickup</h3>
-<p>Pickup customers can choose cash instead of an invoice. No invoice goes out, and their email states the exact amount to bring.</p>
+<p>Pickup customers can choose cash instead of an invoice. With <strong>Cash pickup deals &amp; public-shop pickup</strong> switched on, public-shop customers can choose Local pickup too (pay by invoice or cash at pickup). Those orders show in Orders like any other, marked Local pickup. No invoice goes out, and their email states the exact amount to bring.</p>
 <p>Their confirmation email also carries a green button reading <strong>"I picked up and paid cash."</strong> When they tap it after collecting their order, the site marks it <span class="pill p-ship">Completed</span> on its own and emails you to say so. Most cash pickups will close themselves out this way with no work from you.</p>
 <div class="callout warn">
 <strong>Still count the cash</strong>
@@ -1091,6 +1274,9 @@ No draft, no undo. Read it once before clicking send.
 
 <h4>Buy one, get one</h4>
 <p>Set 100% for a true "second one free," or 50% for half off the second. It discounts every second item in the cart.</p>
+
+<h4>Cash pickup deals</h4>
+<p>Under a product's sale price or promotion, tick <strong>💵 Cash pickup only</strong>. The sale then applies only when the customer chooses <strong>Local pickup</strong> and <strong>Cash at pickup</strong>. Shipped orders and orders paid by invoice pay the regular price. Customers see the regular price with "💵 $32 cash at pickup" under it and a <em>Cash pickup deal</em> chip on the photo. At checkout the cart tells them how much choosing cash at pickup would save, and the price drops as soon as they pick it. It works in the members' gallery and the public shop. The tick shows once <strong>Cash pickup deals &amp; public-shop pickup</strong> is on under Feature switches. Ending the sale clears it. You can also ask the Concierge, for example "put Harmony at $30, cash pickup only".</p>
 
 <div class="callout warn">
 <strong>Discounts stack</strong>
@@ -1178,10 +1364,10 @@ If someone answers <strong>No</strong> to being 21 or over, they cannot send a r
 <p>Categories become a drop-down list on a phone instead of a row of buttons, which is much easier to tap.</p>
 
 <h3>Shopping</h3>
-<p>On the first visit each session there's a short animated entrance — a night sky, a ridgeline rising, a toadstool grove — then the gallery. They browse, filter by category, and add to a basket that survives closing the tab.</p>
+<p>On the first visit each session there's a short animated entrance — a forest that's brushed aside to reveal a sunlit clearing, the peaks and “{{MEMBERS}}” (about 3 seconds; tapping skips it, and it never plays for people who've turned on reduced motion) — then the gallery. They browse, filter by category, and add to a basket that survives closing the tab.</p>
 
 <h3>Checking out</h3>
-<p>They choose shipping ($10) or free local pickup, confirm their address, can apply a discount code (unless a bundle already applies), can slide points onto the order, or can press <strong>Ask a question</strong> to ask about the items without buying.</p>
+<p>They choose shipping ($10) or free local pickup, confirm their address, can apply a discount code (unless a bundle already applies; in the public shop only codes switched on for it, or an ambassador’s code, which fills itself in for people who came through that ambassador’s page), can slide points onto the order, or can press <strong>Ask a question</strong> to ask about the items without buying.</p>
 <p>Members who forget their password can choose <strong>Email me a code instead</strong> on the sign-in form (when it's switched on) and type the 6-digit code from their inbox.</p>
 
 <h3>Paying</h3>
@@ -1199,6 +1385,10 @@ The words come from the About page. If that page is edited there, this one will 
 
 <h3>Events</h3>
 <p>Anyone can browse <strong>/events</strong> without an account. Clicking an event opens a pop-up with the full details and live availability, and they register from there. If it's full they join the waitlist and get moved up automatically when a spot opens.</p>
+
+<h3>Find us in stores</h3>
+<p>With the Store locator switch on, a highlighted <strong>📍 Find us in stores</strong> button sits in the top menu of every page (members’ gallery included) and in the footer. It opens <strong>/stores</strong>: a map and a list of the shops that carry {{SHORT}}, with hours, phone, directions and your note for each. Product pop-ups say <strong>📍 Find it in a store near you</strong> when a store carries that product, and the Concierge answers “where can I buy this in person?”.</p>
+<p>When a product is out (stock count 0) its card says <strong>Currently restocking</strong>. They can still order it. It's sent when new stock arrives.</p>
 
 <div class="callout warn">
 <strong>Why a link might "not work"</strong>
@@ -1236,6 +1426,15 @@ Payment links opened inside some email preview windows hang, because those windo
 <p class="faq-q">I need to cancel an order.</p>
 <p class="faq-a">Open it and set status to Cancelled. If they already paid, refund through Venmo or Zelle directly — the site can't move money.</p>
 
+<p class="faq-q">A product says “Currently restocking” but we have it.</p>
+<p class="faq-a">Its stock count is 0. Products → Stock counts, type the real number, press Save. To stop counting a product, clear its box.</p>
+
+<p class="faq-q">A Venmo payment didn't show up in Venmo payments.</p>
+<p class="faq-a">Give it a couple of minutes. If it's still missing, check that the Gmail filter is still forwarding Venmo emails (Setup at the bottom of the panel), then mark the order paid by hand after checking the Venmo app.</p>
+
+<p class="faq-q">The Concierge voice keeps stopping mid-answer in conversation mode.</p>
+<p class="faq-a">It thinks you're talking over it. Usually it's background noise or the speaker being loud. Use headphones or move somewhere quieter, or untick Conversation mode and use ▶ Listen.</p>
+
 <p class="faq-q">Something looks broken or a number seems off.</p>
 <p class="faq-a">Refresh the page first. The site sometimes shows you a slightly old copy for a few seconds. If it still looks wrong after refreshing, take a screenshot and send it over.</p>
 </section>
@@ -1246,7 +1445,7 @@ Payment links opened inside some email preview windows hang, because those windo
 <table>
 <tr><th>Term</th><th>Meaning</th></tr>
 <tr><td>{{MEMBERS}}</td><td>The members-only shop — the main site</td></tr>
-<tr><td>Staff password</td><td>The admin password. Different from member passwords.</td></tr>
+<tr><td>Staff password</td><td>The admin password, a new two-word phrase each day (in the nightly email and Settings). Different from member passwords.</td></tr>
 <tr><td>Member</td><td>Someone approved to shop the private gallery</td></tr>
 <tr><td>Expired</td><td>An unpaid invoice that got every reminder. Still pending and can be revived</td></tr>
 <tr><td>Mix &amp; match bundle</td><td>A set of products that's cheaper bought together</td></tr>
@@ -1258,6 +1457,14 @@ Payment links opened inside some email preview windows hang, because those windo
 <tr><td>Shippo</td><td>The service that prints USPS labels</td></tr>
 <tr><td>Campaign</td><td>A marketing email to the mailing list</td></tr>
 <tr><td>Subscriber</td><td>Someone who opted into the mailing list</td></tr>
+<tr><td>Stock count</td><td>How many of a product are on the shelf. Orders take from it</td></tr>
+<tr><td>Backorder</td><td>Units customers ordered that the shelf didn't cover. Send these first when stock arrives</td></tr>
+<tr><td>Currently restocking</td><td>What the shop shows when a product's count is 0. Still orderable</td></tr>
+<tr><td>Conversation mode</td><td>Talking back and forth with the Concierge out loud, like a call</td></tr>
+<tr><td>Ambassador page</td><td>An influencer’s own page at {{HOST}}/their-name, shared by link or QR only. Orders through it are credited to them</td></tr>
+<tr><td>Owed now</td><td>An ambassador’s commission earned on paid orders, minus the payouts recorded</td></tr>
+<tr><td>Attribution window</td><td>How many days after visiting an ambassador’s page an order still counts for them</td></tr>
+<tr><td>Quarantined (Venmo)</td><td>A “payment” email that failed the security check. Check the Venmo app</td></tr>
 <tr><td>CSV</td><td>A spreadsheet file that opens in Excel or Numbers</td></tr>
 </table>
 </section>
@@ -1275,6 +1482,8 @@ Payment links opened inside some email preview windows hang, because those windo
 <li>Check "Awaiting payment" → nudge anything over 3 days</li>
 <li>Pickups to the pickup spot; mark "Completed" after collection</li>
 <li>Approve anyone waiting to join</li>
+<li>Orders → Venmo payments → confirm the matches</li>
+<li>Check the rust-coloured “on backorder” label in Products → Stock counts</li>
 </ol>
 </div>
 
@@ -1284,6 +1493,8 @@ Payment links opened inside some email preview windows hang, because those windo
 <li>Read the nightly email for revenue and top sellers</li>
 <li>Review any sale prices and promotions still running</li>
 <li>Turn off a stale banner</li>
+<li>Update stock counts after deliveries (or tell the Concierge the new numbers)</li>
+<li>Ambassadors: pay anyone owed (record it), and email their progress report</li>
 <li>Save the spreadsheet attachments somewhere safe</li>
 </ol>
 </div>

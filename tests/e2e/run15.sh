@@ -12,7 +12,7 @@ free_ports
 python3 /tmp/harness/seed.py >/dev/null
 python3 -c "import json;p='/tmp/final/data/products.json';d=json.load(open(p));d.append({'id':'p_ask','name':'Ask About Me','description':'Priced on request.','price':'Inquire','image':'x','category':'Special','visibility':'both','createdAt':3});json.dump(d,open(p,'w'))"
 rm -rf /tmp/final/data/transcripts /tmp/final/data/traffic-*.json /tmp/final/data/campaigns.json /tmp/final/data/reminder-*.json /tmp/final/data/assistant-sources.json /tmp/final/data/login-codes.json /tmp/final/data/admins.json /tmp/final/data/bundles.json /tmp/final/data/media-deleted.log
-rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/flags-shared.json /tmp/final/data/email-templates.json
+rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/flags-shared.json /tmp/final/data/email-templates.json /tmp/final/data/stock.json /tmp/final/data/venmo-payments.json /tmp/final/data/inbound-setup.json /tmp/final/data/stores.json
 python3 - <<'PY'
 import json,time
 D="/tmp/final/data/"; now=int(time.time()*1000)

@@ -39,7 +39,7 @@ export type Suggestion = {
    * The exact records this item is about, so the Concierge can act on them
    * without searching (it reads them with the today_item tool).
    */
-  targets?: Array<{ kind: "order" | "member" | "product" | "code" | "event"; id: string; name: string; detail?: string }>;
+  targets?: Array<{ kind: "order" | "member" | "product" | "code" | "event" | "ambassador"; id: string; name: string; detail?: string }>;
   /** Step-by-step for the Concierge: which tools to call with which settings. */
   guide?: string;
 };
@@ -104,7 +104,7 @@ export function managerSuggestions(d: ManagerInput): Suggestion[] {
   }
 
   // 3. Unpaid orders keep piling up while automatic reminders are off.
-  const overdue = real.filter((o) => normalizeStatus(o.status) === "pending" && o.paymentMethod !== "cash" && now - o.createdAt > 2 * DAY);
+  const overdue = real.filter((o) => normalizeStatus(o.status) === "pending" && !o.expiredAt && o.paymentMethod !== "cash" && now - o.createdAt > 2 * DAY);
   if (!d.remindersOn && overdue.length >= 3) {
     out.push({
       key: "reminders-off",
@@ -119,18 +119,22 @@ export function managerSuggestions(d: ManagerInput): Suggestion[] {
     });
   }
 
-  // 4. Very old unpaid orders — close them out so "outstanding" is real.
-  const stale = real.filter((o) => normalizeStatus(o.status) === "pending" && now - o.createdAt > 30 * DAY).sort((a, b) => a.createdAt - b.createdAt);
+  // 4. Unpaid orders to close out: expired ones (the reminders gave up) and
+  //    anything older than 30 days — so "outstanding" is real. Cancel or revive, don't chase.
+  const stale = real.filter((o) => normalizeStatus(o.status) === "pending" && (!!o.expiredAt || now - o.createdAt > 30 * DAY)).sort((a, b) => a.createdAt - b.createdAt);
+  const expiredN = stale.filter((o) => o.expiredAt).length;
   if (stale.length) {
     out.push({
       key: "stale-unpaid",
       priority: "this week",
-      task: `Close out ${plural(stale.length, "unpaid order")} older than 30 days (${money(stale.reduce((n, o) => n + o.total, 0))})`,
-      why: "They inflate “Awaiting payment”. Cancel the ones that won't be paid; a quick last nudge first is fine.",
-      items: stale.slice(0, 8).map((o) => `${ref(o)} ${o.userName} ${money(o.total)} — ${Math.floor((now - o.createdAt) / DAY)}d`),
-      ask: "List the unpaid orders older than 30 days and prepare a 'cancelled' card for each one (one per order), so I can cancel the ones that won't be paid.",
-      targets: stale.slice(0, 10).map((o) => ({ kind: "order" as const, id: o.id, name: `${ref(o)} ${o.userName}`, detail: `${money(o.total)}, ${Math.floor((now - o.createdAt) / DAY)} days old` })),
-      guide: "For each target order call propose_order_status with status cancelled (one card each).",
+      task: `Close out ${plural(stale.length, "unpaid order")} (expired, or older than 30 days) — ${money(stale.reduce((n, o) => n + o.total, 0))}`,
+      why: expiredN
+        ? "The payment reminders have given up on these, so they don't get chased again. Cancel the ones that won't be paid; revive any you still expect (Orders → Expired)."
+        : "They inflate “Awaiting payment”. Cancel the ones that won't be paid.",
+      items: stale.slice(0, 8).map((o) => `${ref(o)} ${o.userName} ${money(o.total)} — ${Math.floor((now - o.createdAt) / DAY)}d${o.expiredAt ? " · expired" : ""}`),
+      ask: "List the expired unpaid orders (and any unpaid over 30 days) and prepare a cancel card for each one (one per order), so I can cancel the ones that won't be paid.",
+      targets: stale.slice(0, 10).map((o) => ({ kind: "order" as const, id: o.id, name: `${ref(o)} ${o.userName}`, detail: `${money(o.total)}, ${Math.floor((now - o.createdAt) / DAY)} days old${o.expiredAt ? ", expired" : ""}` })),
+      guide: "For each target order call propose_order_status with status cancelled (one card each). Don't send payment reminders for these.",
       tab: "orders",
       orderFilter: "pending",
       button: "Prepare cancel cards",

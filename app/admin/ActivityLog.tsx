@@ -35,6 +35,8 @@ const AREAS: Array<[string, string]> = [
   ["discount", "Discount codes"],
   ["campaign", "Emails & campaigns"],
   ["event", "Events"],
+  ["store", "Store locations"],
+  ["ambassador", "Ambassador pages"],
   ["settings", "Settings & banner"],
   ["flag", "Feature switches"],
   ["assistant", "Assistant"],
