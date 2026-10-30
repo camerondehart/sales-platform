@@ -29,6 +29,7 @@ import MediaUpload from "./MediaUpload";
 import { dataUrlToBlob, imageLine, uploadCampaignImage } from "./campaignImage";
 import BundlesPanel from "./BundlesPanel";
 import TodayBulletin from "./TodayBulletin";
+import QaIcon, { type QaIconName } from "./QaIcon";
 import ShippingWeights from "./ShippingWeights";
 import StockCounts from "./StockCounts";
 import VenmoInbox from "./VenmoInbox";
@@ -2682,62 +2683,78 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             <h2>Quick actions</h2>
             {(() => {
               const unpaid = orders.filter((o) => o.status === "pending" && !isExpired(o)).length;
-              type QA = { icon: string; label: string; badge?: number; go?: () => void; href?: string };
+              type QA = { icon: QaIconName; label: string; hint?: string; badge?: number; go?: () => void; href?: string };
               const groups: Array<{ title: string; items: QA[] }> = [
                 {
                   title: "Orders & shop",
                   items: [
-                    { icon: "🧾", label: "Orders", go: () => goTo("orders") },
-                    { icon: "⏳", label: "Awaiting payment", badge: unpaid, go: () => goTo("orders", { filter: "pending" }) },
-                    ...(pending.length > 0 ? [{ icon: "👥", label: "Approve members", badge: pending.length, go: () => goTo("members") }] : []),
-                    { icon: "🏷️", label: "Add a product", go: () => { setTab("products"); setAddOpen(true); } },
-                    { icon: "📦", label: "Update stock counts", go: () => goTo("products", { anchor: "stock-counts" }) },
-                    { icon: "📍", label: "Add a store", go: () => goTo("settings", { settingsTile: "stores" }) },
+                    { icon: "orders", label: "Orders", go: () => goTo("orders") },
+                    { icon: "clock", label: "Awaiting payment", badge: unpaid, go: () => goTo("orders", { filter: "pending" }) },
+                    { icon: "plus", label: "Add a product", go: () => { setTab("products"); setAddOpen(true); } },
+                    { icon: "box", label: "Update stock counts", go: () => goTo("products", { anchor: "stock-counts" }) },
+                    { icon: "pin", label: "Add a store", go: () => goTo("settings", { settingsTile: "stores" }) },
                   ],
                 },
                 {
                   title: "Promote",
                   items: [
-                    { icon: "📣", label: "Send a campaign", go: () => setTab("marketing") },
-                    { icon: "🏷", label: "Create a discount code", go: () => setTab("marketing") },
-                    { icon: "🎟", label: "Schedule an event", go: () => setTab("events") },
-                    { icon: "★", label: "Add an ambassador", go: () => goTo("ambassadors") },
+                    { icon: "megaphone", label: "Send a campaign", go: () => setTab("marketing") },
+                    { icon: "tag", label: "Create a discount code", go: () => setTab("marketing") },
+                    { icon: "calendar", label: "Schedule an event", go: () => setTab("events") },
+                    { icon: "star", label: "Add an ambassador", go: () => goTo("ambassadors") },
                   ],
                 },
                 {
                   title: "Staff & reports",
                   items: [
-                    { icon: "✧", label: "Ask the Concierge", go: () => window.dispatchEvent(new CustomEvent(EVT_OPEN)) },
-                    { icon: "🔑", label: "Today\u2019s staff password", go: () => goTo("settings", { settingsTile: "password" }) },
-                    { icon: "📖", label: "Staff guide", go: () => { window.location.href = "/help"; } },
-                    { icon: "💰", label: "Revenue report", href: "/api/admin/revenue/export" },
-                    { icon: "📄", label: "Orders CSV", href: "/api/admin/orders/export" },
+                    { icon: "spark", label: "Ask the Concierge", go: () => window.dispatchEvent(new CustomEvent(EVT_OPEN)) },
+                    { icon: "key", label: "Today\u2019s staff password", go: () => goTo("settings", { settingsTile: "password" }) },
+                    { icon: "book", label: "Staff guide", go: () => { window.location.href = "/help"; } },
+                    { icon: "chart", label: "Revenue report", href: "/api/admin/revenue/export" },
+                    { icon: "file", label: "Orders CSV", href: "/api/admin/orders/export" },
                   ],
                 },
               ];
               return (
                 <div className="qa">
-                  {groups.map((g) => (
-                    <div key={g.title} className="qa-group">
-                      <div className="qa-title">{g.title}</div>
-                      <div className="qa-grid">
-                        {g.items.map((it) => {
-                          const inner = (
-                            <>
-                              <span className="qa-icon" aria-hidden="true">{it.icon}</span>
-                              <span className="qa-label">{it.label}</span>
-                              {!!it.badge && <span className="qa-badge">{it.badge}</span>}
-                            </>
-                          );
-                          return it.href ? (
-                            <a key={it.label} className="qa-tile" href={it.href} download>{inner}</a>
-                          ) : (
-                            <button key={it.label} type="button" className="qa-tile" onClick={it.go}>{inner}</button>
-                          );
-                        })}
+                  {pending.length > 0 && (
+                    <button type="button" className="qa-approve" onClick={() => goTo("members")}>
+                      <span className="qa-icon" aria-hidden="true"><QaIcon name="users" /></span>
+                      <span className="qa-label">
+                        {pending.length} member request{pending.length === 1 ? "" : "s"} waiting
+                      </span>
+                      <span className="qa-approve-go">Review →</span>
+                    </button>
+                  )}
+                  <div className="qa-groups">
+                    {groups.map((g) => (
+                      <div key={g.title} className="qa-group">
+                        <div className="qa-title">{g.title}</div>
+                        <ul className="qa-list">
+                          {g.items.map((it) => {
+                            const inner = (
+                              <>
+                                <span className="qa-icon" aria-hidden="true"><QaIcon name={it.icon} /></span>
+                                <span className="qa-label">{it.label}</span>
+                                {it.hint && <span className="qa-hint">{it.hint}</span>}
+                                {!!it.badge && <span className="qa-badge">{it.badge}</span>}
+                                <span className="qa-arrow" aria-hidden="true">{it.href ? "↓" : "›"}</span>
+                              </>
+                            );
+                            return (
+                              <li key={it.label + (it.hint || "")}>
+                                {it.href ? (
+                                  <a className="qa-tile" href={it.href} download>{inner}</a>
+                                ) : (
+                                  <button type="button" className="qa-tile" onClick={it.go}>{inner}</button>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               );
             })()}

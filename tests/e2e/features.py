@@ -1010,7 +1010,7 @@ check("lockout: …but staff on another device still sign in", _s2==200, _s2)
 
 # =============== Overview → Quick actions cover the newer areas
 _s,_h=page("/admin", cookie=ADMIN)
-_qa=_h.split("Quick actions",1)[1][:6000] if "Quick actions" in _h else ""
+_qa=_h.split("Quick actions",1)[1][:15000] if "Quick actions" in _h else ""
 check("quick actions: orders, stores, stock counts, ambassadors, staff password and the Concierge are one click away", all(t in _qa for t in ["Orders","Add a store","Update stock counts","Awaiting payment","Add an ambassador","staff password","Ask the Concierge"]) and "Venmo payments" not in _qa, _qa[:300])
 check("quick actions: the originals are still there", all(t in _qa for t in ["Add a product","Create a discount code","Schedule an event","Send a campaign","Revenue report","Orders CSV","Staff guide"]), _qa[:300])
 
