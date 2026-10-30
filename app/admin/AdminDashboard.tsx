@@ -2680,25 +2680,67 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
 
           <section className="admin-section">
             <h2>Quick actions</h2>
-            <div className="quick-actions">
-              <button onClick={() => { setTab("products"); setAddOpen(true); }}>🏷️ Add a product</button>
-              <button onClick={() => goTo("products", { anchor: "stock-counts" })}>📦 Update stock counts</button>
-              <button onClick={() => goTo("settings", { settingsTile: "stores" })}>📍 Add a store</button>
-              <button onClick={() => goTo("orders", { filter: "pending" })}>
-                🧾 Awaiting payment{(() => { const n = orders.filter((o) => o.status === "pending" && !isExpired(o)).length; return n > 0 ? ` (${n})` : ""; })()}
-              </button>
-              <button onClick={() => goTo("orders", { anchor: "venmo-inbox" })}>💸 Venmo payments</button>
-              {pending.length > 0 && <button onClick={() => goTo("members")}>👥 Approve members ({pending.length})</button>}
-              <button onClick={() => setTab("marketing")}>🏷 Create a discount code</button>
-              <button onClick={() => setTab("marketing")}>📣 Send a campaign</button>
-              <button onClick={() => setTab("events")}>🎟 Schedule an event</button>
-              <button onClick={() => goTo("ambassadors")}>★ Add an ambassador</button>
-              <button onClick={() => goTo("settings", { settingsTile: "password" })}>🔑 Today&rsquo;s staff password</button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent(EVT_OPEN))}>✧ Ask the Concierge</button>
-              <button onClick={() => { window.location.href = "/help"; }}>📖 Staff guide</button>
-              <a className="quick-link" href="/api/admin/revenue/export" download>💰 Revenue report</a>
-              <a className="quick-link" href="/api/admin/orders/export" download>📄 Orders CSV</a>
-            </div>
+            {(() => {
+              const unpaid = orders.filter((o) => o.status === "pending" && !isExpired(o)).length;
+              type QA = { icon: string; label: string; badge?: number; go?: () => void; href?: string };
+              const groups: Array<{ title: string; items: QA[] }> = [
+                {
+                  title: "Orders & shop",
+                  items: [
+                    { icon: "🧾", label: "Orders", go: () => goTo("orders") },
+                    { icon: "⏳", label: "Awaiting payment", badge: unpaid, go: () => goTo("orders", { filter: "pending" }) },
+                    ...(pending.length > 0 ? [{ icon: "👥", label: "Approve members", badge: pending.length, go: () => goTo("members") }] : []),
+                    { icon: "🏷️", label: "Add a product", go: () => { setTab("products"); setAddOpen(true); } },
+                    { icon: "📦", label: "Update stock counts", go: () => goTo("products", { anchor: "stock-counts" }) },
+                    { icon: "📍", label: "Add a store", go: () => goTo("settings", { settingsTile: "stores" }) },
+                  ],
+                },
+                {
+                  title: "Promote",
+                  items: [
+                    { icon: "📣", label: "Send a campaign", go: () => setTab("marketing") },
+                    { icon: "🏷", label: "Create a discount code", go: () => setTab("marketing") },
+                    { icon: "🎟", label: "Schedule an event", go: () => setTab("events") },
+                    { icon: "★", label: "Add an ambassador", go: () => goTo("ambassadors") },
+                  ],
+                },
+                {
+                  title: "Staff & reports",
+                  items: [
+                    { icon: "✧", label: "Ask the Concierge", go: () => window.dispatchEvent(new CustomEvent(EVT_OPEN)) },
+                    { icon: "🔑", label: "Today\u2019s staff password", go: () => goTo("settings", { settingsTile: "password" }) },
+                    { icon: "📖", label: "Staff guide", go: () => { window.location.href = "/help"; } },
+                    { icon: "💰", label: "Revenue report", href: "/api/admin/revenue/export" },
+                    { icon: "📄", label: "Orders CSV", href: "/api/admin/orders/export" },
+                  ],
+                },
+              ];
+              return (
+                <div className="qa">
+                  {groups.map((g) => (
+                    <div key={g.title} className="qa-group">
+                      <div className="qa-title">{g.title}</div>
+                      <div className="qa-grid">
+                        {g.items.map((it) => {
+                          const inner = (
+                            <>
+                              <span className="qa-icon" aria-hidden="true">{it.icon}</span>
+                              <span className="qa-label">{it.label}</span>
+                              {!!it.badge && <span className="qa-badge">{it.badge}</span>}
+                            </>
+                          );
+                          return it.href ? (
+                            <a key={it.label} className="qa-tile" href={it.href} download>{inner}</a>
+                          ) : (
+                            <button key={it.label} type="button" className="qa-tile" onClick={it.go}>{inner}</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </section>
         </>
       )}

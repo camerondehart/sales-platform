@@ -8643,3 +8643,28 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
   transition: opacity 0.18s, color 0.18s, border-color 0.18s, background 0.18s;
 }
 .home-staff-link:hover, .home-staff-link:focus-visible { opacity: 1; color: var(--accent-strong); border-color: var(--green); background: var(--white); }
+
+/* Overview → Quick actions: grouped tiles (2 across on a phone, more on wider screens) */
+.qa { display: grid; gap: 1.1rem; }
+.qa-title { margin: 0 0 0.5rem; font-family: var(--font-sans); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
+.qa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 0.5rem; }
+.qa-tile {
+  position: relative; display: flex; align-items: center; gap: 0.65rem;
+  min-height: 52px; padding: 0.55rem 0.8rem 0.55rem 0.6rem;
+  border: 1px solid var(--rule-soft); border-radius: 12px; background: var(--white);
+  color: var(--ink); text-align: left; text-decoration: none;
+  font-family: var(--font-sans); font-size: 0.86rem; font-weight: 600; line-height: 1.25;
+  cursor: pointer; transition: border-color 0.16s, background 0.16s, transform 0.16s, box-shadow 0.16s;
+}
+.qa-tile:hover, .qa-tile:focus-visible { border-color: var(--green); background: rgba(133, 186, 69, 0.07); transform: translateY(-1px); box-shadow: 0 3px 10px rgba(43, 47, 39, 0.08); }
+.qa-tile:active { transform: none; }
+.qa-icon { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(133, 186, 69, 0.13); font-size: 1.05rem; line-height: 1; }
+.qa-label { flex: 1; min-width: 0; overflow-wrap: break-word; hyphens: auto; -webkit-hyphens: auto; }
+.qa-badge { flex: none; min-width: 1.45rem; padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--green); color: #fff; font-size: 0.74rem; font-weight: 700; text-align: center; }
+@media (max-width: 560px) {
+  .qa { gap: 0.9rem; }
+  .qa-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem; }
+  .qa-tile { gap: 0.4rem; min-height: 46px; padding: 0.4rem 0.45rem 0.4rem 0.4rem; font-size: 0.74rem; line-height: 1.2; border-radius: 11px; }
+  .qa-icon { width: 24px; height: 24px; border-radius: 7px; font-size: 0.8rem; }
+  .qa-badge { min-width: 1.3rem; padding: 0.05rem 0.38rem; font-size: 0.7rem; }
+}
