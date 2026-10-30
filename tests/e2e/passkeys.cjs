@@ -75,6 +75,29 @@ const check = (name, ok, d = "") => { if (!ok) fails++; console.log(`${ok ? "PAS
     check("flow ran", false, err && err.message);
   }
 
+  // ---------------- Quick actions: "Add a store" opens Settings → Store locations
+  try {
+    const qctx = await b.newContext({ viewport: { width: 1200, height: 900 } });
+    await qctx.addCookies([{ name: "gallery_admin", value: T.admin, url: BASE }]);
+    const qp = await qctx.newPage();
+    await qp.goto(BASE + "/admin");
+    await qp.locator(".quick-actions button", { hasText: "Add a store" }).click();
+    await qp.locator(".settings-open").waitFor({ timeout: 10000 }).catch(() => {});
+    check("quick actions: Add a store opens Settings → Store locations", /Store locations/i.test(await qp.locator(".settings-open").innerText().catch(() => "")));
+    await qp.goto(BASE + "/admin");
+    await qp.locator(".admin-tab", { hasText: "Overview" }).first().click();
+    await qp.locator(".quick-actions button", { hasText: "staff password" }).click();
+    await qp.locator(".settings-open").waitFor({ timeout: 10000 }).catch(() => {});
+    check("quick actions: Today's staff password opens Settings → Steward password", /staff password/i.test(await qp.locator(".settings-open").innerText().catch(() => "")));
+    await qp.locator(".admin-tab", { hasText: "Overview" }).first().click();
+    await qp.locator(".quick-actions button", { hasText: "Update stock counts" }).click();
+    await qp.locator("#stock-counts").waitFor({ timeout: 10000 }).catch(() => {});
+    check("quick actions: Update stock counts goes to Products → Stock counts", (await qp.locator("#stock-counts").count()) === 1);
+    await qctx.close();
+  } catch (err) {
+    check("quick actions flow ran", false, err && err.message);
+  }
+
   // ---------------- Members: one-click popup after signing in, then one-tap sign-in
   const mctx = await b.newContext({ viewport: { width: 390, height: 844 } });
   const mp = await mctx.newPage();

@@ -39,7 +39,7 @@ import EventOfferPicker from "./EventOfferPicker";
 import StaffPhraseCard from "./StaffPhraseCard";
 import { ShopifyImportButton, InvitePanel } from "./MemberImport";
 import { orderWeight, packagingOzOf, DEFAULT_PACKAGING_OZ } from "@/lib/shippingWeight";
-import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_USE_DRAFT, PHOTO_SLOT, type CampaignDraft } from "@/lib/assistant/shared";
+import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_OPEN, EVT_USE_DRAFT, PHOTO_SLOT, type CampaignDraft } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
 
 // Extended type – bulk orders have an `items` array
@@ -137,6 +137,24 @@ export default function AdminDashboard({
       setOrdersPage(0);
     }
     requestAnimationFrame(() => document.querySelector(".admin-tabs")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  // Overview → Quick actions: jump to a tab, a part of it, or a Settings tile.
+  const goTo = (t: TabKey, opts: { filter?: "pending"; anchor?: string; settingsTile?: string } = {}) => {
+    if (opts.settingsTile) {
+      try {
+        localStorage.setItem("fp_settings_open", opts.settingsTile); // SettingsTiles opens this one on arrival
+      } catch {}
+    }
+    if (opts.filter) {
+      setOrderFilter(opts.filter);
+      setOrdersPage(0);
+    }
+    setTab(t);
+    setTimeout(() => {
+      const el = opts.anchor ? document.getElementById(opts.anchor) : null;
+      (el || document.querySelector(".admin-tabs"))?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
   };
 
   // Orders queue
@@ -2664,10 +2682,20 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             <h2>Quick actions</h2>
             <div className="quick-actions">
               <button onClick={() => { setTab("products"); setAddOpen(true); }}>🏷️ Add a product</button>
-              <button onClick={() => { window.location.href = "/help"; }}>📖 Staff guide</button>
+              <button onClick={() => goTo("products", { anchor: "stock-counts" })}>📦 Update stock counts</button>
+              <button onClick={() => goTo("settings", { settingsTile: "stores" })}>📍 Add a store</button>
+              <button onClick={() => goTo("orders", { filter: "pending" })}>
+                🧾 Awaiting payment{(() => { const n = orders.filter((o) => o.status === "pending" && !isExpired(o)).length; return n > 0 ? ` (${n})` : ""; })()}
+              </button>
+              <button onClick={() => goTo("orders", { anchor: "venmo-inbox" })}>💸 Venmo payments</button>
+              {pending.length > 0 && <button onClick={() => goTo("members")}>👥 Approve members ({pending.length})</button>}
               <button onClick={() => setTab("marketing")}>🏷 Create a discount code</button>
-              <button onClick={() => setTab("events")}>🎟 Schedule an event</button>
               <button onClick={() => setTab("marketing")}>📣 Send a campaign</button>
+              <button onClick={() => setTab("events")}>🎟 Schedule an event</button>
+              <button onClick={() => goTo("ambassadors")}>★ Add an ambassador</button>
+              <button onClick={() => goTo("settings", { settingsTile: "password" })}>🔑 Today&rsquo;s staff password</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent(EVT_OPEN))}>✧ Ask the Concierge</button>
+              <button onClick={() => { window.location.href = "/help"; }}>📖 Staff guide</button>
               <a className="quick-link" href="/api/admin/revenue/export" download>💰 Revenue report</a>
               <a className="quick-link" href="/api/admin/orders/export" download>📄 Orders CSV</a>
             </div>

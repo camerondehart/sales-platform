@@ -102,7 +102,7 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
   );
 
   return (
-    <section className="admin-section sw vi">
+    <section className="admin-section sw vi" id="venmo-inbox">
       <button type="button" className="sw-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <span>
           <h2>Venmo payments{suggested.length ? <span className="badge">{suggested.length}</span> : null}</h2>

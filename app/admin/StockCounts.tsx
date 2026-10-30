@@ -69,7 +69,7 @@ export default function StockCounts({ products, orders }: { products: Product[];
   }
 
   return (
-    <section className="admin-section sw">
+    <section className="admin-section sw" id="stock-counts">
       <button type="button" className="sw-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <span>
           <h2>
