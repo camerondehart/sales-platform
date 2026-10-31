@@ -8,7 +8,7 @@ import { useState } from "react";
  * the page. Used in Marketing → Templates and on the Concierge's template and
  * campaign-draft cards.
  */
-export default function EmailPreview({ subject, body, label = "Preview email" }: { subject?: string; body: string; label?: string }) {
+export default function EmailPreview({ subject, body, theme, label = "Preview email" }: { subject?: string; body: string; theme?: string; label?: string }) {
   const [open, setOpen] = useState(false);
   const [html, setHtml] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -18,7 +18,7 @@ export default function EmailPreview({ subject, body, label = "Preview email" }:
   async function toggle() {
     if (open) return setOpen(false);
     setOpen(true);
-    const key = `${subject || ""}\n${body}`;
+    const key = `${subject || ""}\n${theme || ""}\n${body}`;
     if (html && shownFor === key) return;
     setLoading(true);
     setErr("");
@@ -26,7 +26,8 @@ export default function EmailPreview({ subject, body, label = "Preview email" }:
       const r = await fetch("/api/admin/templates/preview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, body }),
+        // With a theme (campaign cards), the seasonal design exactly as it will be sent.
+        body: JSON.stringify(theme !== undefined ? { subject, body, theme } : { subject, body }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Couldn't build the preview.");

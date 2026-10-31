@@ -3,7 +3,9 @@ import { Resend } from "resend";
 import { VersionedStore } from "./versionedStore";
 import { activeSubscribers, getSubscribers, memberUnsubToken } from "./subscribers";
 import { getUsers } from "./users";
-import { CAMPAIGN_SUPPORT_EMAIL, tagCampaignLinks, wrapCampaign } from "./campaignEmail";
+import { CAMPAIGN_SUPPORT_EMAIL, tagCampaignLinks } from "./campaignEmail";
+import { renderCampaign } from "./campaignRender";
+import type { ThemeChoice } from "./campaignThemes";
 import { brand } from "@/lib/brand";
 
 /**
@@ -40,6 +42,10 @@ export type Campaign = {
   /** For audience "groups". */
   groups?: AudienceGroup[];
   status: "scheduled" | "sending" | "sent" | "cancelled";
+  /** Seasonal look (lib/campaignThemes.ts). Missing on older campaigns = plain. */
+  theme?: ThemeChoice;
+  /** Last edited while still scheduled. */
+  editedAt?: number;
   createdAt: number;
   scheduledFor: number;
   approvedAt: number;
@@ -119,6 +125,7 @@ export async function createCampaign(input: {
   customEmails?: string[];
   groups?: AudienceGroup[];
   scheduledFor?: number;
+  theme?: ThemeChoice;
 }): Promise<Campaign> {
   const now = Date.now();
   const c: Campaign = {
@@ -128,6 +135,7 @@ export async function createCampaign(input: {
     audience: input.audience,
     customEmails: input.audience === "custom" ? (input.customEmails || []).slice(0, 5000) : undefined,
     groups: input.audience === "groups" ? input.groups : undefined,
+    theme: input.theme || "auto",
     status: "scheduled",
     createdAt: now,
     scheduledFor: input.scheduledFor && input.scheduledFor > now ? input.scheduledFor : now,
@@ -141,6 +149,37 @@ export async function createCampaign(input: {
     return { data: [c, ...keep], result: undefined };
   }, { allowShrink: true });
   return c;
+}
+
+/**
+ * Edit a scheduled campaign that hasn't started sending: subject, text, theme,
+ * who it goes to and when. Recipients are worked out when sending starts, so
+ * the new audience is the one used.
+ */
+export async function updateCampaign(
+  id: string,
+  input: { subject: string; body: string; audience: Audience; customEmails?: string[]; groups?: AudienceGroup[]; scheduledFor?: number; theme?: ThemeChoice }
+): Promise<{ before: Campaign; after: Campaign } | null> {
+  return store.mutate<{ before: Campaign; after: Campaign } | null>((rows) => {
+    const i = rows.findIndex((r) => r.id === id);
+    if (i < 0 || rows[i].status !== "scheduled" || rows[i].startedAt) return { data: null, result: null };
+    const now = Date.now();
+    const before = rows[i];
+    const after: Campaign = {
+      ...before,
+      subject: input.subject.trim().slice(0, 200),
+      body: input.body.slice(0, 50_000),
+      audience: input.audience,
+      customEmails: input.audience === "custom" ? (input.customEmails || []).slice(0, 5000) : undefined,
+      groups: input.audience === "groups" ? input.groups : undefined,
+      theme: input.theme || before.theme || "auto",
+      scheduledFor: input.scheduledFor && input.scheduledFor > now ? input.scheduledFor : before.scheduledFor,
+      editedAt: now,
+    };
+    const next = rows.slice();
+    next[i] = after;
+    return { data: next, result: { before, after } };
+  });
 }
 
 export async function cancelCampaign(id: string): Promise<Campaign | null> {
@@ -215,15 +254,15 @@ export async function processCampaign(id: string, siteUrl: string, deadline: num
     const got = await claimBatch(id);
     if (!got) break;
     const { c, batch } = got;
-    const payload = batch.map((r) => ({
+    const payload = await Promise.all(batch.map(async (r) => ({
       from,
       to: r.e,
       reply_to: replyTo,
       subject: c.subject,
-      html: tagCampaignLinks(wrapCampaign(c.body, `${siteUrl}/unsubscribe?token=${r.t}`, r.n), c.id, siteUrl),
+      html: tagCampaignLinks(await renderCampaign({ subject: c.subject, body: c.body, theme: c.theme, unsubUrl: `${siteUrl}/unsubscribe?token=${r.t}`, name: r.n, siteUrl, when: c.scheduledFor }), c.id, siteUrl),
       headers: { "List-Unsubscribe": `<${siteUrl}/unsubscribe?token=${r.t}>` },
       tags: [{ name: "campaign", value: c.id }],
-    }));
+    })));
     let ok = 0;
     let bad = 0;
     try {

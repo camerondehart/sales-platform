@@ -147,7 +147,7 @@ All behind switches in Settings → Feature switches (live-site defaults in brac
 | Daily staff password [on] | The shared admin password becomes a new two-word phrase daily (nightly email + Settings); the old fixed password stops after 7 days |
 | Cash pickup deals & public-shop pickup [off] | "Cash pickup only" sales, and Local pickup (invoice or cash) in the public shop |
 
-Campaigns can include uploaded photos (composer "Upload photo", or a photo sent to the Concierge). `package.json` pins `@peculiar/asn1-schema` with `overrides` so passkey signatures can be read; run `npm ci` after pulling.
+Campaigns can include uploaded photos (composer "Upload photo", or a photo sent to the Concierge). Campaigns get a seasonal look (banner art, colours, dividers; `auto` picks one from the words or the season) with a live preview, drag-to-arrange blocks and photo sizes, and scheduled campaigns can be edited until they start sending. The art lives in `public/email-art/` and is copied once to the Blob store for inboxes. `package.json` pins `@peculiar/asn1-schema` with `overrides` so passkey signatures can be read; run `npm ci` after pulling.
 
 ## 5. Tests
 

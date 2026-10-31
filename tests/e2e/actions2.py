@@ -156,6 +156,11 @@ s,o=confirm(c)
 camps=json.loads(tool("list_campaigns")["reply"].split("TOOLRESULT::",1)[1])["campaigns"]
 sc=[x for x in camps if x["subject"]=="Spring teas"]
 check("campaign scheduled (nothing sent)", s==200 and sc and sc[0]["status"]=="scheduled", (s,o,sc))
+check("campaign card: shows the look it picked (Spring) and it's saved with the campaign", any("Spring" in l for l in c["lines"]) and c["request"]["body"].get("theme")=="auto", c["lines"])
+_r=tool("prepare_campaign_draft",{"subject":"Cozy season","body":"Hi","audience":"subscribers","theme":"fall"})
+check("campaign draft: carries the look staff asked for", (_r.get("draft") or {}).get("theme")=="fall", _r.get("draft"))
+_c=card(tool("propose_campaign_test",{"subject":"Gifts","body":"Hi","theme":"holiday"}))
+check("campaign test card: carries the look", _c and _c["request"]["body"].get("theme")=="holiday" and any("Holiday" in l for l in _c["lines"]), _c)
 c=card(tool("propose_cancel_campaign",{"campaign_id":sc[0]["id"]})); s,o=confirm(c)
 check("cancel scheduled campaign", s==200 and o["campaign"]["status"]=="cancelled", o)
 n=len(mail())

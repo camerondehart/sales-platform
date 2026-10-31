@@ -195,6 +195,38 @@ else:
 s,r=req("/api/admin/campaigns", {"subject":"T","body":"Hi","testOnly":True})
 check("campaign: test send unchanged", s==200 and r.get("test"), (s,r))
 
+# Seasonal looks: artwork + palette, previewed and test-sent exactly as sent.
+n=len(mail())
+s,r=req("/api/admin/campaigns", {"subject":"Boo","body":"Hi\n\n---\n\n[Shop](https://www.example.com/retail)","testOnly":True,"theme":"halloween"})
+_h=(mail()[n:] or [{}])[-1].get("html","")
+check("campaign look: themed test send has the seasonal banner, divider art and colours", s==200 and "email-art/halloween-header.jpg" in _h and "email-art/halloween-divider.png" in _h and "#e07a2e" in _h.lower(), _h[:300])
+n=len(mail())
+s,r=req("/api/admin/campaigns", {"subject":"Plain","body":"Hi","testOnly":True,"theme":"none"})
+_h=(mail()[n:] or [{}])[-1].get("html","")
+check("campaign look: Plain has no artwork", s==200 and "email-art/" not in _h, _h[:200])
+s,r=req("/api/admin/templates/preview", {"subject":"Spooky season sale","body":"Hi","theme":"auto"})
+check("campaign look: Auto picks from the words (Halloween)", s==200 and r.get("theme")=="halloween" and "halloween-header.jpg" in r.get("html",""), (s,r.get("theme")))
+s,r=req("/api/admin/templates/preview", {"subject":"News","body":"Hi","theme":"auto","when":int(datetime.datetime(2026,7,4,12,tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()*1000)})
+check("campaign look: Auto falls back to the send date's season (July = summer)", s==200 and r.get("theme")=="summer", (s,r.get("theme")))
+s,r=req("/api/admin/templates/preview", {"subject":"T","body":"Hi"})
+check("campaign look: template previews without a look stay plain", s==200 and "theme" not in r and "email-art/" not in r.get("html",""), r.get("theme"))
+s,r=req("/api/admin/templates/preview", {"subject":"T","body":"![Shelf|small](https://example.com/a.jpg)\n\n![Jar|medium](https://example.com/b.jpg)","theme":"fall"})
+check("campaign look: photo sizes (small / medium)", s==200 and 'width="200"' in r["html"] and 'width="340"' in r["html"], r.get("html","")[:300])
+
+# Editing a scheduled campaign
+s,r=req("/api/admin/campaigns", {"subject":"Edit me","body":"Hi","audience":"all","scheduledFor":now+8*H,"theme":"fall"})
+eid=r.get("id")
+s,r=req("/api/admin/campaigns", {"action":"update","id":eid,"subject":"Edited subject","body":"New body","theme":"winter","audience":"custom","customList":"sub1@example.com, sub2@example.com","scheduledFor":now+9*H}, method="PATCH")
+check("campaign edit: a scheduled campaign can be changed", s==200 and r["campaign"]["subject"]=="Edited subject" and r["campaign"]["theme"]=="winter" and r["recipients"]==2, (s,r))
+s,r=req("/api/admin/campaigns", method="GET")
+row=[c for c in r["campaigns"] if c["id"]==eid][0]
+check("campaign edit: history has the new version (and its pasted list, for editing)", row["body"]=="New body" and row["status"]=="scheduled" and abs(row["scheduledFor"]-(now+9*H))<60000 and sorted(row.get("customEmails",[]))==["sub1@example.com","sub2@example.com"], row)
+s,r=req("/api/admin/campaigns", {"action":"update","id":eid,"subject":"X","body":"Y","audience":"all","scheduledFor":now-10*60*1000}, method="PATCH")
+check("campaign edit: can't move it into the past", s==400, (s,r))
+req("/api/admin/campaigns", {"action":"cancel","id":eid}, method="PATCH")
+s,r=req("/api/admin/campaigns", {"action":"update","id":eid,"subject":"X","body":"Y","audience":"all","scheduledFor":now+9*H}, method="PATCH")
+check("campaign edit: refused once cancelled (or sending)", s==400, (s,r))
+
 # webhook (signed like Resend/Svix)
 SECRET=os.environ.get("WH_SECRET","")
 def hook(evt, secret=SECRET, ts=None):

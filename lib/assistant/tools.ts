@@ -39,6 +39,7 @@ import { ADMIN_EXTRA_DEFS, runAdminExtra } from "./adminActions";
 import { AMBASSADOR_DEFS, runAmbassadorTool } from "./ambassadorTools";
 import { resolveSegment, SEGMENT_KEYS } from "../segments";
 import { recipientsFor } from "../campaignSchedule";
+import { THEME_KEYS, cleanThemeChoice } from "../campaignThemes";
 import { splitChased, CHASE_QUIET_DAYS } from "../chased";
 import { isEnabled } from "../flags";
 import { liveBundles } from "../bundleStore";
@@ -629,6 +630,7 @@ const DEFS: ToolDef[] = [
           segment_product: str("For bought_product: product id or name"),
           use_photo: { type: "boolean", description: `true to put the photo the staff sent in this chat into the email. Put ${PHOTO_SLOT} on its own line in body where it should go (otherwise it goes at the top)` },
           photo_alt: str("With use_photo: a short description of the photo (for people who can't see images)"),
+          theme: str(`Optional look (seasonal banner, colours, dividers): auto (default: picked from the words, then the season) | none (plain) | ${THEME_KEYS.join(" | ")}`),
         },
         required: ["subject", "body", "audience"],
       },
@@ -1940,13 +1942,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         body = body.split(PHOTO_SLOT).join("");
       }
       const audience = args.audience === "members" || args.audience === "nonmembers" || args.audience === "all" ? args.audience : "subscribers";
+      const theme = cleanThemeChoice(args.theme);
       if (!subject || !body) return { error: "Need a subject and a body." };
       if (s(args.segment, 40)) {
         const g = await resolveSegment(s(args.segment, 40), { days: Number(args.segment_days), limit: Number(args.segment_limit), product: s(args.segment_product, 120) });
         if ("error" in g) return g;
         if (g.emails.length === 0) return { error: `Nobody is in the group "${g.label}" right now.` };
         const reach = (await recipientsFor("custom", g.emails)).length;
-        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label, ...(photo ? { photo } : {}) };
+        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label, theme, ...(photo ? { photo } : {}) };
         return {
           ok: true,
           group: g.label,
@@ -1955,7 +1958,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           say: `The draft is shown with a button to open it in the campaign composer, addressed to ${g.label} (${reach} of the ${g.emails.length} in the group will get it). It has NOT been sent.${reach < g.emails.length ? " Mention briefly that the rest have unsubscribed or aren't members/subscribers, so personal notes are the way to reach them." : ""}`,
         };
       }
-      ctx.draft = { subject, body, audience, ...(photo ? { photo } : {}) };
+      ctx.draft = { subject, body, audience, theme, ...(photo ? { photo } : {}) };
       return { ok: true, say: `The draft is shown with a button to open it in the campaign composer${photo ? ", which adds their photo" : ""}. It has NOT been sent.` };
     }
   }

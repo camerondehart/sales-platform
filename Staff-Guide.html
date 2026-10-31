@@ -716,7 +716,11 @@ Anyone on the mailing list whose email also has an approved {{MEMBERS}} account.
 <h3>Making the email look good</h3>
 <p class="lede">You never have to write HTML. Just type normally and the site turns it into a properly designed email.</p>
 
-<p>Every campaign is automatically wrapped in the {{SHORT}} template: the green header with our name, a white card, the reader's first name at the top, and the unsubscribe footer. You only write what goes in the middle.</p>
+<p>Every campaign is automatically wrapped in a newsletter design: a seasonal banner picture, our name, a white card, the reader's first name at the top, matching coloured headings and buttons, little artwork dividers, and the unsubscribe footer. You only write what goes in the middle.</p>
+
+<h3>Picking a look</h3>
+<p>The composer is in two halves: you write on the left, and the <strong>Preview</strong> on the right shows the email exactly as it will arrive, updating as you type. <kbd>Desktop</kbd> and <kbd>Phone</kbd> switch the preview width. On a phone the preview sits under the composer.</p>
+<p>Under <strong>Look</strong>, pick the artwork: Fall, Halloween, Thanksgiving, Black Friday, Holiday, Winter, New Year, Valentine's, Spring, Mother's Day, Summer or Classic (the mountains). <strong>Auto</strong> (the default) picks for you: words like <em>Halloween</em>, <em>holiday</em>, <em>Valentine's</em> or <em>cozy</em> in the subject or message decide it, otherwise the season of the send date does. The Auto chip shows what it picked. <strong>Plain</strong> leaves the artwork off. The test email uses the same look, so you see the real thing in your inbox. Using a template from the library picks the matching look (a Halloween template gets the Halloween art).</p>
 
 <p>Type plainly and it comes out formatted. Leave a blank line between paragraphs and each becomes its own paragraph. If you want more than that, these few shortcuts are all there is:</p>
 
@@ -728,13 +732,17 @@ Anyone on the mailing list whose email also has an approved {{MEMBERS}} account.
 <tr><td><kbd>*this*</kbd></td><td><em>Italic text</em></td></tr>
 <tr><td><kbd>[Shop now](https://{{HOST}})</kbd></td><td>A green button, if it's alone on its own line</td></tr>
 <tr><td><kbd>[our shop](https://{{HOST}})</kbd></td><td>A link, when it's inside a sentence</td></tr>
-<tr><td><kbd>---</kbd></td><td>A dividing line</td></tr>
+<tr><td><kbd>---</kbd></td><td>A dividing line (a little seasonal artwork divider with a look)</td></tr>
 <tr><td>Any web address</td><td>Becomes a clickable link on its own</td></tr>
 <tr><td><kbd>![Our new label](https://…)</kbd></td><td>A photo, if it's alone on its own line</td></tr>
+<tr><td><kbd>![Our new label|small](https://…)</kbd></td><td>A smaller photo (<kbd>|small</kbd> or <kbd>|medium</kbd>; without it, full width)</td></tr>
 </table>
 
 <h3>Adding a photo</h3>
 <p>Click in the message where the photo should go, then press <kbd>⬆ Upload photo</kbd> under the message box and pick a JPEG, PNG, WebP or GIF. It uploads and the message gets a <kbd>![Photo](https://…)</kbd> line, which shows as the picture in the email. If you haven't clicked in the message, the photo goes at the end. Change the word <em>Photo</em> in the brackets to a short description for people who can't see images. Use <strong>Preview email</strong> or send yourself a test to check how it looks. Big phone photos are shrunk first. iPhone HEIC photos need sharing as JPEG (or set iPhone Settings → Camera → Formats → <strong>Most Compatible</strong>).</p>
+
+<h3>Moving things around (Arrange)</h3>
+<p>Press <kbd>Arrange</kbd> above the message to see it as blocks: headings, paragraphs, lists, photos, buttons and dividers. Drag a block by its <kbd>⋮⋮</kbd> handle to move it (or use <kbd>↑</kbd> <kbd>↓</kbd>, easier on a phone), and <kbd>✕</kbd> removes it. Click a paragraph or heading to edit it. Photos have a description box and <kbd>S</kbd> <kbd>M</kbd> <kbd>L</kbd> size buttons; buttons have their text and link. The <strong>Add</strong> row at the bottom adds a heading, text, a button, a divider or a photo. <kbd>Write</kbd> goes back to the plain text; both edit the same message. A message pasted as HTML can only be edited in Write.</p>
 
 <div class="card">
 <h4 style="margin-top:0">A complete example</h4>
@@ -820,6 +828,7 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
 
 <h3>Scheduling a campaign</h3>
 <p>Set <strong>When</strong> in the composer to a date and time and press send. Scheduling it counts as approving it. It goes out at that time, but only between 9 am and 6 pm {{TZ}}. Anything due overnight waits for 9 am. Until it starts sending, <kbd>Cancel</kbd> in the Campaigns list stops it.</p>
+<p><strong>Changing a scheduled campaign:</strong> press <kbd>Edit</kbd> next to it in the Campaigns list. It opens in the composer with a yellow <em>Editing</em> bar, and you can change anything: subject, look, message, photos, who it goes to and when. Send yourself a test if you like, then press <kbd>Save changes</kbd>. It stays scheduled with your changes. <kbd>Stop editing</kbd> leaves it as it was. Once a campaign has started sending it can't be edited. Each edit is listed in the Activity log with the before and after.</p>
 <p>You can also send to a <strong>pasted list</strong> of addresses. Only people on your mailing list who haven't unsubscribed will get it.</p>
 
 <h3>How a campaign did</h3>

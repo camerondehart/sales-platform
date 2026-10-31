@@ -14,6 +14,9 @@ type Row = {
   body: string;
   audience: string;
   groups?: string[];
+  customEmails?: string[];
+  theme?: string;
+  startedAt?: number;
   status: "scheduled" | "sending" | "sent" | "cancelled";
   createdAt: number;
   scheduledFor: number;
@@ -36,7 +39,19 @@ const audLabel = (r: { audience: string; groups?: string[] }) =>
   r.audience === "groups" && r.groups?.length ? r.groups.map((g) => GROUP_LABEL[g] || g).join(" + ") : AUD[r.audience] || r.audience;
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "—");
 
-export default function CampaignHistory({ refreshKey, onDuplicate }: { refreshKey: number; onDuplicate: (subject: string, body: string) => void }) {
+export type CampaignRow = Row;
+
+export default function CampaignHistory({
+  refreshKey,
+  onDuplicate,
+  onEdit,
+  editingId,
+}: {
+  refreshKey: number;
+  onDuplicate: (subject: string, body: string) => void;
+  onEdit?: (c: Row) => void;
+  editingId?: string | null;
+}) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
@@ -76,7 +91,7 @@ export default function CampaignHistory({ refreshKey, onDuplicate }: { refreshKe
       <h3 className="ch-title">Campaigns</h3>
       <div className="ch-list">
         {rows.map((r) => (
-          <div key={r.id} className={`ch-row ${r.status}`}>
+          <div key={r.id} className={`ch-row ${r.status}${editingId === r.id ? " is-editing" : ""}`}>
             <div className="ch-main">
               <strong>{r.subject}</strong>
               <span className="ch-meta">
@@ -97,6 +112,11 @@ export default function CampaignHistory({ refreshKey, onDuplicate }: { refreshKe
               </div>
             )}
             <div className="ch-actions">
+              {r.status === "scheduled" && onEdit && (
+                <button type="button" className="esc-btn" disabled={editingId === r.id} onClick={() => onEdit(r)}>
+                  {editingId === r.id ? "Editing…" : "Edit"}
+                </button>
+              )}
               {r.status === "scheduled" && (
                 <button type="button" className="esc-btn" disabled={busy === r.id} onClick={() => cancel(r)}>Cancel</button>
               )}

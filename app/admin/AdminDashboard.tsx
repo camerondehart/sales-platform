@@ -42,6 +42,8 @@ import { ShopifyImportButton, InvitePanel } from "./MemberImport";
 import { orderWeight, packagingOzOf, DEFAULT_PACKAGING_OZ } from "@/lib/shippingWeight";
 import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_OPEN, EVT_USE_DRAFT, PHOTO_SLOT, type CampaignDraft } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
+import { cleanThemeChoice, themeForCategory, type ThemeChoice } from "@/lib/campaignThemes";
+import { BlockArranger, LivePreview, ThemePicker } from "./CampaignComposerParts";
 
 // Extended type – bulk orders have an `items` array
 type RecentInquiry = Inquiry & {
@@ -541,6 +543,12 @@ export default function AdminDashboard({
   const [campAudience, setCampAudience] = useState<"groups" | "custom">("groups");
   const [campCustom, setCampCustom] = useState("");
   const [campWhen, setCampWhen] = useState(""); // datetime-local; "" = send now
+  // Seasonal look (lib/campaignThemes.ts), the theme "Auto" resolved to, how the
+  // message is edited, and the scheduled campaign being edited (if any).
+  const [campTheme, setCampTheme] = useState<ThemeChoice>("auto");
+  const [campResolved, setCampResolved] = useState("");
+  const [campMode, setCampMode] = useState<"write" | "arrange">("write");
+  const [campEditing, setCampEditing] = useState<{ id: string; subject: string } | null>(null);
   const [campHistoryKey, setCampHistoryKey] = useState(0);
   const memberEmails = useMemo(
     () => new Set(users.filter((u) => u.status === "approved").map((u) => u.email.toLowerCase())),
@@ -728,6 +736,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       setCampMsg("Pick at least one group to send to.");
       return;
     }
+    if (!testOnly && campEditing) return saveCampaignEdit();
     const audienceLabel = campAudience === "custom" ? "listed" : "";
     const whenMs = campWhen ? pacificToMs(campWhen) : 0; // the box is local time
     if (!testOnly && whenMs && whenMs < Date.now()) {
@@ -759,6 +768,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           groups: campAudience === "groups" ? campGroups : undefined,
           customList: campAudience === "custom" ? campCustom : undefined,
           scheduledFor: !testOnly && whenMs ? whenMs : undefined,
+          theme: campTheme,
         }),
       });
       const data = await res.json();
@@ -771,7 +781,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               : `✅ Sent to ${data.sent} people${data.failed ? `, ${data.failed} failed` : ""}${data.remaining ? ` — the other ${data.remaining} go out within 15 minutes` : ""}.`
         );
         if (!testOnly) {
-          setCampSubject(""); setCampBody(""); setCampWhen(""); setCampHistoryKey((k) => k + 1);
+          setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampHistoryKey((k) => k + 1);
           if (campTodayKey) {
             fetch("/api/admin/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: campTodayKey, done: true }) })
               .then(() => window.dispatchEvent(new CustomEvent(EVT_ADMIN_REFRESH, { detail: ["today"] })))
@@ -781,6 +791,47 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         }
       } else {
         setCampMsg(`❌ ${data.error || "Failed to send."}`);
+      }
+    } catch {
+      setCampMsg("❌ Network error.");
+    }
+    setCampSending(false);
+  }
+
+  // Save changes to a scheduled campaign (Campaigns → Edit). Still scheduled afterwards.
+  async function saveCampaignEdit() {
+    if (!campEditing) return;
+    const whenMs = campWhen ? pacificToMs(campWhen) : 0;
+    if (!whenMs || whenMs < Date.now()) {
+      setCampMsg("Pick a time in the future for it to go out. To send it now instead, cancel it and send a copy.");
+      return;
+    }
+    setCampSending(true);
+    setCampMsg("");
+    try {
+      const res = await adminFetch("/api/admin/campaigns", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id: campEditing.id,
+          subject: campSubject,
+          body: campBody,
+          theme: campTheme,
+          audience: campAudience,
+          groups: campAudience === "groups" ? campGroups : undefined,
+          customList: campAudience === "custom" ? campCustom : undefined,
+          scheduledFor: whenMs,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        const label = new Date(whenMs).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
+        setCampMsg(`✅ Saved. Still scheduled for ${label} (local) to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`);
+        setCampEditing(null);
+        setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampHistoryKey((k) => k + 1);
+      } else {
+        setCampMsg(`❌ ${data.error || "Couldn't save the changes."}`);
       }
     } catch {
       setCampMsg("❌ Network error.");
@@ -2417,6 +2468,8 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       if (!d || typeof d.subject !== "string" || typeof d.body !== "string") return;
       setCampSubject(d.subject);
       setCampBody(d.body);
+      setCampTheme(cleanThemeChoice(d.theme));
+      setCampEditing(null);
       setCampTodayKey(typeof d.todayKey === "string" ? d.todayKey : "");
       if (d.audience === "custom" && typeof d.customList === "string" && d.customList) {
         setCampAudience("custom");
@@ -3529,26 +3582,51 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         <TemplateLibrary
           subject={campSubject}
           body={campBody}
-          onUse={(subject, body) => {
+          onUse={(subject, body, category) => {
             setCampSubject(subject);
             setCampBody(body);
+            setCampTheme(themeForCategory(category));
           }}
         />
 
-        <div className="admin-form">
-          <div className="field full">
-            <label>Subject</label>
-            <input value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder={`New arrivals this week ${brand.emoji}`} />
+        {campEditing && (
+          <div className="cc-editing">
+            <span>✏️ Editing the scheduled campaign <strong>“{campEditing.subject}”</strong>. Changes apply when you press <strong>Save changes</strong>; it stays scheduled.</span>
+            <button type="button" className="esc-btn" onClick={() => { setCampEditing(null); setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampMsg("Stopped editing. The scheduled campaign is unchanged."); }}>Stop editing</button>
           </div>
-          <div className="field full">
-            <label>Message</label>
-            <textarea
-              ref={campBodyRef}
-              rows={10}
-              value={campBody}
-              onFocus={() => (campCursorSet.current = true)}
-              onChange={(e) => setCampBody(e.target.value)}
-              placeholder={`# Fresh batch just landed
+        )}
+
+        <div className="cc">
+          <div className="cc-edit">
+            <div className="field">
+              <label>Subject</label>
+              <input value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder={`New arrivals this week ${brand.emoji}`} />
+            </div>
+
+            <div className="field">
+              <label>Look</label>
+              <ThemePicker value={campTheme} onChange={setCampTheme} resolved={campResolved} />
+              <div className="field-hint">Seasonal artwork, colours and dividers are added for you. <strong>Auto</strong> picks from your words (Halloween, holiday, Valentine&rsquo;s…) or the season of the send date.</div>
+            </div>
+
+            <div className="field">
+              <div className="cc-mode" role="tablist" aria-label="Edit the message">
+                <label>Message</label>
+                <button type="button" role="tab" aria-selected={campMode === "write"} className={campMode === "write" ? "is-on" : ""} onClick={() => setCampMode("write")}>Write</button>
+                <button type="button" role="tab" aria-selected={campMode === "arrange"} className={campMode === "arrange" ? "is-on" : ""} onClick={() => setCampMode("arrange")}>Arrange</button>
+              </div>
+              {campMode === "arrange" && !/<\s*(p|div|h[1-6]|ul|table|img|a|br)\b/i.test(campBody) ? (
+                <BlockArranger body={campBody} onChange={setCampBody} />
+              ) : (
+                <>
+                  {campMode === "arrange" && <div className="field-hint">This message is pasted HTML, so it can only be edited as text.</div>}
+                  <textarea
+                    ref={campBodyRef}
+                    rows={12}
+                    value={campBody}
+                    onFocus={() => (campCursorSet.current = true)}
+                    onChange={(e) => setCampBody(e.target.value)}
+                    placeholder={`# Fresh batch just landed
 
 We just finished a new run and wanted you to hear it first.
 
@@ -3556,68 +3634,93 @@ We just finished a new run and wanted you to hear it first.
 - [Product] in the larger size
 
 [Browse the shop](${brand.siteUrl})`}
-            />
-            <MediaUpload kind="image" value="" onUploaded={insertCampImage} />
-            <div className="field-hint">
-              Just type — it's formatted into the {brand.shortName} template automatically.
-              Blank line for a new paragraph, <code>#</code> for a heading,{" "}
-              <code>-</code> for bullets, <code>**bold**</code>, and{" "}
-              <code>[Button text](https://…)</code> on its own line for a green button.
-              <strong>Upload photo</strong> adds a picture where your cursor is (or <code>![description](https://…)</code> on its own line).
-              Pasted HTML is used as-is. <a href="/help#tab-marketing" target="_blank">See examples in the staff guide →</a>
-            </div>
-          </div>
-          <div className="field full">
-            <label>Send to</label>
-            <div className="sub-filter" style={{ margin: "0.2rem 0 0" }}>
-              {([["ms", "Members subscribed"], ["mn", "Non-subscribed members"], ["ls", "Mailing list subscribed – not member"]] as const).map(([k, label]) => (
-                <button
-                  key={k}
-                  type="button"
-                  className={campAudience === "groups" && campGroups.includes(k) ? "active" : ""}
-                  aria-pressed={campAudience === "groups" && campGroups.includes(k)}
-                  onClick={() => toggleGroup(k)}
-                >
-                  {campAudience === "groups" && campGroups.includes(k) ? "✓ " : ""}
-                  {label} · {groupCount[k]}
-                </button>
-              ))}
-              <button type="button" className={campAudience === "custom" ? "active" : ""} onClick={() => setCampAudience("custom")}>
-                Paste custom email list{campAudience === "custom" ? ` · ${campRecipientCount}` : ""}
-              </button>
-            </div>
-            {campAudience === "custom" && (
-              <>
-                <textarea rows={3} value={campCustom} onChange={(e) => setCampCustom(e.target.value)} placeholder="Paste email addresses — one per line, or separated by commas" style={{ marginTop: "0.5rem" }} />
-                <div className="field-hint">Mailing-list subscribers and members get it; anyone who unsubscribed is skipped — {campRecipientCount} of the {customSet.size} you pasted.</div>
-              </>
-            )}
-          </div>
-          <div className="field full">
-            <label>When</label>
-            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-              <input type="datetime-local" value={campWhen} onChange={(e) => setCampWhen(e.target.value)} style={{ maxWidth: 240 }} />
-              {campWhen ? (
-                <button type="button" className="ap-linkbtn esc-quiet" onClick={() => setCampWhen("")}>Send now instead</button>
-              ) : (
-                <span className="field-hint" style={{ margin: 0 }}>Leave empty to send now, or pick a time (local) to schedule it.</span>
+                  />
+                  <MediaUpload kind="image" value="" onUploaded={insertCampImage} />
+                  <div className="field-hint">
+                    Just type — it&rsquo;s laid out in the newsletter design automatically.
+                    Blank line for a new paragraph, <code>#</code> for a heading,{" "}
+                    <code>-</code> for bullets, <code>**bold**</code>, <code>---</code> for a divider, and{" "}
+                    <code>[Button text](https://…)</code> on its own line for a button.
+                    <strong> Upload photo</strong> adds a picture where your cursor is. Switch to <strong>Arrange</strong> to drag photos, text and buttons into place, or set a photo&rsquo;s size.
+                    Pasted HTML is used as-is. <a href="/help#tab-marketing" target="_blank">See examples in the staff guide →</a>
+                  </div>
+                </>
               )}
             </div>
-            {campWhen && <div className="field-hint">Scheduled emails go out between 9am and 6pm local; a time outside that sends at 9am.</div>}
+
+            <div className="field">
+              <label>Send to</label>
+              <div className="sub-filter" style={{ margin: "0.2rem 0 0" }}>
+                {([["ms", "Members subscribed"], ["mn", "Non-subscribed members"], ["ls", "Mailing list subscribed – not member"]] as const).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={campAudience === "groups" && campGroups.includes(k) ? "active" : ""}
+                    aria-pressed={campAudience === "groups" && campGroups.includes(k)}
+                    onClick={() => toggleGroup(k)}
+                  >
+                    {campAudience === "groups" && campGroups.includes(k) ? "✓ " : ""}
+                    {label} · {groupCount[k]}
+                  </button>
+                ))}
+                <button type="button" className={campAudience === "custom" ? "active" : ""} onClick={() => setCampAudience("custom")}>
+                  Paste custom email list{campAudience === "custom" ? ` · ${campRecipientCount}` : ""}
+                </button>
+              </div>
+              {campAudience === "custom" && (
+                <>
+                  <textarea rows={3} value={campCustom} onChange={(e) => setCampCustom(e.target.value)} placeholder="Paste email addresses — one per line, or separated by commas" style={{ marginTop: "0.5rem" }} />
+                  <div className="field-hint">Mailing-list subscribers and members get it; anyone who unsubscribed is skipped — {campRecipientCount} of the {customSet.size} you pasted.</div>
+                </>
+              )}
+            </div>
+
+            <div className="field">
+              <label>When</label>
+              <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+                <input type="datetime-local" value={campWhen} onChange={(e) => setCampWhen(e.target.value)} style={{ maxWidth: 240 }} />
+                {campWhen && !campEditing ? (
+                  <button type="button" className="ap-linkbtn esc-quiet" onClick={() => setCampWhen("")}>Send now instead</button>
+                ) : !campWhen ? (
+                  <span className="field-hint" style={{ margin: 0 }}>Leave empty to send now, or pick a time (local) to schedule it.</span>
+                ) : null}
+              </div>
+              {campWhen && <div className="field-hint">Scheduled emails go out between 9am and 6pm local; a time outside that sends at 9am.</div>}
+            </div>
+
+            <div className="cc-send">
+              <button type="button" className="submit cc-test" onClick={() => sendCampaign(true)} disabled={campSending}>
+                Send test to myself
+              </button>
+              <button type="button" className="submit" onClick={() => sendCampaign(false)} disabled={campSending || campRecipientCount === 0}>
+                {campSending ? "Sending…" : campEditing ? "Save changes" : `${campWhen ? "Schedule for" : "Send to"} ${campRecipientCount} ${campRecipientCount === 1 ? "person" : "people"}`}
+              </button>
+              {campMsg && <span className="cc-msg">{campMsg}</span>}
+            </div>
           </div>
-          <div className="full" style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" className="submit" onClick={() => sendCampaign(true)} disabled={campSending} style={{ width: "auto", padding: "0.7rem 1.3rem", background: "var(--grey)" }}>
-              Send test to myself
-            </button>
-            <button type="button" className="submit" onClick={() => sendCampaign(false)} disabled={campSending || campRecipientCount === 0} style={{ width: "auto", padding: "0.7rem 1.3rem" }}>
-              {campSending ? "Sending…" : `${campWhen ? "Schedule for" : "Send to"} ${campRecipientCount} ${campRecipientCount === 1 ? "person" : "people"}`}
-            </button>
-            {campMsg && <span style={{ fontSize: "0.9rem" }}>{campMsg}</span>}
-          </div>
+
+          <LivePreview subject={campSubject} body={campBody} theme={campTheme} when={campWhen ? pacificToMs(campWhen) : undefined} onResolved={setCampResolved} />
         </div>
 
         <CampaignHistory
           refreshKey={campHistoryKey}
+          editingId={campEditing?.id}
+          onEdit={(c) => {
+            setCampEditing({ id: c.id, subject: c.subject });
+            setCampSubject(c.subject);
+            setCampBody(c.body);
+            setCampTheme(cleanThemeChoice(c.theme ?? "none"));
+            if (c.audience === "custom") {
+              setCampAudience("custom");
+              setCampCustom((c.customEmails || []).join(", "));
+            } else {
+              setCampAudience("groups");
+              setCampGroups(c.audience === "groups" && c.groups?.length ? (c.groups as CampGroup[]) : c.audience === "all" ? ["ms", "mn", "ls"] : c.audience === "members" ? ["ms", "mn"] : c.audience === "nonmembers" ? ["ls"] : ["ms", "ls"]);
+            }
+            setCampWhen(msToPacificInput(c.scheduledFor));
+            setCampMsg("");
+            setTimeout(() => document.getElementById("campaign-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+          }}
           onDuplicate={(subject, body) => {
             setCampSubject(subject);
             setCampBody(body);

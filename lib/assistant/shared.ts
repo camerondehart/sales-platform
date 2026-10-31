@@ -101,6 +101,8 @@ export type CampaignDraft = {
   groupLabel?: string;
   /** The Today-list item this draft came from (ticked off once the campaign is sent). */
   todayKey?: string;
+  /** Seasonal look for the email (lib/campaignThemes.ts): a theme key, "auto" or "none". */
+  theme?: string;
   /** Use the photo staff sent in the chat: it goes where PHOTO_SLOT is in the body (uploaded when the draft opens in the composer). */
   photo?: { alt: string };
   /** Set by the chat widget on the way to the composer: the photo itself (JPEG data URL, kept in this browser only). */

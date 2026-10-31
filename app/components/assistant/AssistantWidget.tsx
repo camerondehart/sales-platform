@@ -782,6 +782,10 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                             const b = (a.request?.body || {}) as { subject?: string; body?: string };
                             return b.body ? <EmailPreview subject={b.subject || ""} body={b.body} /> : null;
                           })()}
+                          {isAdmin && (a.kind === "campaign_send" || a.kind === "campaign_test") && (() => {
+                            const b = (a.request?.body || {}) as { subject?: string; body?: string; theme?: string };
+                            return b.body ? <EmailPreview subject={b.subject || ""} body={b.body} theme={b.theme || "auto"} /> : null;
+                          })()}
                           {st.state === "done" ? (
                             <div className="as-card-result ok">✓ {st.note || "Done."}</div>
                           ) : (
@@ -817,7 +821,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                         <div className="as-card-title">{m.draft.subject}</div>
                         {m.draft.photo && chatPhotoRef.current && <img className="as-photo" src={chatPhotoRef.current.thumb} alt={m.draft.photo.alt} />}
                         <div className="as-draft-body">{m.draft.body.split(PHOTO_SLOT).join("📷 (your photo)")}</div>
-                        {isAdmin && <EmailPreview subject={m.draft.subject} body={m.draft.body.split(PHOTO_SLOT).join("*📷 Your photo from the chat goes here*")} />}
+                        {isAdmin && <EmailPreview subject={m.draft.subject} theme={m.draft.theme || "auto"} body={m.draft.body.split(PHOTO_SLOT).join("*📷 Your photo from the chat goes here*")} />}
                         <div className="as-card-actions">
                           {isAdmin && (
                             <button className="as-btn as-btn-primary" onClick={() => applyDraft(m.draft!)}>

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { isAdmin } from "@/lib/auth";
 import { audited, auditDetail } from "@/lib/audit";
-import { wrapCampaign } from "@/lib/campaignEmail";
-import { AUDIENCE_GROUPS, cancelCampaign, createCampaign, inWindow, listCampaigns, processCampaign, publicCampaign, recipientsFor, type Audience } from "@/lib/campaignSchedule";
+import { renderCampaign } from "@/lib/campaignRender";
+import { cleanThemeChoice } from "@/lib/campaignThemes";
+import { AUDIENCE_GROUPS, cancelCampaign, createCampaign, inWindow, listCampaigns, processCampaign, publicCampaign, recipientsFor, updateCampaign, type Audience } from "@/lib/campaignSchedule";
 import { readTraffic, pacificDay } from "@/lib/traffic";
 import { brand } from "@/lib/brand";
 
@@ -22,8 +23,10 @@ async function POST_handler(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { subject, body, testOnly, audience = "subscribers", scheduledFor, customList, groups: rawGroups } = await req.json() as {
+  const { subject, body, testOnly, audience = "subscribers", scheduledFor, customList, groups: rawGroups, theme: rawTheme } = await req.json() as {
     subject: string; body: string; testOnly?: boolean;
+    /** Seasonal look: a theme key, "auto" (default) or "none". */
+    theme?: string;
     /** Who gets it: everyone, only members, only non-members, or a pasted list. */
     audience?: "subscribers" | "all" | "members" | "nonmembers" | "custom" | "groups";
     /** For audience "groups": any of ms (members subscribed), mn (non-subscribed members), ls (mailing list, not member). */
@@ -65,7 +68,7 @@ async function POST_handler(req: Request) {
         to: adminEmail,
         reply_to: replyTo,
         subject: `[TEST] ${subject}`,
-        html: wrapCampaign(body, `${siteUrl}/unsubscribe?token=preview`),
+        html: await renderCampaign({ subject, body, theme: cleanThemeChoice(rawTheme), unsubUrl: `${siteUrl}/unsubscribe?token=preview`, siteUrl, when: Number(scheduledFor) || Date.now() }),
       });
       return NextResponse.json({ ok: true, sent: 1, test: true });
     } catch (err) {
@@ -87,8 +90,8 @@ async function POST_handler(req: Request) {
   }
   const when = Number(scheduledFor) || 0;
   if (when && when < Date.now() - 60_000) return NextResponse.json({ error: "That time has already passed." }, { status: 400 });
-  const campaign = await createCampaign({ subject, body, audience: aud, customEmails, groups, scheduledFor: when || undefined });
-  auditDetail({ targetId: campaign.id, after: { subject: campaign.subject, audience: aud, groups, recipients: preview.length, scheduledFor: campaign.scheduledFor } });
+  const campaign = await createCampaign({ subject, body, audience: aud, customEmails, groups, scheduledFor: when || undefined, theme: cleanThemeChoice(rawTheme) });
+  auditDetail({ targetId: campaign.id, after: { subject: campaign.subject, audience: aud, groups, recipients: preview.length, scheduledFor: campaign.scheduledFor, theme: campaign.theme } });
   if (when && when > Date.now()) {
     return NextResponse.json({
       ok: true,
@@ -116,6 +119,8 @@ export async function GET() {
     {
       campaigns: rows.map((c) => ({
         ...publicCampaign(c),
+        // Staff only: a scheduled pasted-list campaign's addresses, so it can be edited.
+        ...(c.status === "scheduled" && c.customEmails?.length ? { customEmails: c.customEmails } : {}),
         opens: count(`eo:${c.id}`),
         clicks: count(`ec:${c.id}`),
         visits: count(`c:${c.id}`),
@@ -128,11 +133,42 @@ export async function GET() {
   );
 }
 
-/** { action: "cancel", id } */
+/**
+ * { action: "cancel", id }
+ * { action: "update", id, subject, body, theme?, audience, groups?, customList?, scheduledFor? }
+ *   edits a scheduled campaign that hasn't started sending.
+ */
 async function PATCH_handler(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const { action, id } = (await req.json().catch(() => ({}))) as { action?: string; id?: string };
+  const b = (await req.json().catch(() => ({}))) as {
+    action?: string; id?: string; subject?: string; body?: string; theme?: string; audience?: string; groups?: string[]; customList?: string; scheduledFor?: number;
+  };
+  const { action, id } = b;
   auditDetail({ action: `campaign.${action || "unknown"}`, targetId: id });
+  if (action === "update") {
+    if (!b.subject?.trim() || !b.body?.trim()) return NextResponse.json({ error: "Subject and body are required." }, { status: 400 });
+    if (b.body.includes("[[PHOTO]]")) return NextResponse.json({ error: "The photo from the chat hasn't been added yet. Use Upload photo, or delete the [[PHOTO]] line." }, { status: 400 });
+    const aud: Audience = (["subscribers", "all", "members", "nonmembers", "custom", "groups"] as const).includes(b.audience as Audience) ? (b.audience as Audience) : "groups";
+    const customEmails = aud === "custom" ? String(b.customList || "").split(/[\s,;]+/).filter((e) => /@/.test(e)) : undefined;
+    const groups = aud === "groups" ? AUDIENCE_GROUPS.filter((g) => Array.isArray(b.groups) && b.groups.includes(g)) : undefined;
+    if (aud === "groups" && !groups?.length) return NextResponse.json({ error: "Pick at least one group to send to." }, { status: 400 });
+    const when = Number(b.scheduledFor) || 0;
+    if (!when || when < Date.now() - 60_000) return NextResponse.json({ error: "Pick a time in the future. To send it now, cancel this one and send a copy." }, { status: 400 });
+    const recipients = (await recipientsFor(aud, customEmails, groups)).length;
+    if (recipients === 0) return NextResponse.json({ error: "Nobody in that group would get it." }, { status: 400 });
+    const r = await updateCampaign(String(id || ""), { subject: b.subject, body: b.body, audience: aud, customEmails, groups, scheduledFor: when, theme: cleanThemeChoice(b.theme) });
+    if (!r) return NextResponse.json({ error: "Only a scheduled campaign that hasn't started sending can be edited." }, { status: 400 });
+    auditDetail({
+      before: { subject: r.before.subject, audience: r.before.audience, groups: r.before.groups, scheduledFor: r.before.scheduledFor, theme: r.before.theme, bodyLength: r.before.body.length },
+      after: { subject: r.after.subject, audience: r.after.audience, groups: r.after.groups, scheduledFor: r.after.scheduledFor, theme: r.after.theme, bodyLength: r.after.body.length, recipients },
+    });
+    return NextResponse.json({
+      ok: true,
+      campaign: publicCampaign(r.after),
+      recipients,
+      note: inWindow(r.after.scheduledFor) ? undefined : "That's outside 9am–6pm local time, so it will go out at 9am the next morning.",
+    });
+  }
   if (action !== "cancel") return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   const c = await cancelCampaign(String(id || ""));
   if (!c) return NextResponse.json({ error: "Only a scheduled campaign that hasn't started can be cancelled." }, { status: 400 });

@@ -42,7 +42,7 @@ export default function TemplateLibrary({
 }: {
   subject: string;
   body: string;
-  onUse: (subject: string, body: string) => void;
+  onUse: (subject: string, body: string, category?: string) => void;
 }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [items, setItems] = useState<Template[]>([]);
@@ -115,7 +115,7 @@ export default function TemplateLibrary({
 
   function use(t: Template) {
     if ((subject.trim() || body.trim()) && !confirm("Replace what's in the composer with this template?")) return;
-    onUse(t.subject, t.body);
+    onUse(t.subject, t.body, t.category);
     setLoadedId(t.starter ? null : t.id);
     setSaveName(t.starter ? "" : t.name);
     setSaveCat(t.starter ? t.category : t.category);
