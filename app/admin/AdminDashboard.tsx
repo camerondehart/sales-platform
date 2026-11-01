@@ -30,6 +30,7 @@ import { dataUrlToBlob, imageLine, uploadCampaignImage } from "./campaignImage";
 import BundlesPanel from "./BundlesPanel";
 import TodayBulletin from "./TodayBulletin";
 import QaIcon, { type QaIconName } from "./QaIcon";
+import FaqPanel from "./FaqPanel";
 import ShippingWeights from "./ShippingWeights";
 import StockCounts from "./StockCounts";
 import VenmoInbox from "./VenmoInbox";
@@ -4041,6 +4042,7 @@ We just finished a new run and wanted you to hear it first.
         {exportMsg && <div style={{ marginTop: "1rem", fontStyle: "italic", color: "var(--mint)" }}>{exportMsg}</div>}
       </section>
             ) },
+            { key: "faq", icon: "❓", title: "FAQ page", summary: "Questions and answers for /faq, which the Concierge also uses.", render: () => <FaqPanel /> },
             { key: "stores", icon: "📍", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
             { key: "activity", icon: "📜", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
           ]}

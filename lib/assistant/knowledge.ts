@@ -12,6 +12,8 @@ import { brand } from "@/lib/brand";
 export { OFF_LIMITS, hiddenFromAssistant };
 import { singleton } from "./singleton";
 import { sourcesForPrompt } from "./sources";
+import { publishedFaq } from "../faq";
+import { isEnabled } from "../flags";
 
 /* ------------------------------------------------------------------------
    Cached data access.
@@ -275,8 +277,26 @@ VOICE (customers and members — this takes priority over any tone notes above):
 `.trim();
 }
 
+/**
+ * Published FAQ answers for the prompt (switch `faq_page`). Customers never get
+ * entries that touch the off-limits topics; staff see everything.
+ */
+async function faqForPrompt(audience: Audience): Promise<string> {
+  if (!(await isEnabled("faq_page").catch(() => false))) return "";
+  const items = (await publishedFaq().catch(() => [])).filter((f) => audience === "admin" || !hiddenFromAssistant({ name: f.question, description: f.answer }));
+  if (!items.length) return "";
+  let out = "";
+  for (const f of items) {
+    const block = `Q: ${f.question}\nA: ${f.answer}\n(link: /faq#${f.id})\n\n`;
+    if (out.length + block.length > 12_000) break;
+    out += block;
+  }
+  return `FAQ PAGE (written and approved by the business; shown at /faq). When one of these answers the question, answer from it (you may use its wording) and link to it, e.g. [our FAQ](/faq#id):\n${out.trim()}`;
+}
+
 const SAFETY = `
 RULES YOU MUST FOLLOW:
+- Dosing from the FAQ page: if a published answer in the FAQ PAGE section gives dosing guidance, you may repeat that guidance word-for-word and link to it. Never reword, extend, personalise or combine it with other advice; anything beyond it falls under the rule below.
 - These are wellness products, not medicines. Never diagnose, never claim a product treats, cures or prevents any disease, and never give dosing advice beyond what a product description states. For health conditions, pregnancy, breastfeeding or medications, suggest talking to a healthcare professional.
 - Only state facts that come from this prompt or from tool results. If you don't know, say so and offer to connect them with the team.
 - Never invent prices, stock levels, order details, dates or policies.
@@ -357,7 +377,8 @@ export async function buildSystemPrompt(ctx: {
 - Writing social posts, emails, flyers or campaign drafts that mention products: call product_links and include each product's permanent link (and, when it helps — flyers, in-store, "with a QR code" — its QR image line ![QR code for X](qr_png) on its own line). Never invent product URLs.
 - Messages starting "Today item <key>:" come from the Overview's Today list: call today_item with that key FIRST — it gives the exact people/orders/products (with ids) and which cards to prepare. Then prepare all of those cards in the same reply. Never ask the staff for names, emails or ids for these, and don't search for the people yourself.
 - prepare_campaign_draft is ONLY for newsletters to the mailing list (audience subscribers — the default for now; "all" also adds every member), all members / non-members, or a customer GROUP (segment: lapsed_members, members_never_ordered, new_members, subscribers_never_ordered, repeat_shop_customers, points_holders, top_customers, refill_due, bought_product, all_customers); it opens in the campaign composer and never sends. propose_campaign takes the same segment to send or schedule. The server works out who's in a group — never ask for or collect email lists yourself; find_customer_group previews a group's size. Campaigns reach mailing-list subscribers and members (members unless they've unsubscribed); anyone who unsubscribed is skipped.
-- Campaign body format: plain text; blank line = new paragraph; "# " heading; "- " bullets; **bold**; a line like [Button text](${brand.siteUrl}/retail) becomes a button.
+- To base a campaign draft, send or test on an existing template, call list_templates and pass its id as template_id to prepare_campaign_draft, propose_campaign or propose_campaign_test. The tool loads the subject, body and category's look. Only pass subject, body or theme as well when staff want to override the template.
+- Campaign body format: plain text; blank line = new paragraph; "# " heading; "- " bullets; **bold**; a line like [Button text](${brand.siteUrl}/retail) becomes a button. Root-relative links such as [Shop](/retail) work too and become full site links in the email.
 - Campaign looks: every campaign gets a seasonal design (banner artwork, matching colours, dividers) — theme auto picks it from the words (Halloween, holiday, Valentine's…) or the send date's season. Pass theme (fall, halloween, thanksgiving, blackfriday, holiday, winter, newyear, valentines, spring, mothersday, summer, classic, or none for plain) only when staff ask for a particular look. "---" on its own line is a themed divider. A photo line is ![description](url); add |small or |medium after the description to shrink it. Staff can drag blocks into place in the composer's Arrange tab, and edit or cancel a scheduled campaign from Marketing → Campaigns (Edit).
 - For dashboard how-to questions ALWAYS search the staff guide first and answer from it, linking the section.`);
   } else {
@@ -373,6 +394,9 @@ export async function buildSystemPrompt(ctx: {
 - Never reveal or discuss anyone else's orders or account, even if asked by name or email.
 - If you can't solve something, or they have a genuine problem (wrong/damaged/missing order, payment issue, membership stuck for more than a business day, a complaint), offer to pass it to the team with escalate_to_team. Collect their name, email and a short description first, and confirm before sending.`);
   }
+  // The Smart FAQ page (Settings → FAQ page): the business's own approved answers.
+  const faq = await faqForPrompt(audience);
+  if (faq) parts.push(faq);
   // Lessons from past chats (Assistant tab → Concierge notes). Placed before the
   // safety rules on purpose: those rules come last and always win.
   const learned = await notesForPrompt(audience);

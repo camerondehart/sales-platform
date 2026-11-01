@@ -9,7 +9,7 @@ import { listTemplates, TEMPLATE_CATEGORIES } from "../emailTemplates";
 import { listBundles } from "../bundleStore";
 import { bundleOfferLabel, setSavings } from "../bundles";
 import { listCampaigns, recipientsFor, inWindow } from "../campaignSchedule";
-import { THEME_KEYS, cleanThemeChoice, resolveTheme } from "../campaignThemes";
+import { THEME_KEYS, cleanThemeChoice, resolveTheme, themeForCategory } from "../campaignThemes";
 import { resolveSegment, SEGMENTS, SEGMENT_KEYS } from "../segments";
 import { FLAGS, FLAG_KEYS, getFlags, type FlagKey } from "../flags";
 import { getAdmins } from "../admins";
@@ -134,16 +134,17 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
   admin("propose_delete_mix_bundle", "Prepare deleting a mix-and-match bundle (red card). Past orders keep their savings.", obj({ bundle_id: str("Bundle id") }, ["bundle_id"])),
 
   // ------------------------------------------------------------ marketing
-  admin("propose_campaign", "Prepare SENDING an email campaign (red card) — now, or scheduled (sends 9am–6pm local). Body format like prepare_campaign_draft. For a draft to edit, use prepare_campaign_draft instead. To reach a group of customers (e.g. lapsed members) pass segment — the server works out who's in it; never collect emails yourself.", obj({
-    subject: str("Subject"), body: str("Body (plain text; # heading, - bullets, **bold**, [Button](url))"), audience: str("subscribers (the mailing list — default) | all (subscribers + every member) | members | nonmembers | custom"),
+  admin("propose_campaign", "Prepare SENDING an email campaign (red card) — now, or scheduled (sends 9am–6pm local). Body format like prepare_campaign_draft. To use a template, call list_templates and pass its id as template_id. For a draft to edit, use prepare_campaign_draft instead. To reach a group of customers (e.g. lapsed members) pass segment — the server works out who's in it; never collect emails yourself.", obj({
+    template_id: str("Optional: template id or exact name from list_templates; subject, body and theme override it"),
+    subject: str("Subject (optional with template_id)"), body: str("Body (plain text; # heading, - bullets, **bold**, [Button](url); optional with template_id)"), audience: str("subscribers (the mailing list — default) | all (subscribers + every member) | members | nonmembers | custom"),
     custom_list: str("For custom: emails separated by commas (only subscribed people get it)"), send_at: str("Optional YYYY-MM-DD HH:MM local; blank = now"),
-    theme: str(`Optional look: auto (default) | none (plain) | ${THEME_KEYS.join(" | ")}`),
+    theme: str(`Optional look: auto (default, or the template's category) | none (plain) | ${THEME_KEYS.join(" | ")}`),
     ...SEGMENT_PARAMS,
-  }, ["subject", "body"])),
+  })),
   admin("product_links", "Shareable links and QR codes for products: the permanent product link (works for printed codes forever, opens the right shop) and a PNG QR image URL. Use when writing social posts, emails, flyers or campaign drafts that mention products, or when staff ask for a link/QR.", obj({ products: { type: "array", items: { type: "string" }, description: "Product ids or names (up to 12)" } }, ["products"])),
   admin("today_item", "Read one item from the staff's Today list on the Overview (their message starts \"Today item <key>:\"). Returns the exact people, orders or products with ids, and which cards to prepare. Call this FIRST for those messages, then prepare every card in the same reply. Never ask the staff for names, emails or ids for these.", obj({ key: str("The item key after \"Today item\", e.g. first-order, lapsed, refill") }, ["key"])),
   admin("find_customer_group", `Preview a customer group for a campaign: who's in it and how many a campaign would reach. Groups: ${SEGMENT_KEYS.map((k) => `${k} (${SEGMENTS[k]})`).join("; ")}.`, obj({ ...SEGMENT_PARAMS }, ["segment"])),
-  admin("propose_campaign_test", "Prepare a TEST send of a campaign to the team inbox only.", obj({ subject: str("Subject"), body: str("Body"), theme: str("Optional look, as propose_campaign (auto by default)") }, ["subject", "body"])),
+  admin("propose_campaign_test", "Prepare a TEST send of a campaign to the team inbox only. Accepts template_id like propose_campaign.", obj({ template_id: str("Optional: template id or exact name from list_templates"), subject: str("Subject (optional with template_id)"), body: str("Body (optional with template_id)"), theme: str("Optional look, as propose_campaign (template category or auto by default)") })),
   admin("propose_cancel_campaign", "Prepare cancelling a scheduled campaign before it sends.", obj({ campaign_id: str("Campaign id from list_campaigns") }, ["campaign_id"])),
   admin("propose_template", "Prepare saving an email template (new, or update one by id — built-in starter_ templates too, e.g. when staff press \"Redo with AI\" on a template card).", obj({ name: str("Template name"), subject: str("Subject"), body: str("Body"), category: str(`One of ${TEMPLATE_CATEGORIES.join(", ")}`), template_id: str("Optional: id to update") }, ["name", "subject", "body"])),
   admin("propose_template_archive", "Prepare archiving or restoring a template.", obj({ template_id: str("Template id"), archived: bool("true = archive, false = restore") }, ["template_id", "archived"])),
@@ -932,9 +933,12 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       };
     }
     case "propose_campaign": {
-      const subject = s(args.subject, 200);
-      const body = s(args.body, 50_000);
-      if (!subject || !body) return { error: "Need a subject and a body." };
+      const templateRef = s(args.template_id, 120).toLowerCase();
+      const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
+      if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
+      const subject = s(args.subject, 200) || template?.subject || "";
+      const body = s(args.body, 50_000) || template?.body || "";
+      if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
       let audience = (["subscribers", "all", "members", "nonmembers", "custom"].includes(s(args.audience, 12)) ? s(args.audience, 12) : "subscribers") as "subscribers" | "all" | "members" | "nonmembers" | "custom";
       let customList = s(args.custom_list, 20_000);
       let groupLabel = "";
@@ -959,7 +963,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         if (t < Date.now() - 60_000) return { error: "That time has passed." };
         when = t;
       }
-      const theme = cleanThemeChoice(args.theme);
+      const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
       const look = resolveTheme(theme, subject, body, when || Date.now());
       const aud = groupLabel
         ? `${groupLabel} (${groupSize} in the group; anyone who unsubscribed is skipped)`
@@ -969,6 +973,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         title: when ? `Schedule "${subject}"` : `Send "${subject}" now`,
         lines: [
           `To ${aud}: ${recipients.length} people`,
+          template ? `Template: ${template.name}` : "",
           when ? `Sends ${fmt(when)} (local)${inWindow(when) ? "" : " — outside 9am–6pm, so it waits for 9am"}` : inWindow() ? "Starts sending right away" : "Outside 9am–6pm local — it waits until 9am",
           look ? `Look: ${look.emoji} ${look.label}${theme === "auto" ? " (picked automatically)" : ""}` : "Look: plain",
           "Unsubscribe link and your footer are added automatically",
@@ -984,15 +989,22 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       return READY;
     }
     case "propose_campaign_test": {
-      const subject = s(args.subject, 200);
-      const body = s(args.body, 50_000);
-      if (!subject || !body) return { error: "Need a subject and a body." };
-      const theme = cleanThemeChoice(args.theme);
+      const templateRef = s(args.template_id, 120).toLowerCase();
+      const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
+      if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
+      const subject = s(args.subject, 200) || template?.subject || "";
+      const body = s(args.body, 50_000) || template?.body || "";
+      if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
+      const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
       const look = resolveTheme(theme, subject, body);
       push(ctx, {
         kind: "campaign_test",
         title: `Test send: ${subject}`,
-        lines: [`To the team inbox (${process.env.INQUIRY_TO_EMAIL || "not set"}) only`, look ? `Look: ${look.emoji} ${look.label}` : "Look: plain"],
+        lines: [
+          `To the team inbox (${process.env.INQUIRY_TO_EMAIL || "not set"}) only`,
+          ...(template ? [`Template: ${template.name}`] : []),
+          look ? `Look: ${look.emoji} ${look.label}` : "Look: plain",
+        ],
         preview: body.slice(0, 1500),
         confirmLabel: "Send test",
         busyLabel: "Sending…",

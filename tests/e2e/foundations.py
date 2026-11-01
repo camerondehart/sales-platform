@@ -32,7 +32,7 @@ def confirm(a):
 # ============ Feature flags
 s,r,_=req("/api/admin/flags")
 keys=[f["key"] for f in r.get("flags",[])]
-check("flags: all 22 listed for this environment", s==200 and len(keys)==22 and r["env"]=="development", (s,r))
+check("flags: all 23 listed for this environment", s==200 and len(keys)==23 and r["env"]=="development", (s,r))
 s,r,_=req("/api/admin/flags", cookie=MEMBER)
 check("flags: admin only", s==401, s)
 _s,_fl,_=req("/api/admin/flags")
@@ -283,7 +283,10 @@ s,r,_=req("/api/admin/templates/preview", {"subject":"Hi","body":"# Fall restock
 check("email preview: staff only", s==401, s)
 s,r,_=req("/api/admin/templates/preview", {"subject":"Fall is here","body":"# Fall restock\n\nFresh batches.\n\n[Shop now](https://www.example.com/retail)"})
 h=r.get("html","")
-check("email preview: the real email (house header, sample name, heading, button, footer)", s==200 and "Northwind Goods" in h and "Hi Alex" in h and "Fall restock</h2>" in h and ">Shop now</a>" in h and "Unsubscribe" in h, (s, h[:300]))
+check("email preview: the real email (house header, sample name, heading, button, footer)", s==200 and "Northwind Goods" in h and "Hi Boss" in h and "Fall restock</h2>" in h and ">Shop now</a>" in h and "Unsubscribe" in h, (s, h[:300]))
+s,r,_=req("/api/admin/templates/preview", {"subject":"November news","body":"Hi\n\n[Visit the shop](/retail)","theme":"fall"})
+h=r.get("html","")
+check("email preview: relative links become full site buttons", s==200 and 'href="http://localhost:3470/retail"' in h and ">Visit the shop</a>" in h and "[Visit the shop]" not in h and "Hi Boss" in h, (s, h[:500]))
 s,r,_=req("/api/admin/templates/preview", {"subject":"x","body":"  "})
 check("email preview: empty body says so", s==400, (s,r))
 # ---------- staff chat: the widget tells the model which cards it really showed (and their status)

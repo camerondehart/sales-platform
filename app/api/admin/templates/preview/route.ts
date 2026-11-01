@@ -17,13 +17,13 @@ export async function POST(req: Request) {
   const body = String(b.body || "").slice(0, 50_000);
   const subject = String(b.subject || "").slice(0, 200);
   if (!body.trim()) return NextResponse.json({ error: "Nothing to preview yet." }, { status: 400 });
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || new URL(req.url).origin;
   // With a theme (the campaign composer): the seasonal layout, exactly as it will be sent.
   if (b.theme !== undefined) {
     const theme = cleanThemeChoice(b.theme);
     const when = Number(b.when) || Date.now();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || new URL(req.url).origin;
-    const html = await renderCampaign({ subject, body, theme, unsubUrl: "#unsubscribe", name: "Alex", siteUrl, when });
+    const html = await renderCampaign({ subject, body, theme, unsubUrl: "#unsubscribe", name: "Boss", siteUrl, when });
     return NextResponse.json({ subject, html, theme: resolveTheme(theme, subject, body, when)?.key || "none" }, { headers: { "Cache-Control": "no-store" } });
   }
-  return NextResponse.json({ subject, html: wrapCampaign(body, "#unsubscribe", "Alex") }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ subject, html: wrapCampaign(body, "#unsubscribe", "Boss", { siteUrl }) }, { headers: { "Cache-Control": "no-store" } });
 }

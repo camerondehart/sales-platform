@@ -31,17 +31,18 @@ function looksLikeHtml(s: string): boolean {
 // the divider line for the theme's little divider artwork.
 type Look = { accent: string; onAccent: string; heading: string; divider?: string; full: number };
 const PLAIN_LOOK: Look = { accent: "#85ba45", onAccent: "#ffffff", heading: "#61676d", full: 480 };
-function formatPlainBody(raw: string, look: Look = PLAIN_LOOK): string {
+function formatPlainBody(raw: string, look: Look = PLAIN_LOOK, siteUrl = ""): string {
   const esc = (t: string) =>
     t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const absolute = (url: string) => siteUrl && url.startsWith("/") ? `${siteUrl.replace(/\/$/, "")}${url}` : url;
 
   // NOTE: esc() already turned every "&" into "&amp;", so URLs matched below
   // are ALREADY href-safe. Do not run hrefSafe() on them — that would double
   // encode into "&amp;amp;" and break the link.
   const inline = (t: string) =>
     esc(t)
-      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
-        `<a href="$2" style="color:${look === PLAIN_LOOK ? "#6fa336" : look.accent};font-weight:600;">$1</a>`)
+      .replace(/\[([^\]]+)\]\(((?:https?:\/\/|\/(?!\/))[^\s)]+)\)/g,
+        (_m, label: string, url: string) => `<a href="${absolute(url)}" style="color:${look === PLAIN_LOOK ? "#6fa336" : look.accent};font-weight:600;">${label}</a>`)
       .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
       .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>")
       // Bare URLs, but not ones already inside an href we just built
@@ -81,10 +82,10 @@ function formatPlainBody(raw: string, look: Look = PLAIN_LOOK): string {
 
     // A lone [text](url) on its own line becomes a real button
     if (lines.length === 1) {
-      const btn = lines[0].match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+      const btn = lines[0].match(/^\[([^\]]+)\]\(((?:https?:\/\/|\/(?!\/))[^\s)]+)\)$/);
       if (btn) {
         out.push(
-          `<div style="text-align:center;margin:1.5rem 0;"><a href="${hrefSafe(btn[2])}" style="display:inline-block;background:${look.accent};color:${look.onAccent};padding:0.85rem 1.75rem;border-radius:${look === PLAIN_LOOK ? 6 : 999}px;text-decoration:none;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-size:0.8rem;">${esc(btn[1])}</a></div>`
+          `<div style="text-align:center;margin:1.5rem 0;"><a href="${hrefSafe(absolute(btn[2]))}" style="display:inline-block;background:${look.accent};color:${look.onAccent};padding:0.85rem 1.75rem;border-radius:${look === PLAIN_LOOK ? 6 : 999}px;text-decoration:none;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;font-size:0.8rem;">${esc(btn[1])}</a></div>`
         );
         continue;
       }
@@ -125,9 +126,9 @@ export function wrapCampaign(
   bodyHtml: string,
   unsubUrl: string,
   name?: string,
-  opts?: { theme?: Theme | null; art?: { header: string; divider: string } }
+  opts?: { theme?: Theme | null; art?: { header: string; divider: string }; siteUrl?: string }
 ): string {
-  if (opts?.theme && opts.art) return wrapThemed(bodyHtml, unsubUrl, name, opts.theme, opts.art);
+  if (opts?.theme && opts.art) return wrapThemed(bodyHtml, unsubUrl, name, opts.theme, opts.art, opts.siteUrl);
   return `
   <!DOCTYPE html>
   <html><head><meta charset="UTF-8"></head>
@@ -138,7 +139,7 @@ export function wrapCampaign(
       </div>
       <div style="padding:24px;line-height:1.65;">
         ${name ? `<p style="margin:0 0 1rem;">Hi ${escapeHtml(name.split(" ")[0])},</p>` : ""}
-        ${looksLikeHtml(bodyHtml) ? bodyHtml : formatPlainBody(bodyHtml)}
+        ${looksLikeHtml(bodyHtml) ? bodyHtml : formatPlainBody(bodyHtml, PLAIN_LOOK, opts?.siteUrl)}
       </div>
       <div style="padding:16px 24px;background:#f3f6ec;font-size:0.75rem;color:#81858b;text-align:center;line-height:1.5;">
         Questions? Reply to
@@ -152,9 +153,9 @@ export function wrapCampaign(
 
 
 /** The seasonal newsletter: banner artwork, themed colours, divider art, soft footer. Tables for email clients. */
-function wrapThemed(bodyHtml: string, unsubUrl: string, name: string | undefined, t: Theme, art: { header: string; divider: string }): string {
+function wrapThemed(bodyHtml: string, unsubUrl: string, name: string | undefined, t: Theme, art: { header: string; divider: string }, siteUrl = ""): string {
   const look: Look = { accent: t.accent, onAccent: t.onAccent, heading: "#3f4549", divider: art.divider, full: 536 };
-  const body = looksLikeHtml(bodyHtml) ? bodyHtml : formatPlainBody(bodyHtml, look);
+  const body = looksLikeHtml(bodyHtml) ? bodyHtml : formatPlainBody(bodyHtml, look, siteUrl);
   return `
   <!DOCTYPE html>
   <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>

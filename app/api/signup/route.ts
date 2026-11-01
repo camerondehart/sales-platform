@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { tooMany } from "@/lib/publicLimits";
 import { createUser } from "@/lib/users";
-import { addSubscriber, recordOptOut } from "@/lib/subscribers";
+import { addSubscriber } from "@/lib/subscribers";
 import { Resend } from "resend";
 import { brand } from "@/lib/brand";
 
@@ -33,22 +33,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  // Mailing list opt-in from the sign-up form. Ticked by default, so only an
-  // explicit `false` keeps them off the list. Never blocks the sign-up.
-  if (body.subscribe !== false) {
-    try {
-      await addSubscriber(body.email, body.name, "signup");
-    } catch (err) {
-      console.error("Failed to add signup subscriber", err);
-    }
-  } else {
-    // Unticked "Keep me posted": members get campaigns unless they opt out
-    // (Terms §9), so remember the opt-out now.
-    try {
-      await recordOptOut(body.email, body.name, "signup");
-    } catch (err) {
-      console.error("Failed to record signup opt-out", err);
-    }
+  // Every new member joins the mailing list (Cam, 2026-10-31; agreement §4.3 lets
+  // the business choose automatic opt-in). They can unsubscribe from any email.
+  // An older sign-up form may still send subscribe:false; it's no longer an opt-out.
+  // Never blocks the sign-up.
+  try {
+    await addSubscriber(body.email, body.name, "signup");
+  } catch (err) {
+    console.error("Failed to add signup subscriber", err);
   }
 
   // Notify admin by email that there's a new signup pending review.
@@ -71,7 +63,7 @@ export async function POST(req: Request) {
               <tr><td style="padding: 0.3rem 1rem 0.3rem 0; color: #81858b;">Email</td><td><a href="mailto:${escapeHtml(body.email)}" style="color: #85ba45;">${escapeHtml(body.email)}</a></td></tr>
               <tr><td style="padding: 0.3rem 1rem 0.3rem 0; color: #81858b;">21 or over</td><td>${body.ageVerified ? "Yes" : "No"}</td></tr>
               <tr><td style="padding: 0.3rem 1rem 0.3rem 0; color: #81858b;">Prior customer</td><td>${body.priorCustomer ? "Yes" : "No"}</td></tr>
-              <tr><td style="padding: 0.3rem 1rem 0.3rem 0; color: #81858b;">Mailing list</td><td>${body.subscribe !== false ? "Yes" : "No"}</td></tr>
+              <tr><td style="padding: 0.3rem 1rem 0.3rem 0; color: #81858b;">Mailing list</td><td>Yes</td></tr>
             </table>
             ${
               body.message

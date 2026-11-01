@@ -35,11 +35,13 @@ import {
 } from "./knowledge";
 import type { ActionProposal, Audience, CampaignDraft, ChatMessage } from "./shared";
 import { PHOTO_SLOT, SUPPORT_EMAIL } from "./shared";
+import { getFaq } from "../faq";
 import { ADMIN_EXTRA_DEFS, runAdminExtra } from "./adminActions";
 import { AMBASSADOR_DEFS, runAmbassadorTool } from "./ambassadorTools";
 import { resolveSegment, SEGMENT_KEYS } from "../segments";
 import { recipientsFor } from "../campaignSchedule";
-import { THEME_KEYS, cleanThemeChoice } from "../campaignThemes";
+import { THEME_KEYS, cleanThemeChoice, themeForCategory } from "../campaignThemes";
+import { listTemplates } from "../emailTemplates";
 import { splitChased, CHASE_QUIET_DAYS } from "../chased";
 import { isEnabled } from "../flags";
 import { liveBundles } from "../bundleStore";
@@ -343,6 +345,35 @@ const DEFS: ToolDef[] = [
     audiences: ["admin"],
     type: "function",
     function: {
+      name: "list_faq",
+      description: "Read-only: the FAQ page's questions and answers (Settings → FAQ page), with ids, topic and whether each is published.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
+      name: "propose_faq",
+      description: "Prepare a change to the FAQ page (staff must confirm; the business approves every answer). action add (question + answer, optional topic, published defaults to false = draft unless staff asked to publish), edit (faq_id + any of question/answer/topic), publish, unpublish, or delete (red card). Get ids from list_faq. Never invent dosing guidance: only use dosing wording the staff gave you.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: str("What to do", { enum: ["add", "edit", "publish", "unpublish", "delete"] }),
+          faq_id: str("For edit/publish/unpublish/delete: the id from list_faq"),
+          question: str("The question"),
+          answer: str("The answer (plain text; blank line = new paragraph, \"- \" = bullet)"),
+          topic: str("Topic that groups it on the page, e.g. Ordering, Products, Pickup"),
+          published: { type: "boolean", description: "For add: true only if staff asked to publish it now" },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
       name: "propose_stock_count",
       description: "Prepare setting a product's stock count (Products → Stock counts), e.g. when new stock arrives. Staff must confirm. One card per product. count = how many are on the shelf now (0 or more).",
       parameters: {
@@ -617,12 +648,13 @@ const DEFS: ToolDef[] = [
     function: {
       name: "prepare_campaign_draft",
       description:
-        "Newsletter draft opened in the campaign composer (never sends): for the whole mailing list, all members, all non-members, or a customer GROUP via segment (e.g. lapsed_members, subscribers_never_ordered, top_customers, bought_product) — the server works out who's in the group. Never for one person, an order or a payment reminder — use propose_order_message or propose_member_message for those.",
+        "Newsletter draft opened in the campaign composer (never sends): for the whole mailing list, all members, all non-members, or a customer GROUP via segment (e.g. lapsed_members, subscribers_never_ordered, top_customers, bought_product) — the server works out who's in the group. To use a template, call list_templates and pass its id as template_id. Never for one person, an order or a payment reminder — use propose_order_message or propose_member_message for those.",
       parameters: {
         type: "object",
         properties: {
-          subject: str("Email subject line"),
-          body: str("Email body in the composer's plain-text format"),
+          template_id: str("Optional: template id or exact name from list_templates. Loads its subject, body and matching look; subject, body and theme override those"),
+          subject: str("Email subject line (optional with template_id)"),
+          body: str("Email body in the composer's plain-text format (optional with template_id)"),
           audience: str("Who it's for (ignored when segment is given). subscribers = the mailing list (the default); all = subscribers + every member", { enum: ["subscribers", "all", "members", "nonmembers"] }),
           segment: str(`Optional customer group: ${SEGMENT_KEYS.join(" | ")}`),
           segment_days: { type: "number", description: "Group window in days (e.g. 60 for lapsed_members)" },
@@ -630,9 +662,9 @@ const DEFS: ToolDef[] = [
           segment_product: str("For bought_product: product id or name"),
           use_photo: { type: "boolean", description: `true to put the photo the staff sent in this chat into the email. Put ${PHOTO_SLOT} on its own line in body where it should go (otherwise it goes at the top)` },
           photo_alt: str("With use_photo: a short description of the photo (for people who can't see images)"),
-          theme: str(`Optional look (seasonal banner, colours, dividers): auto (default: picked from the words, then the season) | none (plain) | ${THEME_KEYS.join(" | ")}`),
+          theme: str(`Optional look (seasonal banner, colours, dividers): auto (default, or the template's category) | none (plain) | ${THEME_KEYS.join(" | ")}`),
         },
-        required: ["subject", "body", "audience"],
+        required: ["audience"],
       },
     },
   },
@@ -1283,6 +1315,56 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       });
       return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
     }
+    case "list_faq": {
+      const items = await getFaq();
+      return { count: items.length, published: items.filter((f) => f.published).length, items: items.map((f) => ({ id: f.id, question: f.question, answer: f.answer.slice(0, 1500), topic: f.category || "General", published: f.published })) };
+    }
+    case "propose_faq": {
+      const action = String(args.action);
+      const items = await getFaq();
+      const hit = items.find((f) => f.id === s(args.faq_id, 80));
+      if (action !== "add" && !hit) return { error: "No FAQ entry with that id. Use list_faq." };
+      if (action === "add") {
+        const question = s(args.question, 300), answer = s(args.answer, 6000);
+        if (!question || !answer) return { error: "Need the question and its answer." };
+        const published = args.published === true;
+        ctx.actions.push({
+          id: newId(),
+          kind: "faq_add",
+          title: `Add to the FAQ${published ? "" : " (as a draft)"}: ${question}`,
+          lines: [s(args.topic, 60) ? `Topic: ${s(args.topic, 60)}` : "Topic: General", published ? "Goes on /faq and the Concierge uses it once confirmed." : "Saved as a draft: publish it in Settings → FAQ page when it's approved."],
+          preview: answer.slice(0, 1200),
+          confirmLabel: published ? "Add and publish" : "Save draft",
+          request: { method: "POST", url: "/api/admin/faq", body: { question, answer, category: s(args.topic, 60), published } },
+          refresh: ["faq" as const],
+        });
+        return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+      }
+      const f = hit!;
+      if (action === "edit") {
+        const body: Record<string, unknown> = { id: f.id };
+        const lines: string[] = [];
+        const has = (a: Record<string, unknown>, k: string) => a[k] !== undefined && a[k] !== null;
+        if (has(args, "question") && s(args.question, 300) && s(args.question, 300) !== f.question) { body.question = s(args.question, 300); lines.push(`Question: ${f.question} → ${body.question}`); }
+        if (has(args, "answer") && s(args.answer, 6000) && s(args.answer, 6000) !== f.answer) { body.answer = s(args.answer, 6000); lines.push("New answer (below)"); }
+        if (has(args, "topic") && s(args.topic, 60) !== f.category) { body.category = s(args.topic, 60); lines.push(`Topic: ${f.category || "General"} → ${s(args.topic, 60) || "General"}`); }
+        if (!lines.length) return { note: "Nothing would change." };
+        if (f.published) lines.push("It's published: the page and the Concierge change once confirmed.");
+        ctx.actions.push({ id: newId(), kind: "faq_edit", title: `Edit FAQ: ${f.question}`, lines, preview: typeof body.answer === "string" ? body.answer.slice(0, 1200) : undefined, confirmLabel: "Save changes", request: { method: "PUT", url: "/api/admin/faq", body }, refresh: ["faq" as const] });
+        return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+      }
+      if (action === "publish" || action === "unpublish") {
+        const on = action === "publish";
+        if (f.published === on) return { note: `It's already ${on ? "published" : "a draft"}.` };
+        ctx.actions.push({ id: newId(), kind: "faq_publish", title: `${on ? "Publish" : "Unpublish"} FAQ: ${f.question}`, lines: [on ? "Shows on /faq and the Concierge starts using it." : "Comes off /faq and the Concierge stops using it (kept as a draft)."], confirmLabel: on ? "Publish" : "Unpublish", request: { method: "PUT", url: "/api/admin/faq", body: { id: f.id, published: on } }, refresh: ["faq" as const] });
+        return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+      }
+      if (action === "delete") {
+        ctx.actions.push({ id: newId(), kind: "faq_delete", title: `Delete FAQ: ${f.question}`, lines: ["Removed from /faq and the Concierge. This can't be undone (unpublish keeps it instead)."], confirmLabel: "Delete", danger: true, request: { method: "DELETE", url: `/api/admin/faq?id=${encodeURIComponent(f.id)}`, body: undefined }, refresh: ["faq" as const] });
+        return { proposed: true, say: "Ready to confirm. Nothing has changed yet." };
+      }
+      return { error: "action must be add, edit, publish, unpublish or delete." };
+    }
     case "propose_stock_count": {
       const id = s(args.product_id, 80);
       const n = Number(args.count);
@@ -1928,8 +2010,11 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       return { proposed: true, say: "Ready to confirm." };
     }
     case "prepare_campaign_draft": {
-      const subject = s(args.subject, 150);
-      let body = s(args.body, 8000);
+      const templateRef = s(args.template_id, 120).toLowerCase();
+      const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
+      if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
+      const subject = s(args.subject, 150) || template?.subject || "";
+      let body = s(args.body, 8000) || template?.body || "";
       // The photo staff sent in this chat (the widget still has it and uploads it when the draft opens).
       let photo: CampaignDraft["photo"];
       if (args.use_photo === true) {
@@ -1942,8 +2027,8 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         body = body.split(PHOTO_SLOT).join("");
       }
       const audience = args.audience === "members" || args.audience === "nonmembers" || args.audience === "all" ? args.audience : "subscribers";
-      const theme = cleanThemeChoice(args.theme);
-      if (!subject || !body) return { error: "Need a subject and a body." };
+      const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
+      if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
       if (s(args.segment, 40)) {
         const g = await resolveSegment(s(args.segment, 40), { days: Number(args.segment_days), limit: Number(args.segment_limit), product: s(args.segment_product, 120) });
         if ("error" in g) return g;
@@ -1959,7 +2044,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         };
       }
       ctx.draft = { subject, body, audience, theme, ...(photo ? { photo } : {}) };
-      return { ok: true, say: `The draft is shown with a button to open it in the campaign composer${photo ? ", which adds their photo" : ""}. It has NOT been sent.` };
+      return { ok: true, template: template?.name, say: `${template ? `Using the “${template.name}” template, the` : "The"} draft is shown with a button to open it in the campaign composer${photo ? ", which adds their photo" : ""}. It has NOT been sent.` };
     }
   }
   return { error: `Unknown tool ${name}` };

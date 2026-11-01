@@ -4,7 +4,7 @@ import { useState } from "react";
 
 /**
  * "Preview email" for staff: shows the real email HTML (house header, body,
- * footer, sample name "Alex") in a sandboxed frame — no scripts, can't touch
+ * footer, sample name "Boss") in a sandboxed frame — no scripts, can't touch
  * the page. Used in Marketing → Templates and on the Concierge's template and
  * campaign-draft cards.
  */

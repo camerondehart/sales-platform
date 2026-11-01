@@ -20,7 +20,7 @@ export async function renderCampaign(input: {
   when?: number;
 }): Promise<string> {
   const theme = resolveTheme(input.theme ?? "none", input.subject, input.body, input.when);
-  if (!theme) return wrapCampaign(input.body, input.unsubUrl, input.name);
+  if (!theme) return wrapCampaign(input.body, input.unsubUrl, input.name, { siteUrl: input.siteUrl });
   const art = await themeArt(theme.key, input.siteUrl);
-  return wrapCampaign(input.body, input.unsubUrl, input.name, { theme, art });
+  return wrapCampaign(input.body, input.unsubUrl, input.name, { theme, art, siteUrl: input.siteUrl });
 }

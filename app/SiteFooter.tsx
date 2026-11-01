@@ -1,9 +1,11 @@
 import { brand } from "@/lib/brand";
 import { isEnabled } from "@/lib/flags";
+import { faqHasAnswers } from "@/lib/faq";
 
 // A tiny footer on every page: the usual links, the Terms, and a quiet sign-off.
 export default async function SiteFooter() {
   const stores = await isEnabled("store_locator").catch(() => false);
+  const faq = (await isEnabled("faq_page").catch(() => false)) && (await faqHasAnswers());
   const year = new Intl.DateTimeFormat("en-US", { timeZone: brand.timezone, year: "numeric" }).format(new Date());
   return (
     <footer className="site-foot">
@@ -13,6 +15,7 @@ export default async function SiteFooter() {
         <a href="/events">Events</a>
         {stores && <a href="/stores">Find us in stores</a>}
         <a href="/about">About</a>
+        {faq && <a href="/faq">FAQ</a>}
         <a href="/terms">Terms</a>
         <a href={`mailto:${brand.supportEmail}`}>Contact</a>
       </nav>

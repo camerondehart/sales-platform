@@ -424,8 +424,8 @@ function SignUpForm() {
   const [message, setMessage] = useState("");
   const [ageVerified, setAgeVerified] = useState<boolean | null>(null);
   const [priorCustomer, setPriorCustomer] = useState<boolean | null>(null);
-  // Opted in by default; they can untick it here or unsubscribe from any email.
-  const [subscribe, setSubscribe] = useState(true);
+  // Every new member joins the mailing list; they can unsubscribe from any email.
+  const subscribe = true;
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -594,20 +594,9 @@ function SignUpForm() {
         </div>
       </div>
 
-      <label className="gate-optin">
-        <input
-          type="checkbox"
-          checked={subscribe}
-          onChange={(e) => setSubscribe(e.target.checked)}
-        />
-        <span>
-          <strong>Keep me posted</strong>
-          <small>
-            New arrivals, sales, and upcoming classes — members get these unless you untick
-            this. You can unsubscribe from any email.
-          </small>
-        </span>
-      </label>
+      <p className="auth-hint auth-optin-note">
+        Members get our emails about new arrivals, sales and classes. You can unsubscribe from any email.
+      </p>
 
       {brand.consultationFormUrl && (
         <div className="gate-consultation">

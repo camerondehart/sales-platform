@@ -27,6 +27,10 @@ export type ActionProposal = {
     | "venmo_payment"
     | "stock_count"
     | "store_create"
+    | "faq_add"
+    | "faq_edit"
+    | "faq_publish"
+    | "faq_delete"
     | "ambassador"
     | "ambassador_payout"
     | "ambassador_report"
@@ -90,7 +94,7 @@ export type ActionProposal = {
 export type AdminRefreshKey =
   | "users" | "orders" | "products" | "discounts" | "settings" | "banner"
   | "events" | "subscribers" | "bundles" | "campaigns" | "templates" | "flags"
-  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors";
+  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq";
 
 export type CampaignDraft = {
   subject: string;

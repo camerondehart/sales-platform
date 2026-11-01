@@ -103,9 +103,8 @@ export default async function TermsPage() {
           <h3>9. Emails</h3>
           <p>
             If you join our mailing list we&rsquo;ll send occasional news and offers. Membership in {brand.members} includes
-            these emails too: as a member you&rsquo;re eligible to receive them unless you choose not to &mdash; untick
-            &ldquo;Keep me posted&rdquo; when you join, or use the unsubscribe link in any marketing email, and we&rsquo;ll stop.
-            We&rsquo;ll still send emails about your orders and account.
+            these emails too: when you join, you&rsquo;re added to our mailing list. Use the unsubscribe link in any
+            marketing email and we&rsquo;ll stop. We&rsquo;ll still send emails about your orders and account.
           </p>
 
           <h3>10. Liability</h3>

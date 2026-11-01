@@ -41,7 +41,7 @@ type Kind = "image" | "button" | "heading" | "divider" | "list" | "photo-slot" |
 type Block = { id: number; text: string };
 
 const IMG_RE = /^!\[([^\]]*)\]\((https:\/\/[^\s)]+)\)$/;
-const BTN_RE = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/;
+const BTN_RE = /^\[([^\]]+)\]\(((?:https?:\/\/|\/(?!\/))[^\s)]+)\)$/;
 
 function kindOf(text: string): Kind {
   const t = text.trim();

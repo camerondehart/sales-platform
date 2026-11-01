@@ -39,6 +39,7 @@ export const FLAG_KEYS = [
   "rotating_staff_password",
   "cash_pickup",
   "member_passkeys",
+  "faq_page",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -170,7 +171,13 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   },
   rotating_staff_password: {
     label: "Daily staff password",
-    description: "The staff password becomes a new two-word phrase each day (e.g. maple-otter-42), changing at midnight Pacific. It's in the nightly report email and always shown in Settings → Steward password. Yesterday's still works until noon. The old fixed password keeps working for 7 days after this first runs, then stops. Face ID and the emailed link keep working. Off = back to the fixed password.",
+    description: "The staff password becomes a new two-word phrase each day (e.g. maple-otter-42), changing at midnight local time. It's in the nightly report email and always shown in Settings → Steward password. Yesterday's still works until noon. The old fixed password keeps working for 7 days after this first runs, then stops. Face ID and the emailed link keep working. Off = back to the fixed password.",
+    defaults: on,
+    built: true,
+  },
+  faq_page: {
+    label: "FAQ page",
+    description: "The Smart FAQ page at /faq: questions and answers you write and publish in Settings → FAQ page. The Concierge answers from the published ones (it may repeat dosing guidance from them word-for-word, never beyond it). The page stays hidden until at least one answer is published. Off = /faq is hidden and the Concierge stops using it (answers stay saved).",
     defaults: on,
     built: true,
   },
