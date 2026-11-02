@@ -141,6 +141,7 @@ export default function GalleryClient({
   actingAs,
   stores = false,
   faceId = false,
+  consult = false,
 }: {
   products: Product[];
   userName: string;
@@ -152,6 +153,8 @@ export default function GalleryClient({
   stores?: boolean;
   /** member_passkeys switch: Face ID popup after sign-in + Account → Face ID. */
   faceId?: boolean;
+  /** consultation_form switch: the Phone Consultation footnote links to /consultation. */
+  consult?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -740,19 +743,29 @@ export default function GalleryClient({
                 <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.
               </p>
             </div>
-            {brand.consultationFormUrl && (
-            <div className="footnote">
-              <div className="footnote-icon" aria-hidden="true">🌿</div>
-              <div className="footnote-title">Consultation</div>
-              <p>
-                Want personalized guidance?{" "}
-                <a href={brand.consultationFormUrl} target="_blank" rel="noopener noreferrer">
-                  Fill out our consultation form
-                </a>{" "}
-                and we'll be in touch.
-              </p>
-            </div>
-            )}
+            {consult ? (
+              <div className="footnote">
+                <div className="footnote-icon" aria-hidden="true">🌿</div>
+                <div className="footnote-title">Phone Consultation</div>
+                <p>
+                  Want personalized guidance?{" "}
+                  <a href="/consultation">Book a free phone consultation</a>{" "}
+                  and we'll be in touch.
+                </p>
+              </div>
+            ) : brand.consultationFormUrl ? (
+              <div className="footnote">
+                <div className="footnote-icon" aria-hidden="true">🌿</div>
+                <div className="footnote-title">Consultation</div>
+                <p>
+                  Want personalized guidance?{" "}
+                  <a href={brand.consultationFormUrl} target="_blank" rel="noopener noreferrer">
+                    Fill out our consultation form
+                  </a>{" "}
+                  and we'll be in touch.
+                </p>
+              </div>
+            ) : null}
           </div>
         </footer>
       </div>

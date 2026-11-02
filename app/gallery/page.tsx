@@ -34,7 +34,7 @@ export default async function GalleryPage() {
   return (
     <>
       <Scene variant="soft" />
-      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={(await getVisitor())?.as} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} />
+      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={(await getVisitor())?.as} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} consult={await isEnabled("consultation_form").catch(() => false)} />
     </>
   );
 }

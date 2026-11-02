@@ -40,6 +40,7 @@ export const FLAG_KEYS = [
   "cash_pickup",
   "member_passkeys",
   "faq_page",
+  "consultation_form",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -178,6 +179,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   faq_page: {
     label: "FAQ page",
     description: "The Smart FAQ page at /faq: questions and answers you write and publish in Settings → FAQ page. The Concierge answers from the published ones (it may repeat dosing guidance from them word-for-word, never beyond it). The page stays hidden until at least one answer is published. Off = /faq is hidden and the Concierge stops using it (answers stay saved).",
+    defaults: on,
+    built: true,
+  },
+  consultation_form: {
+    label: "Phone consultation requests",
+    description: "Our own free phone consultation request form at /consultation , linked on the sign-up form and in the members' area, and the Concierge can take the same request in chat. Requests land in Assistant → Handed to the team (topic \"consultation\") and the team inbox; the customer gets a confirmation. Off = the page, links and Concierge option are hidden.",
     defaults: on,
     built: true,
   },

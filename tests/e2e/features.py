@@ -217,11 +217,24 @@ check("campaign look: template previews without a look stay plain", s==200 and "
 s,r=req("/api/admin/templates/preview", {"subject":"T","body":"![Shelf|small](https://example.com/a.jpg)\n\n![Jar|medium](https://example.com/b.jpg)","theme":"fall"})
 check("campaign look: photo sizes (small / medium)", s==200 and 'width="200"' in r["html"] and 'width="340"' in r["html"], r.get("html","")[:300])
 
+# Inbox preview line: hidden at the top of the email, custom or the first sentence.
+n=len(mail())
+s,r=req("/api/admin/campaigns", {"subject":"Preview","body":"# Big news\n\nOur fall batch just landed & it is lovely.\n\n[Shop](https://www.example.com/retail)","testOnly":True,"theme":"fall"})
+_h=(mail()[n:] or [{}])[-1].get("html","")
+_b=_h.split("<body",1)[-1]
+check("preview line: automatic = the first sentence, hidden before everything else", s==200 and "display:none" in _b[:400] and "Our fall batch just landed &amp; it is lovely." in _b[:600] and "Big news" not in _b[:600], _b[:600])
+n=len(mail())
+s,r=req("/api/admin/campaigns", {"subject":"Preview","body":"Hi there","testOnly":True,"theme":"none","preheader":"Members save 20% this weekend"})
+_h=(mail()[n:] or [{}])[-1].get("html","")
+check("preview line: staff's own line is used (plain look too)", s==200 and "Members save 20% this weekend" in _h.split("<body",1)[-1][:500], _h[:500])
+s,r=req("/api/admin/templates/preview", {"subject":"x","body":"# Heading only\n\nFirst real sentence here.","theme":"auto"})
+check("preview line: the composer preview reports it", s==200 and r.get("preheader")=="First real sentence here.", r.get("preheader"))
+
 # Editing a scheduled campaign
 s,r=req("/api/admin/campaigns", {"subject":"Edit me","body":"Hi","audience":"all","scheduledFor":now+8*H,"theme":"fall"})
 eid=r.get("id")
-s,r=req("/api/admin/campaigns", {"action":"update","id":eid,"subject":"Edited subject","body":"New body","theme":"winter","audience":"custom","customList":"sub1@example.com, sub2@example.com","scheduledFor":now+9*H}, method="PATCH")
-check("campaign edit: a scheduled campaign can be changed", s==200 and r["campaign"]["subject"]=="Edited subject" and r["campaign"]["theme"]=="winter" and r["recipients"]==2, (s,r))
+s,r=req("/api/admin/campaigns", {"action":"update","id":eid,"subject":"Edited subject","body":"New body","theme":"winter","preheader":"A snowy surprise inside","audience":"custom","customList":"sub1@example.com, sub2@example.com","scheduledFor":now+9*H}, method="PATCH")
+check("campaign edit: a scheduled campaign can be changed", s==200 and r["campaign"]["subject"]=="Edited subject" and r["campaign"]["theme"]=="winter" and r["campaign"].get("preheader")=="A snowy surprise inside" and r["recipients"]==2, (s,r))
 s,r=req("/api/admin/campaigns", method="GET")
 row=[c for c in r["campaigns"] if c["id"]==eid][0]
 check("campaign edit: history has the new version (and its pasted list, for editing)", row["body"]=="New body" and row["status"]=="scheduled" and abs(row["scheduledFor"]-(now+9*H))<60000 and sorted(row.get("customEmails",[]))==["sub1@example.com","sub2@example.com"], row)
@@ -1082,5 +1095,55 @@ check("faq: reorder and list", _s==200 and [i["id"] for i in _x["items"]][:2]==[
 for _id in (_fid,_fid2): req("/api/admin/faq?id="+_id, method="DELETE")
 _s,_h=page("/faq")
 check("faq: delete removes them (page hides again)", _s==404, _s)
+
+# =============== Phone consultation requests (replaced the JotForm) + Terms / Privacy
+def _slot(days_ahead, hhmm):
+    d=datetime.datetime.now(ZoneInfo("America/Los_Angeles")).date()+datetime.timedelta(days=days_ahead)
+    while d.weekday()>=5: d+=datetime.timedelta(days=1)
+    h,m=map(int,hhmm.split(":"))
+    return int(datetime.datetime(d.year,d.month,d.day,h,m,tzinfo=ZoneInfo("America/Los_Angeles")).timestamp()*1000), d.isoformat()
+_s,_h=page("/consultation")
+check("consultation: our own form page (no JotForm anywhere)", _s==200 and "Free phone consultation" in _h and "jotform" not in _h.lower() and "jotform" not in page("/")[1].lower(), _s)
+_s,_h=page("/consultation", MEMBER)
+check("consultation: signed-in members' details are filled in", _s==200 and "mem@example.com" in _h and "Mia" in _h, _s)
+_at,_day=_slot(3,"10:30")
+_ok={"firstName":"Casey","lastName":"Rivers","phone":"(530) 555-0142","email":"casey@example.com","interest":"How to use a product I have","at":_at,"comments":"Curious about dosing times","acknowledged":True,"signature":"Casey Rivers"}
+_s,_r=req("/api/consultation", {**_ok,"acknowledged":False,"email":"v1@example.com"}, cookie=None, headers={"x-forwarded-for":"10.91.0.1"})
+check("consultation: the acknowledgement must be agreed", _s==400 and "agree" in _r.get("error",""), (_s,_r))
+_sat=_at
+while datetime.datetime.fromtimestamp(_sat/1000, ZoneInfo("America/Los_Angeles")).weekday()!=5: _sat+=86400000
+_s,_r=req("/api/consultation", {**_ok,"at":_sat,"email":"v2@example.com"}, cookie=None, headers={"x-forwarded-for":"10.91.0.2"})
+check("consultation: weekends refused", _s==400 and "weekday" in _r.get("error",""), (_s,_r))
+_s,_r=req("/api/consultation", {**_ok,"at":_at+15*60000,"email":"v3@example.com"}, cookie=None, headers={"x-forwarded-for":"10.91.0.3"})
+check("consultation: only the half-hour slots", _s==400, (_s,_r))
+n=len(mail())
+_s,_r=req("/api/consultation", _ok, cookie=None, headers={"x-forwarded-for":"10.91.0.4"})
+_new=mail()[n:]
+_staff=[m for m in _new if "Consultation request" in m.get("subject","")]
+_cust=[m for m in _new if m.get("to") in ("casey@example.com",["casey@example.com"])]
+check("consultation: request goes to the team (reply-to the customer) and confirms to them", _s==200 and _staff and "(530) 555-0142" in _staff[0]["html"] and "Casey Rivers" in _staff[0]["html"] and _cust and "We got your consultation request" in _cust[0].get("subject",""), (_s,_r,[m.get("subject") for m in _new]))
+_esc=[e for e in jl("assistant-escalations.json",[]) if e.get("topic")=="consultation" and e.get("email")=="casey@example.com"]
+check("consultation: lands in Handed to the team with the time, phone and signature", _esc and _esc[0]["consultation"]["at"]==_at and _esc[0]["consultation"]["signature"]=="Casey Rivers" and _esc[0].get("status","open")=="open", _esc[:1])
+_s,_r=req("/api/consultation", cookie=None)
+check("consultation: requested times show as taken (times only, nothing personal)", _s==200 and _at in _r.get("taken",[]) and "casey" not in json.dumps(_r), _r)
+_s,_r=req("/api/consultation", {**_ok,"email":"other@example.com","signature":"Other Person"}, cookie=None, headers={"x-forwarded-for":"10.91.0.5"})
+check("consultation: the same time can't be requested twice", _s==409, (_s,_r))
+_r=_pubtool("consultation_times",{"date":_day},"10.91.0.6")
+check("concierge consultations: lists open times (not the taken one) and the acknowledgement", "10:00" in _r and '"16:30"' in _r and "not doctors or healthcare professionals" in _r and ('"10:30"' not in _r), _r[:400])
+_at2,_day2=_slot(4,"14:00")
+n=len(mail())
+_r=_pubtool("request_consultation",{"name":"Dee Lane","email":"dee@example.com","phone":"530-555-0199","interest":"Finding the right product for me","date":_day2,"time":"14:00"},"10.91.0.7")
+check("concierge consultations: needs their typed signature first", "sign" in _r.lower() and not [m for m in mail()[n:] if "Consultation request" in m.get("subject","")], _r[:300])
+_r=_pubtool("request_consultation",{"name":"Dee Lane","email":"dee@example.com","phone":"530-555-0199","interest":"Finding the right product for me","date":_day2,"time":"14:00","signature":"Dee Lane"},"10.91.0.8")
+check("concierge consultations: sends the request once signed", "Requested for" in _r and [m for m in mail()[n:] if "Consultation request: Dee Lane" in m.get("subject","")], _r[:300])
+req("/api/admin/flags", {"key":"consultation_form","on":False})
+_s,_=page("/consultation"); _s2,_=req("/api/consultation", _ok, cookie=None, headers={"x-forwarded-for":"10.91.0.9"})
+check("consultation: switch off hides the page and form", _s==404 and _s2==404, (_s,_s2))
+req("/api/admin/flags", {"key":"consultation_form","on":True})
+_s,_h=page("/privacy")
+check("privacy: policy page is live and matches the site", _s==200 and "Privacy Policy" in _h and "Northwind Goods" in _h and "Four Peaks" not in _h and "fourpeaks" not in _h and "hashed" in _h and "Do Not Track" in _h and "30 days, then deleted automatically" in _h and "AI" not in _h.split("<article",1)[-1].split("</article>")[0], _s)
+_s,_h=page("/terms")
+check("terms: updated terms (Concierge, consultations, brand state law, links to Privacy)", _s==200 and "Our Concierge" in _h and "/consultation" in _h and "Northwind Goods" in _h and "California" in _h and "laws of the State of" in _h and "Butte" not in _h and "Four Peaks" not in _h and 'href="/privacy"' in _h and "November 1, 2026" in _h, _s)
+check("footer: Privacy linked on every page", 'href="/privacy"' in page("/")[1] and 'href="/privacy"' in page("/retail")[1])
 
 print(f"\n{sum(res)}/{len(res)} passed")

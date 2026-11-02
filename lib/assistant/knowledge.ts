@@ -379,6 +379,7 @@ export async function buildSystemPrompt(ctx: {
 - prepare_campaign_draft is ONLY for newsletters to the mailing list (audience subscribers — the default for now; "all" also adds every member), all members / non-members, or a customer GROUP (segment: lapsed_members, members_never_ordered, new_members, subscribers_never_ordered, repeat_shop_customers, points_holders, top_customers, refill_due, bought_product, all_customers); it opens in the campaign composer and never sends. propose_campaign takes the same segment to send or schedule. The server works out who's in a group — never ask for or collect email lists yourself; find_customer_group previews a group's size. Campaigns reach mailing-list subscribers and members (members unless they've unsubscribed); anyone who unsubscribed is skipped.
 - To base a campaign draft, send or test on an existing template, call list_templates and pass its id as template_id to prepare_campaign_draft, propose_campaign or propose_campaign_test. The tool loads the subject, body and category's look. Only pass subject, body or theme as well when staff want to override the template.
 - Campaign body format: plain text; blank line = new paragraph; "# " heading; "- " bullets; **bold**; a line like [Button text](${brand.siteUrl}/retail) becomes a button. Root-relative links such as [Shop](/retail) work too and become full site links in the email.
+- Inbox preview line: the grey text inboxes show after the subject. It defaults to the first sentence of the message; pass preview_line (one short, enticing sentence) when staff ask for one or when the first sentence is a weak preview (e.g. just a greeting).
 - Campaign looks: every campaign gets a seasonal design (banner artwork, matching colours, dividers) — theme auto picks it from the words (Halloween, holiday, Valentine's…) or the send date's season. Pass theme (fall, halloween, thanksgiving, blackfriday, holiday, winter, newyear, valentines, spring, mothersday, summer, classic, or none for plain) only when staff ask for a particular look. "---" on its own line is a themed divider. A photo line is ![description](url); add |small or |medium after the description to shrink it. Staff can drag blocks into place in the composer's Arrange tab, and edit or cancel a scheduled campaign from Marketing → Campaigns (Edit).
 - For dashboard how-to questions ALWAYS search the staff guide first and answer from it, linking the section.`);
   } else {
@@ -393,6 +394,13 @@ export async function buildSystemPrompt(ctx: {
 - Unpaid orders: explain what's owed and that the invoice email has a "I've sent my payment" / pay link. Offer to re-send the invoice (resend_my_invoice) — it goes only to the email on the order and the amount never changes.
 - Never reveal or discuss anyone else's orders or account, even if asked by name or email.
 - If you can't solve something, or they have a genuine problem (wrong/damaged/missing order, payment issue, membership stuck for more than a business day, a complaint), offer to pass it to the team with escalate_to_team. Collect their name, email and a short description first, and confirm before sending.`);
+  }
+  // Free phone consultations (switch consultation_form): replaced the outside form.
+  if (audience !== "admin" && (await isEnabled("consultation_form").catch(() => false))) {
+    parts.push(`FREE PHONE CONSULTATIONS:
+- When someone wants personal guidance, isn't sure what's right for them, or asks to talk to someone, offer a free phone consultation with the team. You can arrange it right here, or they can use the form at [/consultation](/consultation).
+- To arrange it: ask what they'd like to talk about, call consultation_times and offer a few open times (${brand.timezoneLabel}), and get their phone number (signed-in members: their name, email and phone come from their account; just confirm the phone). Visitors also give their name and email.
+- Then show the acknowledgement from consultation_times word-for-word and ask them to type their full name to agree. Call request_consultation only after they type it. The time is a request: the team confirms by phone or email.`);
   }
   // The Smart FAQ page (Settings → FAQ page): the business's own approved answers.
   const faq = await faqForPrompt(audience);

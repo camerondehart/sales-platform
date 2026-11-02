@@ -10,6 +10,7 @@ import { listBundles } from "../bundleStore";
 import { bundleOfferLabel, setSavings } from "../bundles";
 import { listCampaigns, recipientsFor, inWindow } from "../campaignSchedule";
 import { THEME_KEYS, cleanThemeChoice, resolveTheme, themeForCategory } from "../campaignThemes";
+import { previewLine } from "../campaignPreview";
 import { resolveSegment, SEGMENTS, SEGMENT_KEYS } from "../segments";
 import { FLAGS, FLAG_KEYS, getFlags, type FlagKey } from "../flags";
 import { getAdmins } from "../admins";
@@ -139,12 +140,13 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
     subject: str("Subject (optional with template_id)"), body: str("Body (plain text; # heading, - bullets, **bold**, [Button](url); optional with template_id)"), audience: str("subscribers (the mailing list — default) | all (subscribers + every member) | members | nonmembers | custom"),
     custom_list: str("For custom: emails separated by commas (only subscribed people get it)"), send_at: str("Optional YYYY-MM-DD HH:MM local; blank = now"),
     theme: str(`Optional look: auto (default, or the template's category) | none (plain) | ${THEME_KEYS.join(" | ")}`),
+    preview_line: str("Optional inbox preview line (grey text after the subject); blank = the first sentence of the message"),
     ...SEGMENT_PARAMS,
   })),
   admin("product_links", "Shareable links and QR codes for products: the permanent product link (works for printed codes forever, opens the right shop) and a PNG QR image URL. Use when writing social posts, emails, flyers or campaign drafts that mention products, or when staff ask for a link/QR.", obj({ products: { type: "array", items: { type: "string" }, description: "Product ids or names (up to 12)" } }, ["products"])),
   admin("today_item", "Read one item from the staff's Today list on the Overview (their message starts \"Today item <key>:\"). Returns the exact people, orders or products with ids, and which cards to prepare. Call this FIRST for those messages, then prepare every card in the same reply. Never ask the staff for names, emails or ids for these.", obj({ key: str("The item key after \"Today item\", e.g. first-order, lapsed, refill") }, ["key"])),
   admin("find_customer_group", `Preview a customer group for a campaign: who's in it and how many a campaign would reach. Groups: ${SEGMENT_KEYS.map((k) => `${k} (${SEGMENTS[k]})`).join("; ")}.`, obj({ ...SEGMENT_PARAMS }, ["segment"])),
-  admin("propose_campaign_test", "Prepare a TEST send of a campaign to the team inbox only. Accepts template_id like propose_campaign.", obj({ template_id: str("Optional: template id or exact name from list_templates"), subject: str("Subject (optional with template_id)"), body: str("Body (optional with template_id)"), theme: str("Optional look, as propose_campaign (template category or auto by default)") })),
+  admin("propose_campaign_test", "Prepare a TEST send of a campaign to the team inbox only. Accepts template_id like propose_campaign.", obj({ template_id: str("Optional: template id or exact name from list_templates"), subject: str("Subject (optional with template_id)"), body: str("Body (optional with template_id)"), theme: str("Optional look, as propose_campaign (template category or auto by default)"), preview_line: str("Optional inbox preview line, as propose_campaign") })),
   admin("propose_cancel_campaign", "Prepare cancelling a scheduled campaign before it sends.", obj({ campaign_id: str("Campaign id from list_campaigns") }, ["campaign_id"])),
   admin("propose_template", "Prepare saving an email template (new, or update one by id — built-in starter_ templates too, e.g. when staff press \"Redo with AI\" on a template card).", obj({ name: str("Template name"), subject: str("Subject"), body: str("Body"), category: str(`One of ${TEMPLATE_CATEGORIES.join(", ")}`), template_id: str("Optional: id to update") }, ["name", "subject", "body"])),
   admin("propose_template_archive", "Prepare archiving or restoring a template.", obj({ template_id: str("Template id"), archived: bool("true = archive, false = restore") }, ["template_id", "archived"])),
@@ -976,6 +978,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
           template ? `Template: ${template.name}` : "",
           when ? `Sends ${fmt(when)} (local)${inWindow(when) ? "" : " — outside 9am–6pm, so it waits for 9am"}` : inWindow() ? "Starts sending right away" : "Outside 9am–6pm local — it waits until 9am",
           look ? `Look: ${look.emoji} ${look.label}${theme === "auto" ? " (picked automatically)" : ""}` : "Look: plain",
+          `Inbox preview: ${previewLine(body, s(args.preview_line, 150))}`,
           "Unsubscribe link and your footer are added automatically",
           when ? "You can edit or cancel it from Marketing → Campaigns before it sends" : "",
         ].filter(Boolean),
@@ -983,7 +986,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         confirmLabel: when ? "Schedule" : `Send to ${recipients.length}`,
         busyLabel: when ? "Scheduling…" : "Sending…",
         danger: true,
-        request: { method: "POST", url: "/api/admin/campaigns", body: { subject, body, theme, audience, customList: audience === "custom" ? customList : undefined, scheduledFor: when || undefined } },
+        request: { method: "POST", url: "/api/admin/campaigns", body: { subject, body, theme, preheader: s(args.preview_line, 150) || undefined, audience, customList: audience === "custom" ? customList : undefined, scheduledFor: when || undefined } },
         refresh: ["campaigns"],
       });
       return READY;
@@ -1008,7 +1011,7 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         preview: body.slice(0, 1500),
         confirmLabel: "Send test",
         busyLabel: "Sending…",
-        request: { method: "POST", url: "/api/admin/campaigns", body: { subject, body, theme, testOnly: true } },
+        request: { method: "POST", url: "/api/admin/campaigns", body: { subject, body, theme, preheader: s(args.preview_line, 150) || undefined, testOnly: true } },
         refresh: [],
       });
       return READY;

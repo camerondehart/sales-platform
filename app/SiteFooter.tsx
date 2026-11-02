@@ -17,6 +17,7 @@ export default async function SiteFooter() {
         <a href="/about">About</a>
         {faq && <a href="/faq">FAQ</a>}
         <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
         <a href={`mailto:${brand.supportEmail}`}>Contact</a>
       </nav>
       {brand.city && (

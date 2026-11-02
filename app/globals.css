@@ -7187,6 +7187,9 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
 .cc-preview-size button { font: inherit; font-size: 0.8rem; padding: 0.25rem 0.7rem; border: 0; background: #fff; color: var(--ink); cursor: pointer; }
 .cc-preview-size button.is-on { background: var(--ink); color: #fff; }
 .cc-preview-subject { padding: 0.5rem 0.8rem; font-size: 0.88rem; background: #fff; border-bottom: 1px solid var(--rule-soft); overflow-wrap: anywhere; }
+.cc-preview-subject .cc-preview-line { color: var(--ink-soft); font-weight: 400; }
+.cc-preview-subject strong { font-weight: 600; }
+.cc-optional { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--ink-faint); margin-left: 0.3rem; }
 .cc-preview-subject span { color: var(--ink-faint); margin-right: 0.35rem; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.08em; }
 .cc-preview-frame { padding: 0.8rem; }
 .cc-preview-frame iframe { display: block; width: 100%; height: 640px; border: 0; border-radius: 8px; background: #fff; margin: 0 auto; transition: width .2s; }
@@ -7909,7 +7912,7 @@ html[data-admin-theme="dark"] .cc-preview {
   color-scheme: dark; background: #15190f; color: #e4e8dc;
 }
 html[data-admin-theme="dark"] :is(.cc-preview-bar, .cc-preview-subject) { background: #1c2216; color: #e4e8dc; }
-html[data-admin-theme="dark"] :is(.cc-preview-empty, .cc-preview-subject span) { color: #a3ab9d; }
+html[data-admin-theme="dark"] :is(.cc-preview-empty, .cc-preview-subject span, .cc-preview-line) { color: #a3ab9d; }
 html[data-admin-theme="dark"] .cc-preview-size button { background: #242c1d; color: #e4e8dc; }
 html[data-admin-theme="dark"] .cc-preview-size button.is-on { background: #3b4535; color: #f9f9f8; }
 html[data-admin-theme="dark"] .cc-block :is(input, textarea) { background: #fff; color: var(--ink); }
@@ -8801,3 +8804,42 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .faq-admin-actions button { min-height: 0; padding: 0.35rem 0.65rem; border-radius: 8px; border: 1px solid var(--rule-soft); background: transparent; color: var(--ink-soft); font-size: 0.8rem; }
 .faq-admin-actions button:hover:not(:disabled) { color: var(--accent-strong); border-color: var(--green); }
 .faq-admin-actions button.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); }
+
+/* Free phone consultation request (/consultation) */
+.consult-form { display: grid; gap: 1.4rem; max-width: 640px; margin: 0 auto 3rem; }
+.consult-form fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 0.7rem; min-width: 0; }
+.consult-form legend { font-weight: 700; color: var(--ink); margin-bottom: 0.55rem; font-size: 1rem; }
+.consult-form label { display: grid; gap: 0.35rem; font-size: 0.88rem; color: var(--ink-soft); }
+.consult-form select.gate-input { appearance: auto; }
+.consult-form textarea.gate-input { resize: vertical; min-height: 6rem; font: inherit; }
+.consult-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.consult-tz { font-weight: 400; color: var(--ink-faint); font-size: 0.82rem; margin-left: 0.35rem; }
+.consult-hint { margin: 0; font-size: 0.85rem; color: var(--ink-soft); }
+.consult-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.consult-days { display: flex; gap: 0.45rem; overflow-x: auto; padding-bottom: 0.3rem; scrollbar-width: thin; }
+.consult-days button, .consult-times button { font: inherit; font-size: 0.88rem; padding: 0.5rem 0.8rem; border-radius: 10px; border: 1px solid var(--rule-soft); background: #fff; color: var(--ink); cursor: pointer; white-space: nowrap; }
+.consult-days button.is-on, .consult-times button.is-on { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; }
+.consult-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 0.45rem; }
+.consult-times button:disabled { opacity: 0.4; text-decoration: line-through; cursor: not-allowed; }
+.consult-ack { background: var(--surface-alt); border-radius: 12px; padding: 1rem !important; }
+.consult-check { grid-template-columns: auto 1fr !important; align-items: start; gap: 0.6rem !important; color: var(--ink) !important; font-size: 0.92rem !important; }
+.consult-check input { margin-top: 0.2rem; width: 1.1rem; height: 1.1rem; accent-color: var(--accent-strong); }
+.consult-sign { font-family: 'Libre Baskerville', Georgia, serif; font-style: italic; }
+.consult-done { max-width: 520px; margin: 0 auto 3rem; text-align: center; display: grid; gap: 0.8rem; justify-items: center; }
+@media (max-width: 560px) { .consult-row { grid-template-columns: 1fr; } }
+
+/* Terms + Privacy: lists and tables */
+.terms .about-block ul { margin: 0 0 1rem; padding-left: 1.2rem; color: var(--ink); line-height: 1.7; }
+.terms .about-block li { margin-bottom: 0.35rem; }
+.legal-table-wrap { overflow-x: auto; margin: 0 0 1.1rem; border: 1px solid var(--rule-soft); border-radius: 12px; }
+.legal-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; line-height: 1.55; }
+.legal-table th, .legal-table td { text-align: left; vertical-align: top; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--rule-soft); }
+.legal-table th { background: var(--surface-alt); font-weight: 700; color: var(--ink); }
+.legal-table tr:last-child td { border-bottom: 0; }
+.legal-table td:first-child { font-weight: 600; color: var(--ink); min-width: 9rem; }
+@media (max-width: 640px) {
+  .legal-table, .legal-table tbody, .legal-table tr, .legal-table td { display: block; width: 100%; }
+  .legal-table thead { display: none; }
+  .legal-table tr { border-bottom: 1px solid var(--rule-soft); padding: 0.5rem 0; }
+  .legal-table td { border: 0; padding: 0.2rem 0.8rem; }
+}

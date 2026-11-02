@@ -357,6 +357,13 @@ Every night the site emails a full summary with spreadsheet backups attached. If
 <h3>FAQ page</h3>
 <p><span class="where" style="display:inline">Settings → FAQ page</span> Write the questions customers ask most, with your answers. <kbd>+ Add a question</kbd>, give it a topic (Ordering, Products, Pickup…) so the page groups it, and tick <strong>Published</strong> when it's approved. Drafts stay hidden. Use ↑ ↓ to order them, <kbd>Unpublish</kbd> to take one down without losing it. Published answers appear at <strong>/faq</strong> (linked in the footer; the page stays hidden while nothing is published) and the Concierge answers from them. <strong>You write and approve every answer, including any dosing guidance</strong>: the Concierge repeats dosing only word-for-word from a published answer and never adds to it. You can also ask the staff Concierge to draft or change an entry; it prepares a card, and new ones are drafts unless you say to publish.</p>
 
+<h3>Phone consultation requests</h3>
+<p>Customers ask for a free phone consultation on our own form at <strong>/consultation</strong>, or by asking the Concierge, which takes the request in the chat. Links are on the sign-up form and in the members' area footer. Signed-in members' name, email and phone are filled in from their account. They pick what they'd like to talk about and a weekday time (half-hour slots, 9 AM to 4:30 PM {{TZ}}; times someone else has already asked for are greyed out), add any comments, and agree to the acknowledgement by typing their full name.</p>
+<p>Each request arrives in the team inbox and in <span class="where" style="display:inline">Assistant → Handed to the team</span> with the topic <strong>consultation</strong>, showing the time they asked for, their phone, interest, comments and signature. The customer gets a confirmation email. <strong>The time is a request:</strong> call or reply to confirm it, then mark it resolved. Once resolved, that time frees up on the form again.</p>
+
+<h3>Terms &amp; Privacy</h3>
+<p>The <strong>Terms of Service</strong> (/terms) and <strong>Privacy Policy</strong> (/privacy) are linked in every page's footer. They describe how the site really works (sign-in, payments, the Concierge, consultations, emails), so when a feature changes, ask your developer to update them too.</p>
+
 <h3>Quick actions</h3>
 <p>The <strong>Quick actions</strong> card at the bottom of the Overview puts the jobs you do most one tap away, in three columns, with a <kbd>member requests waiting</kbd> bar above them when someone needs approving. <strong>Orders &amp; shop</strong>: <kbd>Orders</kbd> (the Orders tab, where matched Venmo payments wait to be marked paid), <kbd>Awaiting payment</kbd> (the unpaid orders, with a count), <kbd>Add a product</kbd>, <kbd>Update stock counts</kbd> and <kbd>Add a store</kbd> (opens Settings → Store locations). <strong>Promote</strong>: <kbd>Send a campaign</kbd>, <kbd>Create a discount code</kbd>, <kbd>Schedule an event</kbd> and <kbd>Add an ambassador</kbd>. <strong>Staff &amp; reports</strong>: <kbd>Ask the Concierge</kbd>, <kbd>Today's staff password</kbd> (opens Settings → Steward password), the <kbd>Staff guide</kbd>, and downloads of the <kbd>Revenue report</kbd> and <kbd>Orders CSV</kbd>. On a phone the columns stack.</p>
 
@@ -720,6 +727,9 @@ Anyone on the mailing list whose email also has an approved {{MEMBERS}} account.
 <p class="lede">You never have to write HTML. Just type normally and the site turns it into a properly designed email.</p>
 
 <p>Every campaign is automatically wrapped in a newsletter design: a seasonal banner picture, our name, a white card, the reader's first name at the top, matching coloured headings and buttons, little artwork dividers, and the unsubscribe footer. You only write what goes in the middle.</p>
+
+<h3>The preview line</h3>
+<p>Inboxes show a grey line of text after the subject. Under the subject, <strong>Preview line</strong> sets it: one short sentence that makes people want to open it. Leave it empty and the first sentence of your message is used (the box shows which). It's hidden inside the email, so it never appears in the message itself. The preview's <em>Inbox</em> row shows the subject and preview line together. You can also ask the Concierge for one.</p>
 
 <h3>Picking a look</h3>
 <p>The composer is in two halves: you write on the left, and the <strong>Preview</strong> on the right shows the email exactly as it will arrive, updating as you type. <kbd>Desktop</kbd> and <kbd>Phone</kbd> switch the preview width. On a phone the preview sits under the composer.</p>
@@ -1135,6 +1145,7 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Cash pickup deals &amp; public-shop pickup</strong>: the <em>Cash pickup only</em> tick on sales, and Local pickup (invoice or cash) in the public shop. Off = the public shop is ship-only.</li>
 <li><strong>Daily staff password</strong> (on): the staff password changes every day (see <em>Signing in</em>). Switching it off goes back to the old fixed password. Only do that if your developer asks.</li>
 <li><strong>FAQ page</strong> (on): the /faq page and the Concierge using it. Off hides the page; answers stay saved.</li>
+<li><strong>Phone consultation requests</strong> (on): the /consultation form, its links, and the Concierge taking requests. Off hides all three.</li>
 <li><strong>Member sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Members get the one-tap sign-in and the popup offering it after they sign in. Off hides both; saved devices stay saved.</li>
 <li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>

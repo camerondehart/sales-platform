@@ -107,6 +107,8 @@ export type CampaignDraft = {
   todayKey?: string;
   /** Seasonal look for the email (lib/campaignThemes.ts): a theme key, "auto" or "none". */
   theme?: string;
+  /** Inbox preview line (empty = the first sentence of the message). */
+  preheader?: string;
   /** Use the photo staff sent in the chat: it goes where PHOTO_SLOT is in the body (uploaded when the draft opens in the composer). */
   photo?: { alt: string };
   /** Set by the chat widget on the way to the composer: the photo itself (JPEG data URL, kept in this browser only). */

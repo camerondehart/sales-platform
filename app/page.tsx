@@ -50,6 +50,7 @@ export default async function Home() {
           codeLogin={await isEnabled("email_code_login").catch(() => false)}
           staffLink={await isEnabled("admin_magic_link").catch(() => false)}
           faceId={await isEnabled("member_passkeys").catch(() => false)}
+          consult={await isEnabled("consultation_form").catch(() => false)}
         />
         {shopProducts.length > 0 ? (
           <a className="scroll-cue" href="#shop" aria-label="Scroll down to our shop, open to everyone">
@@ -96,7 +97,7 @@ export default async function Home() {
               <p>
                 {brand.shippingNote} Questions? Email{" "}
                 <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.{" "}
-                <a href="/terms">Terms of Service</a>
+                <a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy</a>
               </p>
             </div>
             <div className="footnote">

@@ -10,7 +10,7 @@ import { FaceIdIcon, markSignedIn } from "@/app/components/MemberFaceId";
 
 type Mode = "signin" | "signup" | "forgot" | "code" | "firsttime";
 
-export default function AuthForms({ codeLogin = false, staffLink = false, faceId = false }: { codeLogin?: boolean; staffLink?: boolean; faceId?: boolean }) {
+export default function AuthForms({ codeLogin = false, staffLink = false, faceId = false, consult = false }: { codeLogin?: boolean; staffLink?: boolean; faceId?: boolean; consult?: boolean }) {
   const [mode, setMode] = useState<Mode>("signin");
   // The email typed on the password form carries over to "Email me a code".
   const [typedEmail, setTypedEmail] = useState("");
@@ -41,7 +41,7 @@ export default function AuthForms({ codeLogin = false, staffLink = false, faceId
       {mode === "signin" && <SignInForm faceId={faceId} staffLink={staffLink} onForgot={() => setMode("forgot")} onCode={codeLogin ? (email: string) => { setTypedEmail(email); setMode("code"); } : undefined} onFirstTime={() => setMode("firsttime")} />}
       {mode === "firsttime" && <FirstTimeForm onBack={() => setMode("signin")} />}
       {mode === "code" && <CodeSignInForm initialEmail={typedEmail} onBack={() => setMode("signin")} />}
-      {mode === "signup" && <SignUpForm />}
+      {mode === "signup" && <SignUpForm consult={consult} />}
       {mode === "forgot" && <ForgotPasswordForm onBack={() => setMode("signin")} />}
     </div>
   );
@@ -417,7 +417,7 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-function SignUpForm() {
+function SignUpForm({ consult = false }: { consult?: boolean }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -595,10 +595,18 @@ function SignUpForm() {
       </div>
 
       <p className="auth-hint auth-optin-note">
-        Members get our emails about new arrivals, sales and classes. You can unsubscribe from any email.
+        Members get our emails about new arrivals, sales and classes. You can unsubscribe from any email. See our{" "}
+        <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.
       </p>
 
-      {brand.consultationFormUrl && (
+      {consult ? (
+        <div className="gate-consultation">
+          <strong>Interested in a free phone consultation?</strong>
+          <span>
+            {" "}<a href="/consultation">Pick a time that suits you</a>.
+          </span>
+        </div>
+      ) : brand.consultationFormUrl ? (
         <div className="gate-consultation">
           <strong>Interested in a consultation?</strong>
           <span>
@@ -608,7 +616,7 @@ function SignUpForm() {
             </a>.
           </span>
         </div>
-      )}
+      ) : null}
 
       <button type="submit" className="gate-button" disabled={loading}>
         {loading ? "Submitting..." : "Request to join"}

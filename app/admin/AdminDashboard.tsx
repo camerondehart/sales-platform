@@ -45,6 +45,7 @@ import { EVT_ADMIN_REFRESH, EVT_ESCALATIONS, EVT_OPEN, EVT_USE_DRAFT, PHOTO_SLOT
 import { brand } from "@/lib/brand";
 import { cleanThemeChoice, themeForCategory, type ThemeChoice } from "@/lib/campaignThemes";
 import { BlockArranger, LivePreview, ThemePicker } from "./CampaignComposerParts";
+import { autoPreviewLine } from "@/lib/campaignPreview";
 
 // Extended type – bulk orders have an `items` array
 type RecentInquiry = Inquiry & {
@@ -547,6 +548,8 @@ export default function AdminDashboard({
   // Seasonal look (lib/campaignThemes.ts), the theme "Auto" resolved to, how the
   // message is edited, and the scheduled campaign being edited (if any).
   const [campTheme, setCampTheme] = useState<ThemeChoice>("auto");
+  // Inbox preview line ("" = the first sentence of the message, lib/campaignPreview.ts).
+  const [campPreheader, setCampPreheader] = useState("");
   const [campResolved, setCampResolved] = useState("");
   const [campMode, setCampMode] = useState<"write" | "arrange">("write");
   const [campEditing, setCampEditing] = useState<{ id: string; subject: string } | null>(null);
@@ -770,6 +773,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           customList: campAudience === "custom" ? campCustom : undefined,
           scheduledFor: !testOnly && whenMs ? whenMs : undefined,
           theme: campTheme,
+          preheader: campPreheader,
         }),
       });
       const data = await res.json();
@@ -782,7 +786,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               : `✅ Sent to ${data.sent} people${data.failed ? `, ${data.failed} failed` : ""}${data.remaining ? ` — the other ${data.remaining} go out within 15 minutes` : ""}.`
         );
         if (!testOnly) {
-          setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampHistoryKey((k) => k + 1);
+          setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampHistoryKey((k) => k + 1);
           if (campTodayKey) {
             fetch("/api/admin/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: campTodayKey, done: true }) })
               .then(() => window.dispatchEvent(new CustomEvent(EVT_ADMIN_REFRESH, { detail: ["today"] })))
@@ -819,6 +823,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           subject: campSubject,
           body: campBody,
           theme: campTheme,
+          preheader: campPreheader,
           audience: campAudience,
           groups: campAudience === "groups" ? campGroups : undefined,
           customList: campAudience === "custom" ? campCustom : undefined,
@@ -830,7 +835,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         const label = new Date(whenMs).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
         setCampMsg(`✅ Saved. Still scheduled for ${label} (local) to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`);
         setCampEditing(null);
-        setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampHistoryKey((k) => k + 1);
+        setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampHistoryKey((k) => k + 1);
       } else {
         setCampMsg(`❌ ${data.error || "Couldn't save the changes."}`);
       }
@@ -2470,6 +2475,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       setCampSubject(d.subject);
       setCampBody(d.body);
       setCampTheme(cleanThemeChoice(d.theme));
+      setCampPreheader(typeof d.preheader === "string" ? d.preheader : "");
       setCampEditing(null);
       setCampTodayKey(typeof d.todayKey === "string" ? d.todayKey : "");
       if (d.audience === "custom" && typeof d.customList === "string" && d.customList) {
@@ -3593,7 +3599,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         {campEditing && (
           <div className="cc-editing">
             <span>✏️ Editing the scheduled campaign <strong>“{campEditing.subject}”</strong>. Changes apply when you press <strong>Save changes</strong>; it stays scheduled.</span>
-            <button type="button" className="esc-btn" onClick={() => { setCampEditing(null); setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampMsg("Stopped editing. The scheduled campaign is unchanged."); }}>Stop editing</button>
+            <button type="button" className="esc-btn" onClick={() => { setCampEditing(null); setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampMsg("Stopped editing. The scheduled campaign is unchanged."); }}>Stop editing</button>
           </div>
         )}
 
@@ -3602,6 +3608,12 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             <div className="field">
               <label>Subject</label>
               <input value={campSubject} onChange={(e) => setCampSubject(e.target.value)} placeholder={`New arrivals this week ${brand.emoji}`} />
+            </div>
+
+            <div className="field">
+              <label>Preview line <span className="cc-optional">optional</span></label>
+              <input value={campPreheader} maxLength={150} onChange={(e) => setCampPreheader(e.target.value)} placeholder={autoPreviewLine(campBody) ? `Automatic: ${autoPreviewLine(campBody)}` : "Cozy November treats, up to 20% off for members"} />
+              <div className="field-hint">The grey line inboxes show after the subject. Leave it empty to use the first sentence of your message.</div>
             </div>
 
             <div className="field">
@@ -3700,7 +3712,7 @@ We just finished a new run and wanted you to hear it first.
             </div>
           </div>
 
-          <LivePreview subject={campSubject} body={campBody} theme={campTheme} when={campWhen ? pacificToMs(campWhen) : undefined} onResolved={setCampResolved} />
+          <LivePreview subject={campSubject} body={campBody} theme={campTheme} preheader={campPreheader} when={campWhen ? pacificToMs(campWhen) : undefined} onResolved={setCampResolved} />
         </div>
 
         <CampaignHistory
@@ -3711,6 +3723,7 @@ We just finished a new run and wanted you to hear it first.
             setCampSubject(c.subject);
             setCampBody(c.body);
             setCampTheme(cleanThemeChoice(c.theme ?? "none"));
+            setCampPreheader(c.preheader || "");
             if (c.audience === "custom") {
               setCampAudience("custom");
               setCampCustom((c.customEmails || []).join(", "));

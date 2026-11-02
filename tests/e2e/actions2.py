@@ -162,6 +162,10 @@ check("campaign draft: carries the look staff asked for", (_r.get("draft") or {}
 _r=tool("prepare_campaign_draft",{"template_id":"Fall ritual","audience":"subscribers"})
 _d=_r.get("draft") or {}
 check("campaign draft: loads a template by name with its category look", _d.get("subject")=="Cozy season is here 🍂" and "# Settle into fall" in _d.get("body","") and _d.get("theme")=="fall", _r)
+_r=tool("prepare_campaign_draft",{"subject":"Cozy","body":"Hi friend.","audience":"subscribers","preview_line":"Cozy treats inside"})
+check("campaign draft: carries the inbox preview line", (_r.get("draft") or {}).get("preheader")=="Cozy treats inside", _r.get("draft"))
+_c=card(tool("propose_campaign",{"subject":"Cozy","body":"Hi friend.","audience":"subscribers","send_at":"2030-04-03 10:00","preview_line":"Cozy treats inside"}))
+check("campaign send card: shows and sends the preview line", _c and _c["request"]["body"].get("preheader")=="Cozy treats inside" and any("Inbox preview: Cozy treats inside" in l for l in _c["lines"]), _c and _c["lines"])
 _r=tool("prepare_campaign_draft",{"template_id":"starter_holiday","theme":"","audience":"subscribers"})
 check("campaign draft: a blank look still uses the template's look", (_r.get("draft") or {}).get("theme")=="holiday", _r.get("draft"))
 _r=tool("prepare_campaign_draft",{"template_id":"starter_fall","subject":"Custom subject","body":"Custom body","theme":"winter","audience":"subscribers"})

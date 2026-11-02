@@ -16,6 +16,7 @@ type Row = {
   groups?: string[];
   customEmails?: string[];
   theme?: string;
+  preheader?: string;
   startedAt?: number;
   status: "scheduled" | "sending" | "sent" | "cancelled";
   createdAt: number;

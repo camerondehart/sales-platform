@@ -44,6 +44,8 @@ export type Campaign = {
   status: "scheduled" | "sending" | "sent" | "cancelled";
   /** Seasonal look (lib/campaignThemes.ts). Missing on older campaigns = plain. */
   theme?: ThemeChoice;
+  /** Inbox preview line written by staff (empty = the first sentence of the message). */
+  preheader?: string;
   /** Last edited while still scheduled. */
   editedAt?: number;
   createdAt: number;
@@ -87,7 +89,7 @@ export async function recipientsFor(audience: Audience, customEmails?: string[],
   const subs = activeSubscribers(everyone);
   // Who can be emailed: active subscribers, plus approved members who aren't on
   // the list — membership includes occasional emails unless they've opted out
-  // (Terms §9). Anyone who has ever unsubscribed is skipped.
+  // (Terms §13). Anyone who has ever unsubscribed is skipped.
   const optedOut = new Set(everyone.filter((s) => s.unsubscribedAt).map((s) => s.email.toLowerCase()));
   const onList = new Set(subs.map((s) => s.email.toLowerCase()));
   const approved = (await getUsers()).filter((u) => u.status === "approved");
@@ -126,6 +128,7 @@ export async function createCampaign(input: {
   groups?: AudienceGroup[];
   scheduledFor?: number;
   theme?: ThemeChoice;
+  preheader?: string;
 }): Promise<Campaign> {
   const now = Date.now();
   const c: Campaign = {
@@ -136,6 +139,7 @@ export async function createCampaign(input: {
     customEmails: input.audience === "custom" ? (input.customEmails || []).slice(0, 5000) : undefined,
     groups: input.audience === "groups" ? input.groups : undefined,
     theme: input.theme || "auto",
+    ...(input.preheader?.trim() ? { preheader: input.preheader.trim().slice(0, 200) } : {}),
     status: "scheduled",
     createdAt: now,
     scheduledFor: input.scheduledFor && input.scheduledFor > now ? input.scheduledFor : now,
@@ -158,7 +162,7 @@ export async function createCampaign(input: {
  */
 export async function updateCampaign(
   id: string,
-  input: { subject: string; body: string; audience: Audience; customEmails?: string[]; groups?: AudienceGroup[]; scheduledFor?: number; theme?: ThemeChoice }
+  input: { subject: string; body: string; audience: Audience; customEmails?: string[]; groups?: AudienceGroup[]; scheduledFor?: number; theme?: ThemeChoice; preheader?: string }
 ): Promise<{ before: Campaign; after: Campaign } | null> {
   return store.mutate<{ before: Campaign; after: Campaign } | null>((rows) => {
     const i = rows.findIndex((r) => r.id === id);
@@ -173,6 +177,7 @@ export async function updateCampaign(
       customEmails: input.audience === "custom" ? (input.customEmails || []).slice(0, 5000) : undefined,
       groups: input.audience === "groups" ? input.groups : undefined,
       theme: input.theme || before.theme || "auto",
+      preheader: input.preheader?.trim() ? input.preheader.trim().slice(0, 200) : undefined,
       scheduledFor: input.scheduledFor && input.scheduledFor > now ? input.scheduledFor : before.scheduledFor,
       editedAt: now,
     };
@@ -259,7 +264,7 @@ export async function processCampaign(id: string, siteUrl: string, deadline: num
       to: r.e,
       reply_to: replyTo,
       subject: c.subject,
-      html: tagCampaignLinks(await renderCampaign({ subject: c.subject, body: c.body, theme: c.theme, unsubUrl: `${siteUrl}/unsubscribe?token=${r.t}`, name: r.n, siteUrl, when: c.scheduledFor }), c.id, siteUrl),
+      html: tagCampaignLinks(await renderCampaign({ subject: c.subject, body: c.body, theme: c.theme, unsubUrl: `${siteUrl}/unsubscribe?token=${r.t}`, name: r.n, siteUrl, when: c.scheduledFor, preheader: c.preheader }), c.id, siteUrl),
       headers: { "List-Unsubscribe": `<${siteUrl}/unsubscribe?token=${r.t}>` },
       tags: [{ name: "campaign", value: c.id }],
     })));

@@ -251,7 +251,7 @@ export async function removeSubscriberById(id: string): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// Members who aren't on the mailing list still get campaigns (Terms §9: being
+// Members who aren't on the mailing list still get campaigns (Terms §13: being
 // a member includes occasional emails unless you unsubscribe). Their
 // unsubscribe link carries a signed token instead of a subscriber record;
 // using it saves an opt-out record so they're never emailed again.

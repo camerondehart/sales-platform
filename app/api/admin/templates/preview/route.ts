@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { wrapCampaign } from "@/lib/campaignEmail";
 import { renderCampaign } from "@/lib/campaignRender";
 import { cleanThemeChoice, resolveTheme } from "@/lib/campaignThemes";
+import { previewLine } from "@/lib/campaignPreview";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const b = (await req.json().catch(() => ({}))) as { subject?: unknown; body?: unknown; theme?: unknown; when?: unknown };
+  const b = (await req.json().catch(() => ({}))) as { subject?: unknown; body?: unknown; theme?: unknown; when?: unknown; preheader?: unknown };
   const body = String(b.body || "").slice(0, 50_000);
   const subject = String(b.subject || "").slice(0, 200);
   if (!body.trim()) return NextResponse.json({ error: "Nothing to preview yet." }, { status: 400 });
@@ -22,8 +23,8 @@ export async function POST(req: Request) {
   if (b.theme !== undefined) {
     const theme = cleanThemeChoice(b.theme);
     const when = Number(b.when) || Date.now();
-    const html = await renderCampaign({ subject, body, theme, unsubUrl: "#unsubscribe", name: "Boss", siteUrl, when });
-    return NextResponse.json({ subject, html, theme: resolveTheme(theme, subject, body, when)?.key || "none" }, { headers: { "Cache-Control": "no-store" } });
+    const html = await renderCampaign({ subject, body, theme, unsubUrl: "#unsubscribe", name: "Boss", siteUrl, when, preheader: String(b.preheader || "").slice(0, 200) });
+    return NextResponse.json({ subject, html, preheader: previewLine(body, String(b.preheader || "")), theme: resolveTheme(theme, subject, body, when)?.key || "none" }, { headers: { "Cache-Control": "no-store" } });
   }
   return NextResponse.json({ subject, html: wrapCampaign(body, "#unsubscribe", "Boss", { siteUrl }) }, { headers: { "Cache-Control": "no-store" } });
 }

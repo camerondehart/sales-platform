@@ -50,6 +50,8 @@ export type Escalation = {
   replies?: EscalationReply[];
   /** The chat that led to it (last few turns), for context when replying. */
   transcript?: Array<{ role: "user" | "assistant"; content: string }>;
+  /** Phone consultation requests (topic "consultation"): the time they asked for, their phone, and their signed acknowledgement. */
+  consultation?: { at: number; phone: string; interest: string; signature: string; acknowledgedAt: number };
 };
 
 export type EscalationReply = { at: number; body: string; emailed: boolean };

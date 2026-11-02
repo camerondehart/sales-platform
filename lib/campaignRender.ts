@@ -18,9 +18,11 @@ export async function renderCampaign(input: {
   siteUrl: string;
   /** "auto" picks the season from this date (the send time). */
   when?: number;
+  /** Inbox preview line; empty = the first sentence of the message. */
+  preheader?: string;
 }): Promise<string> {
   const theme = resolveTheme(input.theme ?? "none", input.subject, input.body, input.when);
-  if (!theme) return wrapCampaign(input.body, input.unsubUrl, input.name, { siteUrl: input.siteUrl });
+  if (!theme) return wrapCampaign(input.body, input.unsubUrl, input.name, { siteUrl: input.siteUrl, preheader: input.preheader });
   const art = await themeArt(theme.key, input.siteUrl);
-  return wrapCampaign(input.body, input.unsubUrl, input.name, { theme, art, siteUrl: input.siteUrl });
+  return wrapCampaign(input.body, input.unsubUrl, input.name, { theme, art, siteUrl: input.siteUrl, preheader: input.preheader });
 }

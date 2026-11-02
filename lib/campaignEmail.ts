@@ -1,6 +1,7 @@
 import { escapeHtml, hrefSafe } from "./invoiceEmail";
 import { brand } from "@/lib/brand";
 import type { Theme } from "./campaignThemes";
+import { previewLine } from "./campaignPreview";
 
 // Campaign email template, shared by "Send now" and scheduled sends.
 // Moved here unchanged from app/api/admin/campaigns/route.ts.
@@ -126,13 +127,15 @@ export function wrapCampaign(
   bodyHtml: string,
   unsubUrl: string,
   name?: string,
-  opts?: { theme?: Theme | null; art?: { header: string; divider: string }; siteUrl?: string }
+  opts?: { theme?: Theme | null; art?: { header: string; divider: string }; siteUrl?: string; preheader?: string }
 ): string {
-  if (opts?.theme && opts.art) return wrapThemed(bodyHtml, unsubUrl, name, opts.theme, opts.art, opts.siteUrl);
+  const hidden = preheaderHtml(previewLine(bodyHtml, opts?.preheader));
+  if (opts?.theme && opts.art) return wrapThemed(bodyHtml, unsubUrl, name, opts.theme, opts.art, opts.siteUrl, hidden);
   return `
   <!DOCTYPE html>
   <html><head><meta charset="UTF-8"></head>
   <body style="font-family:'Optima','Helvetica Neue',sans-serif;background:#f9f9f8;padding:20px;color:#61676d;">
+    ${hidden}
     <div style="max-width:560px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
       <div style="background:#85ba45;padding:20px 24px;color:white;">
         <h1 style="margin:0;font-family:'Libre Baskerville',Georgia,serif;font-style:italic;font-weight:400;font-size:1.5rem;">${brand.name}</h1>
@@ -152,14 +155,24 @@ export function wrapCampaign(
 }
 
 
+/**
+ * The inbox preview line, hidden in the email itself (first thing in <body>),
+ * padded with invisible characters so inboxes don't run on into "Hi Bailey,".
+ */
+function preheaderHtml(text: string): string {
+  if (!text) return "";
+  return `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;color:transparent;">${escapeHtml(text)}${"&#847;&zwnj;&nbsp;".repeat(90)}</div>`;
+}
+
 /** The seasonal newsletter: banner artwork, themed colours, divider art, soft footer. Tables for email clients. */
-function wrapThemed(bodyHtml: string, unsubUrl: string, name: string | undefined, t: Theme, art: { header: string; divider: string }, siteUrl = ""): string {
+function wrapThemed(bodyHtml: string, unsubUrl: string, name: string | undefined, t: Theme, art: { header: string; divider: string }, siteUrl = "", hidden = ""): string {
   const look: Look = { accent: t.accent, onAccent: t.onAccent, heading: "#3f4549", divider: art.divider, full: 536 };
   const body = looksLikeHtml(bodyHtml) ? bodyHtml : formatPlainBody(bodyHtml, look, siteUrl);
   return `
   <!DOCTYPE html>
   <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
   <body style="margin:0;padding:0;background:${t.soft};">
+    ${hidden}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${t.soft};">
       <tr><td align="center" style="padding:24px 12px;">
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 2px 10px rgba(40,44,36,0.08);">

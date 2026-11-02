@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { THEME_KEYS, THEMES, type ThemeChoice } from "@/lib/campaignThemes";
 import { brand } from "@/lib/brand";
 import MediaUpload from "./MediaUpload";
+import { previewLine } from "@/lib/campaignPreview";
 
 // Marketing → Email campaigns: the theme picker, the "Arrange" block editor
 // (move photos, text and buttons around) and the live preview. The message
@@ -184,12 +185,12 @@ export function BlockArranger({ body, onChange }: { body: string; onChange: (b: 
 // ---------------------------------------------------------------- live preview
 
 /** The email exactly as it will look (same renderer as sending), on a desktop or phone width. */
-export function LivePreview({ subject, body, theme, when, onResolved }: { subject: string; body: string; theme: ThemeChoice; when?: number; onResolved?: (key: string) => void }) {
+export function LivePreview({ subject, body, theme, preheader = "", when, onResolved }: { subject: string; body: string; theme: ThemeChoice; preheader?: string; when?: number; onResolved?: (key: string) => void }) {
   const [html, setHtml] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const [phone, setPhone] = useState(false);
-  const key = useMemo(() => JSON.stringify([subject, body, theme, when || 0]), [subject, body, theme, when]);
+  const key = useMemo(() => JSON.stringify([subject, body, theme, preheader, when || 0]), [subject, body, theme, preheader, when]);
   useEffect(() => {
     if (!body.trim()) {
       setHtml("");
@@ -199,7 +200,7 @@ export function LivePreview({ subject, body, theme, when, onResolved }: { subjec
     let live = true;
     setLoading(true);
     const t = setTimeout(() => {
-      fetch("/api/admin/templates/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body, theme, when }) })
+      fetch("/api/admin/templates/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, body, theme, when, preheader }) })
         .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
         .then(({ ok, d }) => {
           if (!live) return;
@@ -227,7 +228,10 @@ export function LivePreview({ subject, body, theme, when, onResolved }: { subjec
           <button type="button" role="radio" aria-checked={phone} className={phone ? "is-on" : ""} onClick={() => setPhone(true)}>Phone</button>
         </div>
       </div>
-      <div className="cc-preview-subject"><span>Subject</span> {subject || <em>(no subject yet)</em>}</div>
+      <div className="cc-preview-subject">
+        <span>Inbox</span> <strong>{subject || <em>(no subject yet)</em>}</strong>
+        {body.trim() && <em className="cc-preview-line"> — {previewLine(body, preheader)}</em>}
+      </div>
       <div className={`cc-preview-frame${phone ? " is-phone" : ""}`}>
         {html ? (
           <iframe title="Email preview" sandbox="" srcDoc={html} />

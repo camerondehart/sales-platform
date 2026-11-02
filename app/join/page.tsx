@@ -102,7 +102,7 @@ export default async function JoinPage({ searchParams }: { searchParams: { event
                 <p>
                   {brand.shippingNote} Questions? Email{" "}
                   <a href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>.{" "}
-                  <a href="/terms">Terms of Service</a>
+                  <a href="/terms">Terms of Service</a> · <a href="/privacy">Privacy</a>
                 </p>
               </div>
               <div className="footnote">

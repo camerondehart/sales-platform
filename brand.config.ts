@@ -44,6 +44,15 @@ const brandConfig = {
 
   /** Optional link to an external consultation/booking form (members' gallery footer). Empty = hidden. */
   consultationFormUrl: "",
+  /**
+   * Free phone consultations (/consultation, switch consultation_form): the
+   * statement people agree to (and sign by typing their name) before asking
+   * for a call. Empty = a general default (lib/consultSlots.ts).
+   */
+  consultationAcknowledgement: "",
+
+  /** Legal pages (/terms, /privacy): whose law applies and where disputes go. county "" = just the state's courts. */
+  legal: { state: "California", county: "" },
 
   /** Local pickup. Shown at checkout, on the order confirmation and in the order email. */
   pickup: {

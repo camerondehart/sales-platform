@@ -42,6 +42,8 @@ import { resolveSegment, SEGMENT_KEYS } from "../segments";
 import { recipientsFor } from "../campaignSchedule";
 import { THEME_KEYS, cleanThemeChoice, themeForCategory } from "../campaignThemes";
 import { listTemplates } from "../emailTemplates";
+import { CONSULT_ACK, CONSULT_INTERESTS, SLOT_TIMES, bookableDates, slotLabel, slotMs, slotText } from "../consultSlots";
+import { cleanConsultation, requestConsultation, takenSlots } from "../consultation";
 import { splitChased, CHASE_QUIET_DAYS } from "../chased";
 import { isEnabled } from "../flags";
 import { liveBundles } from "../bundleStore";
@@ -167,6 +169,42 @@ const DEFS: ToolDef[] = [
           summary: str("One or two sentences describing the problem"),
         },
         required: ["name", "email", "topic", "summary"],
+      },
+    },
+  },
+  {
+    audiences: ["public", "member"],
+    type: "function",
+    function: {
+      name: "consultation_times",
+      description:
+        "Open times for a free phone consultation (weekdays, half-hour slots 9 AM–4:30 PM local time). Call this before request_consultation so you only offer times that are free.",
+      parameters: {
+        type: "object",
+        properties: { date: str("Optional YYYY-MM-DD (local time). Leave out to get the next few weekdays") },
+      },
+    },
+  },
+  {
+    audiences: ["public", "member"],
+    type: "function",
+    function: {
+      name: "request_consultation",
+      description:
+        "Send a free phone consultation request to the team (they confirm the time by phone or email). Before calling: get their interest, a free time from consultation_times and their phone (members: name, email and phone come from their account unless they give different ones; visitors: ask for name, email and phone), then show the acknowledgement from the tool's `acknowledgement` text word-for-word and ask them to agree by typing their full name. Only call once they have typed their full name to sign.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: str("Full name (members: optional, from their account)"),
+          email: str("Email (members: optional, from their account)"),
+          phone: str("Phone with area code (members: optional if on their account)"),
+          interest: str("What they'd like to talk about", { enum: [...CONSULT_INTERESTS] }),
+          date: str("YYYY-MM-DD (local time), a weekday"),
+          time: str("HH:MM in 24-hour local time, on the half hour, e.g. 16:30"),
+          comments: str("Optional: anything else they want the team to know"),
+          signature: str("The full name they typed to agree to the acknowledgement, exactly as typed"),
+        },
+        required: ["interest", "date", "time", "signature"],
       },
     },
   },
@@ -662,6 +700,7 @@ const DEFS: ToolDef[] = [
           segment_product: str("For bought_product: product id or name"),
           use_photo: { type: "boolean", description: `true to put the photo the staff sent in this chat into the email. Put ${PHOTO_SLOT} on its own line in body where it should go (otherwise it goes at the top)` },
           photo_alt: str("With use_photo: a short description of the photo (for people who can't see images)"),
+          preview_line: str("Optional inbox preview line (the grey text after the subject, up to ~140 characters). Leave it out to use the first sentence of the message"),
           theme: str(`Optional look (seasonal banner, colours, dividers): auto (default, or the template's category) | none (plain) | ${THEME_KEYS.join(" | ")}`),
         },
         required: ["audience"],
@@ -999,6 +1038,48 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         return { found: false, note: "No order matches that reference and email. Suggest double-checking both, or escalating." };
       }
       return { found: true, order: { ...orderSummary(order), meaning: STATUS_HELP[normalizeStatus(order.status)] } };
+    }
+    case "consultation_times": {
+      if (!(await isEnabled("consultation_form").catch(() => false))) return { error: `Consultations can be arranged by emailing ${SUPPORT_EMAIL}.` };
+      const taken = new Set(await takenSlots());
+      const now = Date.now();
+      const want = s(args.date, 10);
+      const days = bookableDates(now).filter((d) => !want || d === want).slice(0, want ? 1 : 3);
+      if (want && !days.length) return { note: "That day isn't available (consultations are on weekdays, up to 60 days ahead). Offer one of the next weekdays instead.", next_days: bookableDates(now).slice(0, 5) };
+      return {
+        timezone: brand.timezoneLabel,
+        days: days.map((d) => ({
+          date: d,
+          open: SLOT_TIMES.filter((t) => slotMs(d, t) >= now + 2 * 3600_000 && !taken.has(slotMs(d, t))).map((t) => ({ time: t, label: slotLabel(t) })),
+        })),
+        acknowledgement: CONSULT_ACK,
+        form: "/consultation",
+        note: "Offer a few of the open times. They can also use the form at /consultation.",
+      };
+    }
+    case "request_consultation": {
+      if (!(await isEnabled("consultation_form").catch(() => false))) return { error: `Consultations can be arranged by emailing ${SUPPORT_EMAIL}.` };
+      if (overLimit(`consult:ip:${ctx.ip}`, 3, 3600_000)) return { ok: false, note: `Already sent several requests. Ask them to email ${SUPPORT_EMAIL}.` };
+      if (!s(args.signature, 120)) return { ok: false, note: "Not sent yet. Show them the acknowledgement word-for-word and ask them to type their full name to sign; then call this again with it as signature.", acknowledgement: CONSULT_ACK };
+      const member = ctx.audience === "member" ? ctx.user : null;
+      const c = cleanConsultation({
+        name: s(args.name, 120) || member?.name || "",
+        email: s(args.email, 200) || member?.email || "",
+        phone: s(args.phone, 40) || member?.phone || "",
+        interest: s(args.interest, 80),
+        at: slotMs(s(args.date, 10), s(args.time, 5)),
+        comments: s(args.comments, 1500),
+        signature: s(args.signature, 120),
+        acknowledged: !!s(args.signature, 120),
+      });
+      if (!c.ok) return { ok: false, note: c.error, acknowledgement: CONSULT_ACK };
+      const r = await requestConsultation(c.value, {
+        source: "concierge",
+        audience: ctx.audience,
+        transcript: ctx.transcript.slice(-12).map((m) => ({ role: (m.role === "user" ? "user" : "assistant") as "user" | "assistant", content: m.content.slice(0, 1500) })),
+      });
+      if (!r.ok) return { ok: false, note: r.error };
+      return { ok: true, say: `Requested for ${slotText(c.value.at)}. The team will confirm by phone or email (usually within one business day), and a confirmation is on its way to ${c.value.email}.` };
     }
     case "escalate_to_team": {
       const name = s(args.name, 100);
@@ -2028,13 +2109,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       }
       const audience = args.audience === "members" || args.audience === "nonmembers" || args.audience === "all" ? args.audience : "subscribers";
       const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
+      const preheader = s(args.preview_line, 150);
       if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
       if (s(args.segment, 40)) {
         const g = await resolveSegment(s(args.segment, 40), { days: Number(args.segment_days), limit: Number(args.segment_limit), product: s(args.segment_product, 120) });
         if ("error" in g) return g;
         if (g.emails.length === 0) return { error: `Nobody is in the group "${g.label}" right now.` };
         const reach = (await recipientsFor("custom", g.emails)).length;
-        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label, theme, ...(photo ? { photo } : {}) };
+        ctx.draft = { subject, body, audience: "custom", customList: g.emails.join(", "), groupLabel: g.label, theme, ...(preheader ? { preheader } : {}), ...(photo ? { photo } : {}) };
         return {
           ok: true,
           group: g.label,
@@ -2043,7 +2125,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           say: `The draft is shown with a button to open it in the campaign composer, addressed to ${g.label} (${reach} of the ${g.emails.length} in the group will get it). It has NOT been sent.${reach < g.emails.length ? " Mention briefly that the rest have unsubscribed or aren't members/subscribers, so personal notes are the way to reach them." : ""}`,
         };
       }
-      ctx.draft = { subject, body, audience, theme, ...(photo ? { photo } : {}) };
+      ctx.draft = { subject, body, audience, theme, ...(preheader ? { preheader } : {}), ...(photo ? { photo } : {}) };
       return { ok: true, template: template?.name, say: `${template ? `Using the “${template.name}” template, the` : "The"} draft is shown with a button to open it in the campaign composer${photo ? ", which adds their photo" : ""}. It has NOT been sent.` };
     }
   }

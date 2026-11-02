@@ -32,7 +32,7 @@ def confirm(a):
 # ============ Feature flags
 s,r,_=req("/api/admin/flags")
 keys=[f["key"] for f in r.get("flags",[])]
-check("flags: all 23 listed for this environment", s==200 and len(keys)==23 and r["env"]=="development", (s,r))
+check("flags: all 24 listed for this environment", s==200 and len(keys)==24 and r["env"]=="development", (s,r))
 s,r,_=req("/api/admin/flags", cookie=MEMBER)
 check("flags: admin only", s==401, s)
 _s,_fl,_=req("/api/admin/flags")
