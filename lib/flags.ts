@@ -43,6 +43,7 @@ export const FLAG_KEYS = [
   "consultation_form",
   "seasonal_entrance",
   "seasonal_site",
+  "site_requests",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -199,6 +200,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   seasonal_site: {
     label: "Seasonal site backgrounds",
     description: "The valley behind the site gently changes colour with the seasons and holidays, with a few leaves, snowflakes, petals or hearts drifting down behind the page. Follows the same theme as the entrance animation (Settings → Entrance animation: Auto or a chosen one). Staff pages are never changed. Off = the usual look.",
+    defaults: on,
+    built: true,
+  },
+  site_requests: {
+    label: "Site change requests",
+    description: "Staff can ask the staff Concierge for changes to the site. Small ones (wording, colours, layout tweaks) go straight to the developer's build queue and appear on stage at the next build run; medium and large ones wait in Settings → Site requests for the developer to approve. Needs GITHUB_SITE_REQUESTS_REPO and GITHUB_SITE_REQUESTS_TOKEN set (and a scheduled worker, see README); the live site is only ever updated when the developer puts stage live.",
     defaults: on,
     built: true,
   },

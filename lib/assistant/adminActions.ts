@@ -10,11 +10,12 @@ import { listBundles } from "../bundleStore";
 import { bundleOfferLabel, setSavings } from "../bundles";
 import { listCampaigns, recipientsFor, inWindow } from "../campaignSchedule";
 import { entranceStatus } from "../entrance";
+import { enforceSize, listRequests, siteRequestsReady } from "../siteRequests";
 import { ENTRANCE_KEYS, ENTRANCE_THEMES, autoSchedule, cleanEntranceChoice, isEntranceKey, resolveEntrance } from "../entranceThemes";
 import { THEME_KEYS, cleanThemeChoice, resolveTheme, themeForCategory } from "../campaignThemes";
 import { previewLine } from "../campaignPreview";
 import { resolveSegment, SEGMENTS, SEGMENT_KEYS } from "../segments";
-import { FLAGS, FLAG_KEYS, getFlags, type FlagKey } from "../flags";
+import { FLAGS, FLAG_KEYS, getFlags, isEnabled, type FlagKey } from "../flags";
 import { getAdmins } from "../admins";
 import { getReminderSettings } from "../reminders";
 import { getSettings } from "../settings";
@@ -157,6 +158,8 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
 
   // ------------------------------------------------------------ settings
   admin("propose_loyalty_settings", "Prepare changing loyalty points settings.", obj({ enabled: bool("Loyalty on/off"), points_per_dollar: num("Points earned per $1"), points_per_dollar_redeemed: num("Points that equal $1 off"), min_points_to_redeem: num("Minimum points before redeeming") })),
+  admin("propose_site_request", "Prepare filing a change request for the website itself (wording, colours, layout, a new section or feature, a bug) when staff ask for the SITE to change, not for content you can change with other cards (products, prices, banner, campaigns, FAQ…). Size it honestly: small = wording/copy, colours, spacing, images, reordering or hiding existing things on a page; medium = a new section, panel or behaviour on one page; large = new features, anything across many pages, or anything touching money, sign-in, customer data, emails or legal text. Small requests go straight to the developer's build queue and appear on stage at the next build run; medium/large wait for the developer's approval. Write the details as a clear, complete description of what should change and where.", obj({ title: str("Short title, e.g. 'Make the shop heading bigger'"), details: str("What should change, where, and why — specific enough to build"), size: str("small | medium | large"), page: str("Optional: which page or part of the site") }, ["title", "details", "size"])),
+  admin("list_site_requests", "The site change requests staff have filed: status (waiting for the developer's approval, queued, being built, on stage, needs attention, declined, done), size and who asked.", obj({}, [])),
   admin("entrance_status", "The members' entrance animation: which theme members see now, the saved choice (auto or a theme), whether the Seasonal entrance animations switch is on, the themes available and the next Auto changes.", obj({}, [])),
   admin("propose_entrance", `Prepare changing the members' entrance animation (Settings → Entrance animation). choice: auto (holidays first, then the season) or one of ${ENTRANCE_KEYS.join(", ")} (classic = the original). The card has a Preview button. Needs the seasonal_entrance switch on to show anything but Classic (use propose_feature_switch for that).`, obj({ choice: str(`auto | ${ENTRANCE_KEYS.join(" | ")}`) }, ["choice"])),
   admin("propose_feature_switch", `Prepare turning a feature switch on or off (this environment only). Keys: ${FLAG_KEYS.join(", ")}.`, obj({ key: str("Switch key"), on: bool("true = on") }, ["key", "on"])),
@@ -937,6 +940,38 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         examples: g.names,
         note: reach.length < g.emails.length ? "Campaigns reach mailing-list subscribers and members (members get them unless they've unsubscribed); non-member customers only if they're subscribed. Anyone who unsubscribed is always skipped. For the rest, personal notes (propose_member_message / propose_order_message) are the way." : undefined,
       };
+    }
+    case "propose_site_request": {
+      if (!(await isEnabled("site_requests").catch(() => false))) return { error: "Site change requests are switched off (Settings → Feature switches)." };
+      if (!siteRequestsReady()) return { error: "Site change requests aren't connected to GitHub yet; ask the developer to set GITHUB_SITE_REQUESTS_REPO and GITHUB_SITE_REQUESTS_TOKEN." };
+      const title = s(args.title, 120);
+      const details = s(args.details, 4000);
+      if (title.length < 4 || details.length < 10) return { error: "Need a short title and a clear description of the change." };
+      const { size, bumped } = enforceSize(s(args.size, 10).toLowerCase(), title, details);
+      push(ctx, {
+        kind: "site_request",
+        title: `Site request: ${title}`,
+        lines: [
+          `Size: ${size}${bumped ? " (raised from small: it touches money, sign-in, customer data, emails or legal text)" : ""}`,
+          size === "small" ? "Goes straight to the build queue; it shows up on stage at the next build run for the developer to check and put live" : "This needs separate work from the developer: it goes to them for review (nothing is built automatically) and they'll reach out about it",
+          s(args.page, 120) ? `Page: ${s(args.page, 120)}` : "",
+          details.length > 220 ? `${details.slice(0, 220)}…` : details,
+        ].filter(Boolean),
+        confirmLabel: "Send request",
+        busyLabel: "Sending…",
+        request: { method: "POST", url: "/api/admin/site-requests", body: { title, details, size, page: s(args.page, 120) || undefined } },
+        refresh: ["site_requests"],
+      });
+      return READY;
+    }
+    case "list_site_requests": {
+      if (!siteRequestsReady()) return { note: "Site change requests aren't connected to GitHub yet." };
+      try {
+        const rows = await listRequests();
+        return { requests: rows.slice(0, 20).map((r) => ({ number: r.number, title: r.title, size: r.size, status: r.status, requestedBy: r.requestedBy, filed: fmt(r.createdAt) })) };
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : "Couldn't reach GitHub." };
+      }
     }
     case "entrance_status": {
       return await entranceStatus();

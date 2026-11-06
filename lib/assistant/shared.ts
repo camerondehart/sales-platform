@@ -32,6 +32,7 @@ export type ActionProposal = {
     | "faq_publish"
     | "faq_delete"
     | "entrance_theme"
+    | "site_request"
     | "ambassador"
     | "ambassador_payout"
     | "ambassador_report"
@@ -95,7 +96,7 @@ export type ActionProposal = {
 export type AdminRefreshKey =
   | "users" | "orders" | "products" | "discounts" | "settings" | "banner"
   | "events" | "subscribers" | "bundles" | "campaigns" | "templates" | "flags"
-  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance";
+  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance" | "site_requests";
 
 export type CampaignDraft = {
   subject: string;

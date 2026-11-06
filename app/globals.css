@@ -9113,3 +9113,22 @@ body:has(.admin-shell) .site-foot-made { margin-top: 0.1rem; opacity: 0.8; }
 .sr-form { display: grid; gap: 0.45rem; padding: 0.8rem; border: 1px dashed var(--rule); border-radius: 12px; }
 .sr-form input, .sr-form textarea, .sr-form select { font: inherit; padding: 0.5rem 0.65rem; border: 1px solid var(--rule-soft); border-radius: 8px; background: var(--surface, #fff); color: var(--ink); }
 .sr-form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; } .sr-form-row select { flex: 1 1 220px; }
+/* Site requests panel, tidied (2026-11-05): status pills, From line, actions, folded New request form. */
+.sr-intro { margin-top: -0.4rem; max-width: 70ch; }
+.sr-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.sr-head .sr-status { font-size: 0.72rem; letter-spacing: 0.02em; padding: 0.12rem 0.55rem; border-radius: 999px; background: rgba(127, 127, 127, 0.12); }
+.sr-meta strong { font-weight: 600; color: var(--ink); }
+.sr-actions { flex-wrap: wrap; align-items: center; }
+.sr-actions .esc-btn { padding: 0.35rem 0.8rem; font-size: 0.8rem; }
+.sr-remove { color: var(--danger-strong); }
+.sr-row.is-editing { display: block; }
+.sr-edit { border: 0; padding: 0; }
+.sr-edit-head { font-size: 0.9rem; }
+.sr-new { margin: 0.6rem 0 0.8rem; }
+.sr-new > summary { display: inline-flex; align-items: center; cursor: pointer; list-style: none; font-weight: 700; font-size: 0.88rem; padding: 0.4rem 0.9rem; border: 1px solid var(--rule); border-radius: 999px; color: var(--ink); }
+.sr-new > summary::-webkit-details-marker { display: none; }
+.sr-new[open] > summary { margin-bottom: 0.5rem; }
+.sr-msg { margin: 0.2rem 0 0.6rem; }
+html[data-admin-theme="dark"] .sr-waiting { background: rgba(236, 213, 142, 0.16); color: #ecd58e; }
+html[data-admin-theme="dark"] .sr-row.is-needs-approval { border-color: rgba(236, 213, 142, 0.45); }
+.sr-setup { margin: 0.2rem 0 0.4rem; padding-left: 1.2rem; display: grid; gap: 0.3rem; }

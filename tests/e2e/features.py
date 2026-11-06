@@ -1206,4 +1206,59 @@ check("preview background: staff see that season with a Stop bar", 'data-season=
 _s,_,_h=_raw("/", "fp_season_preview=winter")
 check("preview background: visitors with the cookie see nothing different", "season-preview-bar" not in _h, _s)
 
+# =============== Site change requests (Concierge → GitHub issue queue → the developer approves → worker builds)
+DEV=f"gallery_admin={T['dev']}"; STAFF=f"gallery_admin={T['staff']}"
+_s,_st=req("/api/admin/admins")
+_before=_st.get("admins",[])
+req("/api/admin/admins", {"admins": _before+[{"email":"dev@example.com","name":"Dev"},{"email":"sam@example.com","name":"Sam"}]}, method="PUT")
+_s,_r=req("/api/admin/site-requests", {"title":"Bigger shop heading","details":"Make the shop heading a little bigger on phones.","size":"small"}, cookie=STAFF)
+check("site requests: a small request goes straight to the build queue as a GitHub issue", _s==200 and _r["request"]["status"]=="ready" and _r["request"]["size"]=="small", (_s,_r))
+_gh=json.loads(urllib.request.urlopen(GW+"/__gh").read())
+check("site requests: the issue says who asked and carries the site's marker + labels", _gh and "sam@example.com" in _gh[-1]["body"] and "storefront-site-request" in _gh[-1]["body"] and set(["site-request","size:small","ready"])<=set(_gh[-1]["labels"]), _gh[-1:] )
+_s,_r=req("/api/admin/site-requests", {"title":"Change the checkout button","details":"Make the checkout payment button say Pay now.","size":"small"}, cookie=STAFF)
+check("site requests: anything touching money/sign-in/data is never 'small' (waits for the developer)", _s==200 and _r["request"]["status"]=="needs-approval" and _r["bumped"] is True, (_s,_r))
+check("site requests: bigger ones tell staff it's separate work and the developer will reach out", "separate work from the developer" in _r.get("message","") and "reach out" in _r.get("message",""), _r.get("message"))
+_n=_r["request"]["number"]
+_s,_x=req("/api/admin/site-requests", {"action":"approve","number":_n}, cookie=STAFF, method="PATCH")
+check("site requests: only the developer can approve (not other staff)", _s==403, (_s,_x))
+_s,_x=req("/api/admin/site-requests", {"action":"approve","number":_n}, cookie=ADMIN, method="PATCH")
+check("site requests: …and not the shared staff password", _s==403, (_s,_x))
+_s,_l=req("/api/admin/site-requests", cookie=DEV)
+check("site requests: the developer sees the queue with Approve rights", _s==200 and _l["canApprove"] is True and any(r["number"]==_n and r["status"]=="needs-approval" for r in _l["requests"]), _l)
+_s,_x=req("/api/admin/site-requests", {"action":"approve","number":_n}, cookie=DEV, method="PATCH")
+_gh=json.loads(urllib.request.urlopen(GW+"/__gh").read())
+_i=[i for i in _gh if i["number"]==_n][0]
+check("site requests: approving queues it for the worker", _s==200 and _x["request"]["status"]=="ready" and "ready" in _i["labels"] and "approved" in _i["labels"] and "needs-approval" not in _i["labels"] and any("Approved by dev@example.com" in c for c in _i["comments"]), (_s,_x,_i))
+_s,_r=req("/api/admin/site-requests", {"title":"Add a recipes section","details":"A new page of recipes using our products, linked from the shop.","size":"large"}, cookie=STAFF)
+_s2,_x=req("/api/admin/site-requests", {"action":"decline","number":_r["request"]["number"]}, cookie=DEV, method="PATCH")
+check("site requests: the developer can decline (closed, never built)", _s2==200 and _x["request"]["status"]=="declined", (_s2,_x))
+_s,_l=req("/api/admin/site-requests", cookie=STAFF)
+check("site requests: staff see statuses but no approve rights", _s==200 and _l["canApprove"] is False and len(_l["requests"])>=3, _l.get("canApprove"))
+check("site requests: the list says who asked, by name", any(r.get("requestedByName")=="Sam" and r["requestedBy"]=="sam@example.com" for r in _l["requests"]), _l["requests"][:1])
+_s,_r=req("/api/admin/site-requests", {"title":"Footer spacing","details":"Make the footer a little shorter top to bottom.","size":"small"}, cookie=STAFF)
+_n=_r["request"]["number"]
+_s,_x=req("/api/admin/site-requests", {"action":"edit","number":_n,"title":"Footer spacing on phones","details":"Make the footer a little shorter on phones only.","size":"small"}, cookie=STAFF, method="PATCH")
+check("site requests: only the developer can edit (not other staff)", _s==403, (_s,_x))
+_s,_x=req("/api/admin/site-requests", {"action":"edit","number":_n,"title":"Footer spacing on phones","details":"Make the footer a little shorter on phones only.","size":"small"}, cookie=DEV, method="PATCH")
+_gh=json.loads(urllib.request.urlopen(GW+"/__gh").read()); _i=[i for i in _gh if i["number"]==_n][0]
+check("site requests: the developer can edit the title and description (marker and who asked kept)", _s==200 and _x["request"]["status"]=="ready" and _i["title"]=="Footer spacing on phones" and "on phones only" in _i["body"] and "storefront-site-request" in _i["body"] and "sam@example.com" in _i["body"] and any("Edited by dev@example.com" in c for c in _i["comments"]), (_s,_x,_i))
+_s,_x=req("/api/admin/site-requests", {"action":"edit","number":_n,"title":"Footer spacing on phones","details":"Make the footer shorter and change the login button.","size":"small"}, cookie=DEV, method="PATCH")
+_gh=json.loads(urllib.request.urlopen(GW+"/__gh").read()); _i=[i for i in _gh if i["number"]==_n][0]
+check("site requests: an edit that touches sign-in is sized up and waits", _s==200 and _x["request"]["status"]=="needs-approval" and "size:medium" in _i["labels"] and "ready" not in _i["labels"] and "Do not start" in _i["body"], (_s,_x,_i["labels"]))
+_s,_x=req("/api/admin/site-requests", {"action":"remove","number":_n}, cookie=STAFF, method="PATCH")
+check("site requests: only the developer can remove (not other staff)", _s==403, (_s,_x))
+_s,_x=req("/api/admin/site-requests", {"action":"remove","number":_n}, cookie=DEV, method="PATCH")
+_gh=json.loads(urllib.request.urlopen(GW+"/__gh").read()); _i=[i for i in _gh if i["number"]==_n][0]
+_s2,_l=req("/api/admin/site-requests", cookie=DEV)
+check("site requests: the developer can remove one (closed on GitHub, gone from the list)", _s==200 and _i["state"]=="closed" and "removed" in _i["labels"] and "ready" not in _i["labels"] and not any(r["number"]==_n for r in _l["requests"]), (_s,_x,_i["labels"]))
+_r=atool("propose_site_request", {"title":"Softer footer text","details":"Make the footer links a touch larger on phones.","size":"small"})
+_c=(_r.get("actions") or [None])[0]
+check("concierge site requests: a card to file it (nothing filed until confirmed)", _c and _c["kind"]=="site_request" and _c["request"]["url"]=="/api/admin/site-requests" and any("build queue" in l for l in _c["lines"]), _c)
+_r=atool("propose_site_request", {"title":"Change discount rules","details":"Let discount codes stack with bundles.","size":"small"})
+_c=(_r.get("actions") or [None])[0]
+check("concierge site requests: money changes are sized up to wait for the developer", _c and _c["request"]["body"]["size"]=="medium" and any("separate work from the developer" in l and "reach out" in l for l in _c["lines"]), _c and _c["lines"])
+_r=atool("list_site_requests", {})
+check("concierge site requests: can say what happened to a request", "needs-approval" in _r.get("reply","") or "ready" in _r.get("reply",""), _r.get("reply","")[:200])
+req("/api/admin/admins", {"admins": _before}, method="PUT")
+
 print(f"\n{sum(res)}/{len(res)} passed")

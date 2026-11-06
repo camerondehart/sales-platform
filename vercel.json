@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "request-*": false
+    }
+  },
   "crons": [
     {
       "path": "/api/admin/export-email",

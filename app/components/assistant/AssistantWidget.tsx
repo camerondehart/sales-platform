@@ -256,6 +256,30 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   const audience: "public" | "member" | "admin" =
     mode === "admin" ? "admin" : path.startsWith("/gallery") ? "member" : "public";
 
+  // Staff starter buttons come from today's bulletin (same list as the Overview card):
+  // the top open items that the Concierge can prepare cards for. Falls back to the fixed ones.
+  const [todayChips, setTodayChips] = useState<Array<{ id: string; label: string; ask: string }> | null>(null);
+  useEffect(() => {
+    if (audience !== "admin" || !open || messages.length > 0) return;
+    let live = true;
+    fetch("/api/admin/today", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { tasks?: Array<{ id: string; task: string; ask?: string }>; done?: string[] } | null) => {
+        if (!live || !d?.tasks) return;
+        const done = new Set(d.done || []);
+        setTodayChips(
+          d.tasks
+            .filter((t) => t.ask && !done.has(t.id))
+            .slice(0, 3)
+            .map((t) => ({ id: t.id, label: t.task.length > 70 ? `${t.task.slice(0, 68).trimEnd()}…` : t.task, ask: t.ask as string })),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [audience, open, messages.length]);
+
   // ------------------------------------------------------------- bootstrap
   useEffect(() => {
     setPath(window.location.pathname);
@@ -520,6 +544,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
       if ((action.kind === "order_message" || action.kind === "member_message" || action.kind === "resend_invoice") && data?.sentTo) note = `Sent to ${data.sentTo}.`;
       if (action.kind === "member_create") note = data?.emailSent === false ? "Account created — but the welcome email didn't send. Ask me to email them a fresh password." : "Account created and emailed.";
       if (action.kind === "campaign_send") note = data?.scheduled ? "Scheduled — cancel it any time before it goes out." : `Sending to ${data?.sent ?? data?.total ?? "your list"}.`;
+      if (action.kind === "site_request" && typeof data?.message === "string") note = data.message;
       if (action.kind === "campaign_test") note = "Test sent to the team inbox.";
       if (action.kind === "member_password") note = data?.email?.ok === false ? "Password changed — but the email didn't send. Try again, or ask them to use “Forgot password”." : "New password emailed to them.";
       if (action.kind === "shipping_label" && data?.trackingNumber) note = `Label bought — tracking ${data.trackingNumber}.`;
@@ -685,11 +710,24 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                     : "Ask about our products, your order, membership or your account. If I can't sort it, I'll pass you to the team."}
                 </p>
                 <div className="as-chips">
-                  {SUGGESTIONS[audience].map((s) => (
-                    <button key={s} className="as-chip" onClick={() => send(s)}>
-                      {s}
-                    </button>
-                  ))}
+                  {audience === "admin" && todayChips && todayChips.length > 0 ? (
+                    <>
+                      {todayChips.map((c) => (
+                        <button key={c.id} className="as-chip" onClick={() => send(c.ask)} title="From today's list on the Overview">
+                          {c.label}
+                        </button>
+                      ))}
+                      <button className="as-chip" onClick={() => send(SUGGESTIONS.admin[0])}>
+                        {SUGGESTIONS.admin[0]}
+                      </button>
+                    </>
+                  ) : (
+                    SUGGESTIONS[audience].map((s) => (
+                      <button key={s} className="as-chip" onClick={() => send(s)}>
+                        {s}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             ) : (

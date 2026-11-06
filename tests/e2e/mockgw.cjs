@@ -18,12 +18,34 @@ const reply = (res, msg, model = "anthropic/claude-haiku-4.5") => {
   res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify({ id: "x", object: "chat.completion", model, choices: [{ index: 0, message: { role: "assistant", ...msg }, finish_reason: msg.tool_calls ? "tool_calls" : "stop" }], usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100 } }));
 };
+const ghIssues = [];
 http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
   req.on("end", () => {
     if (req.url.endsWith("/models")) { res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(models)); }
     if (req.url === "/__log") { res.writeHead(200); return res.end(JSON.stringify(log)); }
+    // Pretend GitHub for site change requests (GITHUB_API_URL=…/gh).
+    if (req.url.startsWith("/gh/")) {
+      if (req.headers["authorization"] !== "Bearer gh_test") { res.writeHead(401); return res.end("{}"); }
+      const path = req.url.slice(3).split("?")[0];
+      const send = (code, obj) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
+      const asIssue = (i) => ({ ...i, labels: i.labels.map((name) => ({ name })) });
+      const m = path.match(/^\/repos\/[^/]+\/[^/]+\/issues(?:\/(\d+))?(\/comments)?$/);
+      if (!m) return send(404, { message: "Not Found" });
+      if (!m[1] && req.method === "GET") return send(200, [...ghIssues].reverse().map(asIssue));
+      if (!m[1] && req.method === "POST") {
+        const j = JSON.parse(body || "{}");
+        const i = { number: ghIssues.length + 1, title: j.title, body: j.body, labels: j.labels || [], state: "open", html_url: `https://github.com/x/y/issues/${ghIssues.length + 1}`, created_at: new Date().toISOString(), comments: [] };
+        ghIssues.push(i); return send(201, asIssue(i));
+      }
+      const i = ghIssues.find((x) => x.number === Number(m[1]));
+      if (!i) return send(404, { message: "Not Found" });
+      if (m[2] && req.method === "POST") { i.comments.push(JSON.parse(body || "{}").body); return send(201, { id: i.comments.length }); }
+      if (req.method === "PATCH") { const j = JSON.parse(body || "{}"); if (j.labels) i.labels = j.labels; if (j.state) i.state = j.state; if (j.title) i.title = j.title; if (j.body) i.body = j.body; if (j.state_reason) i.state_reason = j.state_reason; return send(200, asIssue(i)); }
+      return send(200, asIssue(i));
+    }
+    if (req.url === "/__gh") { res.writeHead(200); return res.end(JSON.stringify(ghIssues)); }
     // Resend mock
     if (req.url === "/emails" && req.method === "POST") {
       if (mailFail) { res.writeHead(500, { "content-type": "application/json" }); return res.end(JSON.stringify({ name: "internal_server_error", message: "boom" })); }
