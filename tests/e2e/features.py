@@ -1,4 +1,4 @@
-import json, urllib.request, time, os, glob, hmac, hashlib, base64, datetime
+import json, urllib.request, time, os, glob, hmac, hashlib, base64, datetime, re
 from zoneinfo import ZoneInfo
 BASE="http://127.0.0.1:3470"; GW="http://127.0.0.1:4555"; D="/tmp/final/data/"
 T=json.load(open("/tmp/harness/tokens.json")); ADMIN=f"gallery_admin={T['admin']}"; MEMBER=f"gallery_visitor={T['member']}"
@@ -748,6 +748,36 @@ _s,_h=page("/nosuchperson")
 check("ambassadors: an unknown name is a normal 404", _s==404, _s)
 _s,_h=page("/retail")
 check("ambassadors: real pages still win (/retail is the shop)", _s==200 and "morning ritual" not in _h and "retail-intro" in _h, _s)
+# Looks + welcome (lib/ambassadorLooks.ts, switch ambassador_welcome)
+_s,_h=page("/mayarose")
+check("ambassador looks: no emoji = Botanical, with the welcome and a pick ribbon", 'amb-look-botanical' in _h and 'data-amb-welcome' in _h and 'class="amb-welcome' in _h and 'class="card-pick"' in _h and "s pick</span>" in _h, _h[:200])
+_base={k:_amb[k] for k in ("name","slug","headline","bio","photo","productIds","socials","discountCode") if k in _amb}
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"headline":"Maya's cosmic picks 👽"}, method="PUT")
+_s2,_h=page("/mayarose")
+check("ambassador looks: Auto reads the headline's emoji (👽 = Cosmic); the emoji becomes a badge, not part of the title", _s==200 and 'amb-look-cosmic' in _h and 'class="amb-emoji"' in _h and ">Maya&#x27;s cosmic picks</h2>" in _h, (_s,_x.get("error"),_h.count("amb-look-")))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"look":"golden"}, method="PUT")
+check("ambassador looks: staff can pick a look", _s==200 and _x["ambassador"].get("look")=="golden" and 'amb-look-golden' in page("/mayarose")[1], (_s,_x.get("error")))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"]}, method="PUT")
+check("ambassador looks: saving without a look keeps the one chosen", _s==200 and _x["ambassador"].get("look")=="golden", _x.get("ambassador",{}).get("look"))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"look":"<script>"}, method="PUT")
+check("ambassador looks: an unknown look falls back to Auto", _s==200 and _x["ambassador"].get("look")=="auto", _x.get("ambassador",{}).get("look"))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"headline":"Maya's picks 👽","emoji":"🌸 hello","look":"auto"}, method="PUT")
+_h=page("/mayarose")[1]
+check("ambassador emoji: staff can pick their own (one emoji kept), and Auto follows it (🌸 = Blossom)", _s==200 and _x["ambassador"].get("emoji")=="🌸" and 'amb-look-blossom' in _h and '<span class="amb-emoji" aria-hidden="true">🌸</span>' in _h and ">Maya&#x27;s picks</h2>" in _h, (_s,_x.get("ambassador",{}).get("emoji")))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"headline":"Maya's picks 👽","showEmoji":False}, method="PUT")
+_h=page("/mayarose")[1]
+check("ambassador emoji: it can be switched off (no badge, and the headline's emoji is left out)", _s==200 and _x["ambassador"].get("showEmoji") is False and 'class="amb-emoji"' not in _h and "👽" not in _h, (_s,_x.get("error")))
+check("ambassador page: a gentle membership card under their picks, to the request form", 'class="amb-join' in _h and re.search(r"Love what (<!-- -->)?Maya(<!-- -->)? loves\?", _h) is not None and 'href="/#join"' in _h)
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"showEmoji":True,"emoji":"","look":"golden"}, method="PUT")
+check("ambassador emoji: switched back on with none picked uses the headline's (or none)", _s==200 and _x["ambassador"].get("showEmoji") is True and not _x["ambassador"].get("emoji"), _x.get("ambassador",{}))
+check("membership request: /#join opens the request form on the homepage", 'id="join"' in page("/")[1])
+_h=page("/mayarose")[1]
+check("ambassador page: their working promo code (MAYA10, 10%) is called out in the hero with Copy", 'class="amb-offer' in _h and ">MAYA10</span>" in _h and ">10% off</strong>" in _h, 'amb-offer' in _h)
+check("ambassador page: the site's seasonal valley sits behind it (soft, like the members' gallery)", 'class="scene scene-soft"' in _h)
+req("/api/admin/flags", {"key":"ambassador_welcome","on":False})
+_h=page("/mayarose")[1]
+check("ambassador welcome: switched off = no welcome (the look still styles the page)", 'class="amb-welcome' not in _h and 'data-amb-welcome' not in _h and 'amb-look-' in _h)
+req("/api/admin/flags", {"key":"ambassador_welcome","on":True})
 def rcheck(amb, ip):
     b={"items":[{"productId":"p_pub","quantity":1}],"name":"Ava Shopper","email":"ava@example.com","address":_ADDR}
     if amb is not None: b["ambassador"]=amb

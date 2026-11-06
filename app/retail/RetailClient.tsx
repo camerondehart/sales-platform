@@ -35,6 +35,8 @@ export default function RetailClient({
   stores = false,
   featuredIds,
   intro,
+  pickedBy,
+  outro,
   pickup = false,
 }: {
   products: Product[];
@@ -45,6 +47,10 @@ export default function RetailClient({
   featuredIds?: string[];
   /** Ambassador pages: replaces the shop's intro. */
   intro?: React.ReactNode;
+  /** Ambassador pages: their first name, for a "Toni's pick" ribbon on each featured card. */
+  pickedBy?: string;
+  /** Ambassador pages: shown under the products (the gentle membership card). */
+  outro?: React.ReactNode;
   /** cash_pickup switch: Local pickup (invoice or cash at pickup) in checkout. */
   pickup?: boolean;
 }) {
@@ -196,6 +202,7 @@ export default function RetailClient({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.image} alt={p.name} loading="lazy" />
                   <ProductFlags product={p} />
+                  {pickedBy && <span className="card-pick">♥ {pickedBy}&rsquo;s pick</span>}
                   {p.video && <span className="card-video-chip">▶ Video</span>}
                 </div>
                 <div className="card-meta" onClick={() => setSelected(p)}>
@@ -213,6 +220,8 @@ export default function RetailClient({
           </div>
           </>
         )}
+
+        {!embedded && outro}
 
         {!embedded && (
         <footer className="footnotes">

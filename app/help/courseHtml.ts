@@ -876,7 +876,7 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
 
 <h3>What an ambassador gets</h3>
 <ul>
-<li><strong>Their own page</strong> at <strong>{{HOST}}/their-name</strong>: their photo, a few words, links to their socials and the products they pick, each with Add to cart. It isn’t in the site’s menus or on Google. People only reach it through their link or QR code.</li>
+<li><strong>Their own page</strong> at <strong>{{HOST}}/their-name</strong>: their photo, a few words, links to their socials and the products they pick (each marked <em>“Toni’s pick”</em>), with Add to cart. Their <strong>discount code</strong> is called out near the top (e.g. <em>“10% off with Toni’s code TONI10”</em>, with a Copy button) while the code is active, not expired and not used up. The site’s seasonal background sits behind the page like everywhere else. Under the products is a gentle <em>“Love what Toni loves?”</em> card that invites visitors to request membership. The page has <strong>its own look</strong> (Cosmic, Botanical, Blossom or Golden hour) and opens with a short <strong>welcome animation</strong>: their photo in a glowing ring, their headline and a drift of their emoji, once per visit (tap to skip). It isn’t in the site’s menus or on Google. People only reach it through their link or QR code.</li>
 <li><strong>Credit for sales</strong>: orders from people who came through their page (within their attribution window) or members who used their code.</li>
 <li><strong>Commission</strong> on those sales, worked out for you, and a <strong>progress report</strong> you can email them any time.</li>
 </ul>
@@ -884,7 +884,7 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
 <h3>Adding an ambassador</h3>
 <ol class="steps">
 <li>Open the <strong>Ambassadors</strong> tab and press <kbd>+ Add an ambassador</kbd>.</li>
-<li><strong>Their page</strong>: name, page address (fills itself in), optional headline, a few words in their voice, a photo (<kbd>Upload photo</kbd>), the <strong>featured products</strong> in order (↑ ↓; public-shop products only; none = whole shop) and their <strong>social links</strong> (each gets its icon).</li>
+<li><strong>Their page</strong>: name, page address (fills itself in), optional headline, a few words in their voice, a photo (<kbd>Upload photo</kbd>), the <strong>featured products</strong> in order (↑ ↓; public-shop products only; none = whole shop) and their <strong>social links</strong> (each gets its icon). <strong>Page look &amp; welcome</strong>: leave it on <em>Auto</em> and it’s picked from their emoji (👽 or ✨ = Cosmic, 🌸 = Blossom, ☀️ = Golden hour, otherwise Botanical), or choose one. Once saved, <kbd>Preview welcome ↗</kbd> plays it on their page. <strong>Their emoji</strong> sits on their photo and drifts through their welcome: tap one of the suggestions or type any emoji (empty = the one in their headline), or untick <em>Show an emoji</em> to have none.</li>
 <li><strong>Their terms</strong>, copied from their agreement:
   <ul>
   <li><strong>Their email</strong>: where progress reports go.</li>
@@ -1168,6 +1168,7 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Seasonal entrance animations</strong> (on): the members' entrance changes with the seasons and holidays (choose or preview in Settings → Entrance animation). Off = always the original.</li>
 <li><strong>Seasonal site backgrounds</strong> (on): the site's background softly follows the same season or holiday as the entrance, with a few things drifting down. Off = the usual look.</li>
 <li><strong>Site change requests</strong> (on): staff can ask the Concierge (or Settings → Site requests) for website changes; small ones are built onto stage automatically, bigger ones wait for your developer. Off hides the panel and the Concierge stops taking requests. Needs setting up first (Settings → Site requests shows what's missing).</li>
+<li><strong>Ambassador welcome animations</strong> (on): each ambassador’s page opens with their short welcome. Off = the page opens straight away (it keeps its look).</li>
 <li><strong>Member sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Members get the one-tap sign-in and the popup offering it after they sign in. Off hides both; saved devices stay saved.</li>
 <li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>

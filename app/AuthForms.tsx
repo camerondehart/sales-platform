@@ -14,9 +14,13 @@ export default function AuthForms({ codeLogin = false, staffLink = false, faceId
   const [mode, setMode] = useState<Mode>("signin");
   // The email typed on the password form carries over to "Email me a code".
   const [typedEmail, setTypedEmail] = useState("");
+  // <site>/#join (e.g. from an ambassador's page) opens the membership request.
+  useEffect(() => {
+    if (window.location.hash === "#join") setMode("signup");
+  }, []);
 
   return (
-    <div className="auth">
+    <div className="auth" id="join">
       <div className="auth-tabs" role="tablist">
         <button
           className={`auth-tab ${mode !== "signup" ? "active" : ""}`}

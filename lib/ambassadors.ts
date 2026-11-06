@@ -1,3 +1,4 @@
+import { cleanEmoji, cleanLook, type LookChoice } from "./ambassadorLooks";
 import path from "path";
 import { VersionedStore } from "./versionedStore";
 import { pacificDay } from "./periods";
@@ -79,6 +80,12 @@ export type Ambassador = {
   /** Public-shop products on their page, in this order. */
   productIds: string[];
   socials: SocialLink[];
+  /** Page + welcome animation style (lib/ambassadorLooks.ts); missing/"auto" = picked from their emoji. */
+  look?: LookChoice;
+  /** The emoji on their photo and in their welcome; empty = the one in their headline, if any. */
+  emoji?: string;
+  /** false = no emoji at all (badge, welcome drift). */
+  showEmoji?: boolean;
   /** Existing discount code that also credits them (members' checkout). */
   discountCode?: string;
   /** Where progress reports go. */
@@ -227,6 +234,10 @@ export function cleanAmbassador(input: Record<string, unknown>, others: Ambassad
       photo: photo || undefined,
       productIds,
       socials,
+      // Only when sent, so an older form (or the Concierge) never resets it.
+      ...(input.look !== undefined ? { look: cleanLook(input.look) } : {}),
+      ...(input.emoji !== undefined ? { emoji: cleanEmoji(input.emoji) || undefined } : {}),
+      ...(input.showEmoji !== undefined ? { showEmoji: input.showEmoji !== false } : {}),
       discountCode: discountCode || undefined,
       email: email || undefined,
       ...(terms.value ? { terms: terms.value } : {}),

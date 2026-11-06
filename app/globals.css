@@ -9132,3 +9132,152 @@ body:has(.admin-shell) .site-foot-made { margin-top: 0.1rem; opacity: 0.8; }
 html[data-admin-theme="dark"] .sr-waiting { background: rgba(236, 213, 142, 0.16); color: #ecd58e; }
 html[data-admin-theme="dark"] .sr-row.is-needs-approval { border-color: rgba(236, 213, 142, 0.45); }
 .sr-setup { margin: 0.2rem 0 0.4rem; padding-left: 1.2rem; display: grid; gap: 0.3rem; }
+
+/* ─────────────── Ambassador pages: looks, welcome, page (2026-11-06) ───────────────
+   One look per ambassador (lib/ambassadorLooks.ts). Only transforms and opacity animate; no
+   backdrop-filter or blend modes (scrolling rule). The welcome is a single full-screen layer. */
+.amb-look-cosmic    { --amb-a: #7f97ad; --amb-b: #a9c9c2; --amb-ink: #4d6478; --amb-deep: #121b26; --amb-deep2: #2a3d52; --amb-tint: rgba(127, 151, 173, 0.13); --amb-tint2: rgba(169, 201, 194, 0.15); }
+.amb-look-botanical { --amb-a: #85ba45; --amb-b: #3f8f6b; --amb-ink: #4f7f22; --amb-deep: #0f2417; --amb-deep2: #24482c; --amb-tint: rgba(133, 186, 69, 0.12); --amb-tint2: rgba(63, 143, 107, 0.10); }
+.amb-look-blossom   { --amb-a: #d39a98; --amb-b: #e8c2a6; --amb-ink: #a3625e; --amb-deep: #2c1a1b; --amb-deep2: #5b3535; --amb-tint: rgba(211, 154, 152, 0.13); --amb-tint2: rgba(232, 194, 166, 0.15); }
+.amb-look-golden    { --amb-a: #d1a45c; --amb-b: #e6cf9a; --amb-ink: #876126; --amb-deep: #251b0e; --amb-deep2: #564020; --amb-tint: rgba(209, 164, 92, 0.13); --amb-tint2: rgba(230, 207, 154, 0.16); }
+
+/* Welcome */
+html[data-amb-welcome="skip"] .amb-welcome, html[data-amb-welcome="done"] .amb-welcome { display: none; }
+.amb-welcome {
+  position: fixed; inset: 0; z-index: 1200; overflow: hidden; cursor: pointer; display: grid; place-items: center;
+  color: #fff; text-align: center; transition: opacity 0.65s ease, transform 0.65s ease;
+  /* Safety net: fades itself away even if the page's script never runs. */
+  animation: aw-auto-out 0.6s ease 4.4s forwards;
+}
+.amb-welcome.is-leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
+@keyframes aw-auto-out { to { opacity: 0; visibility: hidden; pointer-events: none; } }
+.aw-sky { position: absolute; inset: 0; background: radial-gradient(120% 80% at 50% 110%, var(--amb-deep2) 0%, var(--amb-deep) 62%); }
+.aw-glow { position: absolute; left: 50%; top: 42%; width: min(90vw, 620px); aspect-ratio: 1; transform: translate(-50%, -50%) scale(0.6); border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--amb-a) 55%, transparent) 0%, transparent 65%); opacity: 0; animation: aw-glow 2.4s ease 0.15s forwards; }
+@keyframes aw-glow { to { opacity: 0.85; transform: translate(-50%, -50%) scale(1); } }
+.aw-stars span { position: absolute; border-radius: 50%; background: #fff; opacity: 0; animation: aw-twinkle 2.2s ease-in-out infinite; }
+@keyframes aw-twinkle { 0%, 100% { opacity: 0.1; transform: scale(0.7); } 50% { opacity: 0.9; transform: scale(1); } }
+.amb-look-botanical .aw-stars span, .amb-look-golden .aw-stars span { background: var(--amb-b); }
+.amb-look-blossom .aw-stars span { background: #ffd3e1; }
+.aw-center { position: relative; display: grid; justify-items: center; gap: 0.55rem; padding: 0 1.25rem; }
+.aw-ring { position: relative; width: clamp(150px, 34vw, 210px); aspect-ratio: 1; margin-bottom: 0.8rem; opacity: 0; transform: scale(0.82); animation: aw-pop 0.9s cubic-bezier(0.2, 0.9, 0.25, 1.15) 0.2s forwards; }
+@keyframes aw-pop { to { opacity: 1; transform: scale(1); } }
+.aw-ring img, .aw-initial { position: absolute; inset: 9%; width: 82%; height: 82%; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 50px color-mix(in srgb, var(--amb-a) 70%, transparent); }
+.aw-initial { display: grid; place-items: center; background: var(--amb-deep2); font-family: var(--font-display); font-style: italic; font-size: 4rem; }
+.aw-ring-line { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.aw-ring-line circle { fill: none; stroke: var(--amb-b); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 100; animation: aw-draw 1.3s ease 0.35s forwards; filter: drop-shadow(0 0 6px var(--amb-b)); }
+@keyframes aw-draw { to { stroke-dashoffset: 0; } }
+.aw-badge { position: absolute; right: 2%; bottom: 6%; width: 26%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #fff; font-size: clamp(1.4rem, 4vw, 1.9rem);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); opacity: 0; transform: scale(0.3) rotate(-30deg); animation: aw-badge 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) 1.1s forwards; }
+@keyframes aw-badge { to { opacity: 1; transform: scale(1) rotate(0); } }
+.aw-kicker, .aw-title, .aw-sub { opacity: 0; transform: translateY(14px); animation: aw-rise 0.8s ease forwards; }
+.aw-kicker { font-family: var(--font-sans); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.28em; text-transform: uppercase; color: var(--amb-b); animation-delay: 0.75s; }
+.aw-title { font-family: var(--font-display); font-style: italic; font-size: clamp(2.3rem, 8vw, 4.2rem); line-height: 1.02; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.35); animation-delay: 0.95s; }
+.aw-sub { font-family: var(--font-serif); font-style: italic; font-size: clamp(1rem, 3vw, 1.2rem); color: rgba(255, 255, 255, 0.78); animation-delay: 1.3s; }
+@keyframes aw-rise { to { opacity: 1; transform: none; } }
+.aw-drift span { position: absolute; bottom: -2.5rem; opacity: 0; animation: aw-drift 3s ease-in forwards; color: var(--amb-b); text-shadow: 0 0 12px color-mix(in srgb, var(--amb-b) 60%, transparent); }
+@keyframes aw-drift { 0% { opacity: 0; transform: translate(0, 0) rotate(0); } 15% { opacity: 0.95; } 100% { opacity: 0; transform: translate(var(--sway, 10px), -78vh) rotate(25deg); } }
+.aw-skip { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); font-family: var(--font-sans); font-size: 0.66rem; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); }
+@media (prefers-reduced-motion: reduce) { .amb-welcome { display: none; } }
+
+/* Page: the reveal waits under the welcome, then plays */
+.amb-rv { opacity: 0; transform: translateY(14px); animation: amb-rv 0.75s cubic-bezier(0.2, 0.8, 0.25, 1) var(--d, 0s) forwards; }
+@keyframes amb-rv { to { opacity: 1; transform: none; } }
+/* While the welcome plays, the reveal waits for it (and still runs on its own if the welcome never lifts). */
+html[data-amb-welcome="play"] .amb-rv { animation-delay: calc(var(--d, 0s) + 3.6s); }
+@media (prefers-reduced-motion: reduce) { .amb-rv { opacity: 1; transform: none; animation: none; } }
+
+.amb-page .amb-card {
+  position: relative; overflow: hidden; isolation: isolate;
+  border-color: color-mix(in srgb, var(--amb-a) 28%, var(--rule-soft));
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--amb-tint) 0%, transparent 55%),
+    radial-gradient(90% 120% at 100% 100%, var(--amb-tint2) 0%, transparent 60%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.82));
+  box-shadow: 0 1px 2px rgba(97, 103, 109, 0.05), 0 26px 60px -28px color-mix(in srgb, var(--amb-a) 55%, rgba(60, 60, 60, 0.4));
+}
+.amb-aura { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.amb-orb { position: absolute; border-radius: 50%; opacity: 0.55; will-change: transform; }
+.amb-orb-1 { width: 340px; height: 340px; left: -90px; top: -120px; background: radial-gradient(circle, color-mix(in srgb, var(--amb-a) 30%, transparent), transparent 70%); animation: amb-float 14s ease-in-out infinite alternate; }
+.amb-orb-2 { width: 300px; height: 300px; right: -80px; bottom: -140px; background: radial-gradient(circle, color-mix(in srgb, var(--amb-b) 28%, transparent), transparent 70%); animation: amb-float 17s ease-in-out infinite alternate-reverse; }
+@keyframes amb-float { to { transform: translate(40px, 24px) scale(1.08); } }
+.amb-sparkle { position: absolute; color: var(--amb-a); opacity: 0.5; font-size: 0.9rem; animation: aw-twinkle 3.2s ease-in-out infinite; }
+.amb-sparkle-1 { right: 9%; top: 14%; } .amb-sparkle-2 { right: 22%; top: 30%; font-size: 0.7rem; animation-delay: 1.1s; } .amb-sparkle-3 { right: 6%; bottom: 18%; font-size: 1.1rem; animation-delay: 2s; }
+.amb-mark { position: absolute; right: 5%; top: 50%; font-size: clamp(6rem, 13vw, 11rem); line-height: 1; opacity: 0.14; transform: translateY(-50%) rotate(-10deg); animation: amb-mark 9s ease-in-out infinite; color: var(--amb-a); }
+@keyframes amb-mark { 50% { transform: translateY(-56%) rotate(-4deg); } }
+/* Cosmic: a few faint stars in the card */
+.amb-look-cosmic .amb-aura::before { content: ""; position: absolute; inset: 0; opacity: 0.5;
+  background-image: radial-gradient(1.5px 1.5px at 12% 20%, var(--amb-a), transparent), radial-gradient(1px 1px at 72% 18%, var(--amb-b), transparent), radial-gradient(1.5px 1.5px at 86% 64%, var(--amb-a), transparent), radial-gradient(1px 1px at 40% 82%, var(--amb-b), transparent), radial-gradient(1px 1px at 58% 40%, var(--amb-a), transparent); }
+
+.amb-portrait { position: relative; flex: none; width: clamp(140px, 22vw, 210px); aspect-ratio: 1; display: grid; place-items: center; }
+.amb-page .amb-photo { width: 86%; height: 86%; border: 0; box-shadow: 0 0 0 4px #fff, 0 16px 36px -12px color-mix(in srgb, var(--amb-a) 60%, rgba(40, 40, 40, 0.5)); }
+.amb-photo-blank { display: grid; place-items: center; border-radius: 50%; background: var(--amb-tint); color: var(--amb-ink); font-family: var(--font-display); font-style: italic; font-size: 3.4rem; }
+.amb-halo { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, var(--amb-a), var(--amb-b), color-mix(in srgb, var(--amb-a) 20%, transparent), var(--amb-a));
+  -webkit-mask: radial-gradient(circle, transparent 63%, #000 64.5%, #000 68%, transparent 69.5%); mask: radial-gradient(circle, transparent 63%, #000 64.5%, #000 68%, transparent 69.5%); animation: amb-spin 18s linear infinite; }
+@keyframes amb-spin { to { transform: rotate(360deg); } }
+.amb-emoji { position: absolute; right: 4%; bottom: 8%; width: 25%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #fff; font-size: clamp(1.3rem, 3vw, 1.75rem);
+  box-shadow: 0 6px 16px -4px rgba(60, 60, 60, 0.35); animation: amb-bob 3.6s ease-in-out infinite; }
+@keyframes amb-bob { 50% { transform: translateY(-5px) rotate(-6deg); } }
+.amb-kicker { font-family: var(--font-sans); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--amb-ink); }
+.amb-page .amb-title { font-size: clamp(2.4rem, 5.4vw, 3.6rem); }
+.amb-page .amb-name { color: var(--amb-ink); }
+.amb-quote { position: relative; margin: 1.7rem 0 0; padding: 0.2rem 0 0 1.4rem; border-left: 2px solid color-mix(in srgb, var(--amb-a) 45%, transparent); max-width: 62ch; }
+.amb-quote::before { content: "\201C"; position: absolute; left: 0.9rem; top: -1.55rem; font-family: var(--font-display); font-size: 3.4rem; line-height: 1; color: color-mix(in srgb, var(--amb-a) 45%, transparent); }
+.amb-quote .amb-bio:first-child { margin-top: 0; }
+.amb-sign { margin-top: 0.6rem; font-family: var(--font-display); font-style: italic; font-size: 1.35rem; color: var(--amb-ink); }
+.amb-page .amb-social { background: rgba(255, 255, 255, 0.85); }
+.amb-page .amb-social .line-icon { color: var(--amb-ink); }
+.amb-page .amb-social:hover { border-color: var(--amb-a); color: var(--amb-ink); box-shadow: 0 0 16px color-mix(in srgb, var(--amb-a) 30%, transparent); }
+.amb-page .amb-picks-head { align-items: flex-end; }
+.amb-picks-sub { margin: 0.25rem 0 0; font-family: var(--font-serif); font-style: italic; color: var(--ink-soft); }
+.amb-flourish { display: block; width: 170px; height: 12px; margin-top: 0.35rem; }
+.amb-flourish path { fill: none; stroke: var(--amb-a); stroke-width: 2.2; stroke-linecap: round; opacity: 0.75; }
+.amb-page .amb-picks-head a { color: var(--amb-ink); }
+.card-pick { position: absolute; left: 10px; bottom: 10px; z-index: 2; padding: 0.28rem 0.65rem; border-radius: 999px; pointer-events: none;
+  background: var(--amb-ink, var(--accent-strong)); color: #fff; font-family: var(--font-sans); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.35); }
+@media (max-width: 640px) {
+  .amb-quote { padding-left: 0; border-left: 0; }
+  .amb-quote::before { left: 50%; transform: translateX(-50%); top: -1.9rem; }
+  .amb-page .amb-picks-head { align-items: flex-start; flex-direction: column; gap: 0.5rem; }
+  .amb-sparkle-2 { display: none; }
+  .amb-mark { right: -1rem; top: 1rem; font-size: 5.5rem; opacity: 0.1; transform: rotate(-10deg); animation: none; }
+  .amb-quote { margin-top: 2rem; }
+}
+.amb-look-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.amb-look-row select { flex: 1 1 260px; }
+.amb-look-row .esc-btn { text-decoration: none; white-space: nowrap; }
+.amb-emoji-toggle { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 400; margin-bottom: 0.45rem; }
+.amb-emoji-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.amb-emoji-input { width: 4.2rem !important; text-align: center; font-size: 1.2rem; }
+.amb-emoji-pick { width: 2.4rem; height: 2.4rem; border: 1px solid var(--rule-soft); border-radius: 10px; background: var(--surface); font-size: 1.15rem; cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
+.amb-emoji-pick:hover { transform: translateY(-1px); border-color: var(--green); }
+.amb-emoji-pick.is-on { border-color: var(--green); box-shadow: 0 0 0 2px rgba(133, 186, 69, 0.35); }
+/* Ambassador pages: the gentle membership card under their picks */
+.amb-join { position: relative; overflow: hidden; display: flex; align-items: center; gap: clamp(1rem, 3vw, 2rem); margin: 2.6rem 0 0.5rem; padding: clamp(1.2rem, 3vw, 1.8rem) clamp(1.2rem, 3.5vw, 2.2rem);
+  border: 1px solid color-mix(in srgb, var(--amb-a) 30%, var(--rule-soft)); border-radius: 22px;
+  background: radial-gradient(110% 160% at 0% 50%, var(--amb-tint) 0%, transparent 60%), linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.8)); }
+.amb-join-mark { flex: none; width: 3.6rem; height: 3.6rem; display: grid; place-items: center; border-radius: 50%; background: #fff; font-size: 1.7rem; box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--amb-a) 55%, rgba(40, 40, 40, 0.4)); animation: amb-bob 4s ease-in-out infinite; }
+.amb-join-text { flex: 1; min-width: 0; }
+.amb-join h3 { margin: 0.25rem 0 0.2rem; font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: clamp(1.4rem, 3vw, 1.8rem); color: var(--ink); }
+.amb-join p { margin: 0; color: var(--ink-soft); line-height: 1.55; max-width: 56ch; }
+.amb-join-go { flex: none; padding: 0.7rem 1.2rem; border-radius: 999px; background: var(--amb-ink); color: #fff; text-decoration: none; font-family: var(--font-sans); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  box-shadow: 0 8px 20px -10px var(--amb-ink); transition: transform 0.15s ease, box-shadow 0.2s ease; }
+.amb-join-go:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -10px var(--amb-ink); }
+@media (max-width: 640px) {
+  .amb-join { flex-direction: column; text-align: center; }
+  .amb-join p { margin: 0 auto; }
+}
+
+/* Ambassador pages: their promo code, called out in the hero */
+.amb-offer { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem 1rem; margin: 0.9rem 0 0; padding: 0.7rem 0.75rem 0.7rem 1rem; width: fit-content; max-width: 100%;
+  border: 1.5px dashed color-mix(in srgb, var(--amb-a) 60%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--amb-a) 9%, #fff); }
+.amb-offer-text { font-size: 0.95rem; color: var(--ink); line-height: 1.35; }
+.amb-offer-text strong { color: var(--amb-ink); font-size: 1.05rem; }
+.amb-offer-text span { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.1rem; }
+.amb-code { display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.5rem 0.45rem 0.9rem; border: 0; border-radius: 999px; background: var(--amb-ink); color: #fff; cursor: pointer; font: inherit;
+  box-shadow: 0 8px 18px -10px var(--amb-ink); transition: transform 0.15s ease; }
+.amb-code:hover { transform: translateY(-1px); }
+.amb-code-text { font-family: var(--font-sans); font-weight: 800; letter-spacing: 0.14em; font-size: 0.95rem; }
+.amb-code-copy { padding: 0.25rem 0.65rem; border-radius: 999px; background: rgba(255, 255, 255, 0.2); font-family: var(--font-sans); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+@media (max-width: 640px) { .amb-offer { margin-left: auto; margin-right: auto; justify-content: center; text-align: center; } }

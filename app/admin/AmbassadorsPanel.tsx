@@ -6,6 +6,7 @@ import type { Ambassador, AmbassadorTerms } from "@/lib/ambassadors";
 import type { AmbassadorStats } from "@/lib/ambassadorStats";
 import { qrSvg } from "@/lib/qr";
 import MediaUpload from "./MediaUpload";
+import { AMBASSADOR_LOOKS, cleanEmoji, emojiFor, firstEmoji, lookFor, type LookChoice } from "@/lib/ambassadorLooks";
 import { useAdminRefresh } from "./useAdminRefresh";
 import type { AdminRefreshKey } from "@/lib/assistant/shared";
 import { brand, isOwnHost, TEAM } from "@/lib/brand";
@@ -25,6 +26,8 @@ type Form = {
   id?: string;
   name: string; slug: string; slugTouched: boolean; email: string;
   headline: string; bio: string; photo: string;
+  look: LookChoice;
+  emoji: string; showEmoji: boolean;
   productIds: string[];
   socials: Array<{ url: string; label: string }>;
   discountCode: string;
@@ -37,7 +40,7 @@ const blankTerms = (): TermsForm => ({
   commissionPct: "15", growthPct: "20", growthGoal: "", growthOn: false, discountPct: "10",
   trialDays: "90", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
 });
-const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
+const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
 
 const numStr = (n: number | undefined) => (typeof n === "number" ? String(n) : "");
 function termsForm(a: Ambassador): TermsForm {
@@ -50,7 +53,7 @@ function termsForm(a: Ambassador): TermsForm {
   };
 }
 const toForm = (a: Ambassador): Form => ({
-  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "",
+  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "", look: a.look || "auto", emoji: a.emoji || "", showEmoji: a.showEmoji !== false,
   productIds: a.productIds.slice(), socials: a.socials.length ? a.socials.map((s) => ({ url: s.url, label: s.label || "" })) : [{ url: "", label: "" }],
   discountCode: a.discountCode || "", active: a.active, terms: termsForm(a),
 });
@@ -162,7 +165,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
     if (!form) return;
     const t = form.terms;
     const body = {
-      id: form.id, name: form.name, slug: form.slug, email: form.email, headline: form.headline, bio: form.bio, photo: form.photo,
+      id: form.id, name: form.name, slug: form.slug, email: form.email, headline: form.headline, bio: form.bio, photo: form.photo, look: form.look, emoji: form.emoji, showEmoji: form.showEmoji,
       productIds: form.productIds, socials: form.socials.filter((s) => s.url.trim()), discountCode: form.discountCode, active: form.active,
       terms: { ...t },
     };
@@ -266,6 +269,50 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
         <div className="field full">
           <label htmlFor="amb-headline">Headline (optional)</label>
           <input id="amb-headline" value={form.headline} maxLength={120} onChange={(e) => set({ headline: e.target.value })} placeholder={`${form.name.split(" ")[0] || "Alex"}'s favorites`} />
+        </div>
+        <div className="field full">
+          <label htmlFor="amb-look">Page look &amp; welcome</label>
+          <div className="amb-look-row">
+            <select id="amb-look" value={form.look} onChange={(e) => set({ look: e.target.value as LookChoice })}>
+              <option value="auto">Auto: {AMBASSADOR_LOOKS[lookFor({ headline: form.headline, name: form.name, bio: form.bio, emoji: form.emoji, showEmoji: form.showEmoji })].label} (from their emoji)</option>
+              {Object.entries(AMBASSADOR_LOOKS).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}: {v.hint}</option>
+              ))}
+            </select>
+            {form.id && form.slug && (
+              <a className="esc-btn" href={`/${form.slug}?welcome=1`} target="_blank" rel="noopener noreferrer">Preview welcome ↗</a>
+            )}
+          </div>
+          <div className="field-hint">Colours their page and the short welcome animation visitors see when they arrive (once per visit). Save first to preview a change.</div>
+        </div>
+        <div className="field full">
+          <label htmlFor="amb-emoji">Their emoji</label>
+          <label className="amb-emoji-toggle">
+            <input type="checkbox" checked={form.showEmoji} onChange={(e) => set({ showEmoji: e.target.checked })} /> Show an emoji on their photo and in their welcome
+          </label>
+          {form.showEmoji && (
+            <div className="amb-emoji-row">
+              <input
+                id="amb-emoji"
+                className="amb-emoji-input"
+                value={form.emoji}
+                maxLength={16}
+                onChange={(e) => set({ emoji: e.target.value })}
+                placeholder={firstEmoji(form.headline) || "🌿"}
+                aria-label="Emoji"
+              />
+              {["👽", "✨", "🌙", "🌿", "🍄", "🌸", "☀️", "🔥", "💜", "🦋"].map((e) => (
+                <button key={e} type="button" className={`amb-emoji-pick${cleanEmoji(form.emoji) === cleanEmoji(e) ? " is-on" : ""}`} onClick={() => set({ emoji: e })} aria-label={`Use ${e}`}>
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="field-hint">
+            {form.showEmoji
+              ? `Pick one, or type any emoji. Empty = the one in their headline${firstEmoji(form.headline) ? ` (${firstEmoji(form.headline)})` : " (there isn't one, so no emoji shows)"}. Showing now: ${emojiFor(form) || "none"}.`
+              : "No emoji on their page or in their welcome. An emoji typed into the headline is left out too."}
+          </div>
         </div>
         <div className="field full">
           <label htmlFor="amb-bio">A few words (optional)</label>

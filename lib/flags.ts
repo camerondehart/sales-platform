@@ -44,6 +44,7 @@ export const FLAG_KEYS = [
   "seasonal_entrance",
   "seasonal_site",
   "site_requests",
+  "ambassador_welcome",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -206,6 +207,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   site_requests: {
     label: "Site change requests",
     description: "Staff can ask the staff Concierge for changes to the site. Small ones (wording, colours, layout tweaks) go straight to the developer's build queue and appear on stage at the next build run; medium and large ones wait in Settings → Site requests for the developer to approve. Needs GITHUB_SITE_REQUESTS_REPO and GITHUB_SITE_REQUESTS_TOKEN set (and a scheduled worker, see README); the live site is only ever updated when the developer puts stage live.",
+    defaults: on,
+    built: true,
+  },
+  ambassador_welcome: {
+    label: "Ambassador welcome animations",
+    description: "Each ambassador's page opens with a short welcome (about 3 seconds, once per visit, tap to skip): their photo in a glowing ring, their headline and a drift of their emoji, in their page's look (Cosmic, Botanical, Blossom or Golden hour; Auto picks from the emoji in their headline). Pick the look in the Ambassadors tab. Off = the page opens straight away (the look still styles the page).",
     defaults: on,
     built: true,
   },
