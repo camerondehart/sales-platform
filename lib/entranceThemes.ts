@@ -43,6 +43,10 @@ export type EntranceTheme = {
     /** Firework colours (default: gold, pink, blue, lilac). */
     fireworkColors?: string[];
     rainbow?: boolean;
+    /** Northern lights across the sky. */
+    aurora?: boolean;
+    /** A little yeti who pops up and waves (winter Easter egg). */
+    yeti?: boolean;
     /** A pot of gold with a dancing leprechaun (St. Patrick's). */
     leprechaun?: boolean;
     /** A big gobbling turkey (Thanksgiving). */
@@ -108,12 +112,13 @@ export const ENTRANCE_THEMES: Record<EntranceKey, EntranceTheme> = {
   winter: {
     key: "winter", label: "Winter", emoji: "❄️", greeting: "Warm wishes this winter", when: "December to February",
     vars: {
-      "--en-sky-top": "#5b7f9e", "--en-sky-mid": "#b9cfdc", "--en-sky-low": "#e6eef3", "--en-sky-hor": "#f4f7f9", "--en-sun": "#fffaf0",
-      ...WINTER_VARS, "--en-cap": "#c94f43", "--en-kicker": "#c94f43",
+      "--en-sky-top": "#14284a", "--en-sky-mid": "#2f5f8f", "--en-sky-low": "#9cc6e8", "--en-sky-hor": "#eaf4fc", "--en-sun": "#fff8ec",
+      ...WINTER_VARS, "--en-meadow": "#f2f8fd", "--en-meadow2": "#dfeefa", "--en-meadow3": "#c8e0f4", "--en-far1": "#9ab8d8", "--en-far2": "#c4d9ee", "--en-mist": "226, 240, 252",
+      "--en-cap": "#e05a6a", "--en-kicker": "#3f86c6",
     },
     burst: ["#ffffff", "#dce9f2", "#b8d0e0", "#ffffff", "#9fbfd4"],
     falling: { kind: "snow", colors: ["#ffffff"], count: 40 },
-    ground: "shrooms", extras: { snowcaps: true, snowman: true },
+    ground: "shrooms", extras: { snowcaps: true, snowman: true, aurora: true, yeti: true, stars: true },
   },
   valentines: {
     key: "valentines", label: "Valentine's", emoji: "💗", greeting: "Happy Valentine's Day", when: "February 7 to 14",

@@ -6,6 +6,13 @@ import Tracker from "./components/Tracker";
 import SiteFooter from "./SiteFooter";
 import { getBanner } from "@/lib/banner";
 import { brand } from "@/lib/brand";
+import { currentSiteSeason } from "@/lib/entrance";
+import { SITE_LOOKS, siteLookVars } from "@/lib/seasonLooks";
+import { cookies } from "next/headers";
+import { isAdmin } from "@/lib/auth";
+import { ENTRANCE_THEMES, isEntranceKey } from "@/lib/entranceThemes";
+import { SEASON_PREVIEW_COOKIE } from "@/lib/seasonPreview";
+import SeasonDrift from "./components/SeasonDrift";
 
 export const metadata: Metadata = {
   title: `${brand.name} · ${brand.members}`,
@@ -23,6 +30,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const banner = await getBanner();
+  // Seasonal site background (Settings → Entrance animation; switch seasonal_site). null = the usual look.
+  let season = await currentSiteSeason().catch(() => null);
+  // Staff "Preview background" (Settings → Entrance animation): this browser only, staff only.
+  const previewKey = cookies().get(SEASON_PREVIEW_COOKIE)?.value;
+  const previewing = previewKey && isEntranceKey(previewKey) && (await isAdmin().catch(() => false)) ? previewKey : null;
+  if (previewing) season = previewing === "classic" ? null : previewing;
+  const seasonVars = season ? siteLookVars(season) : null;
   // Whether a banner will render. SiteBanner also hides it on staff pages,
   // which only the client knows, so this is a "probably" — close enough for
   // the first-paint estimate below.
@@ -61,9 +75,17 @@ export default async function RootLayout({
           <style dangerouslySetInnerHTML={{ __html: ":root{--banner-h:46px}" }} />
         )}
       </head>
-      <body>
+      <body data-season={season || undefined} style={seasonVars || undefined}>
         <SiteBanner initial={banner} />
         {children}
+        {/* After the page so it drifts over the valley but behind the content (z-index 1). */}
+        {season && SITE_LOOKS[season]?.drift && <SeasonDrift {...SITE_LOOKS[season]!.drift!} />}
+        {previewing && (
+          <div className="season-preview-bar" role="status">
+            Previewing the <strong>{ENTRANCE_THEMES[previewing].label}</strong> background · only you see this
+            <a href="/api/admin/season-preview?key=off&amp;to=/admin">Stop</a>
+          </div>
+        )}
         <SiteFooter />
         <SiteAssistant />
         <Tracker />

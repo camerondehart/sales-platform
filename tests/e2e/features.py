@@ -1173,5 +1173,37 @@ _r=atool("propose_entrance", {"choice":"auto"})
 _c=(_r.get("actions") or [None])[0]
 check("concierge entrance: Auto card says what's next", _c and _c["request"]["body"]=={"choice":"auto"} and any(l.startswith("Next:") for l in _c["lines"]), _c and _c["lines"])
 req("/api/admin/entrance", {"choice":"auto"}, method="PUT")
+# Seasonal site backgrounds follow the same theme
+req("/api/admin/entrance", {"choice":"winter"}, method="PUT")
+_s,_h=page("/")
+check("site background: the homepage takes the season's colours and drifting snow", _s==200 and 'data-season="winter"' in _h and "--sc-sky1" in _h and "season-drift k-snow" in _h, _s)
+_s,_h=page("/admin")
+check("site background: never on staff pages", 'class="season-drift' not in _h, _s)
+req("/api/admin/entrance", {"choice":"classic"}, method="PUT")
+_s,_h=page("/")
+check("site background: Classic keeps the usual look", 'data-season="' not in _h and 'class="season-drift' not in _h)
+req("/api/admin/entrance", {"choice":"halloween"}, method="PUT")
+req("/api/admin/flags", {"key":"seasonal_site","on":False})
+_s,_h=page("/")
+check("site background: switch off keeps the usual look", 'data-season="' not in _h and 'class="season-drift' not in _h)
+req("/api/admin/flags", {"key":"seasonal_site","on":True})
+req("/api/admin/entrance", {"choice":"auto"}, method="PUT")
+# Staff "Preview background": this browser only, staff only
+import http.client
+def _raw(path, cookie=None):
+    c=http.client.HTTPConnection("127.0.0.1", int(BASE.rsplit(":",1)[1]), timeout=60)
+    c.request("GET", path, headers={"cookie": cookie} if cookie else {})
+    r=c.getresponse(); body=r.read().decode(errors="ignore"); h=dict((k.lower(),v) for k,v in r.getheaders()); c.close()
+    return r.status, h, body
+_s,_hd,_=_raw("/api/admin/season-preview?key=winter&to=/", ADMIN)
+check("preview background: staff get a one-hour preview cookie and go to the site", _s==303 and "fp_season_preview=winter" in _hd.get("set-cookie","") and _hd.get("location","").endswith("/"), (_s,_hd))
+_s,_hd,_=_raw("/api/admin/season-preview?key=winter&to=/", None)
+check("preview background: staff only", _s==401, _s)
+_s,_hd,_=_raw("/api/admin/season-preview?key=winter&to=//evil.example", ADMIN)
+check("preview background: only sends you within the site", _s==303 and "evil" not in _hd.get("location",""), _hd.get("location"))
+_s,_,_h=_raw("/", ADMIN+"; fp_season_preview=winter")
+check("preview background: staff see that season with a Stop bar", 'data-season="winter"' in _h and "season-preview-bar" in _h, _s)
+_s,_,_h=_raw("/", "fp_season_preview=winter")
+check("preview background: visitors with the cookie see nothing different", "season-preview-bar" not in _h, _s)
 
 print(f"\n{sum(res)}/{len(res)} passed")

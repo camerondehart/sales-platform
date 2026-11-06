@@ -4021,8 +4021,8 @@ input:focus, textarea:focus, select:focus {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(234, 247, 201, 0.5), transparent 70%),
-    linear-gradient(180deg, #f9f9f8 0%, #f4f6ec 45%, #eef3e2 72%, #e7eed8 100%);
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgba(var(--sc-sun, 234, 247, 201), 0.5), transparent 70%),
+    linear-gradient(180deg, var(--sc-sky1, #f9f9f8) 0%, var(--sc-sky2, #f4f6ec) 45%, var(--sc-sky3, #eef3e2) 72%, var(--sc-sky4, #e7eed8) 100%);
 }
 
 /* ── Clouds: three soft masses on very long drifts ── */
@@ -4075,7 +4075,7 @@ input:focus, textarea:focus, select:focus {
   height: 46vmin;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(234, 247, 201, 0.9), rgba(162, 164, 52, 0.12) 55%, transparent 72%);
+  background: radial-gradient(circle, rgba(var(--sc-sun, 234, 247, 201), 0.9), rgba(162, 164, 52, 0.12) 55%, transparent 72%);
   animation: sun-breathe 9s ease-in-out infinite;
 }
 @keyframes sun-breathe {
@@ -4091,19 +4091,19 @@ input:focus, textarea:focus, select:focus {
 .scene-ridge-haze {
   bottom: 17vh;
   height: clamp(170px, 40vh, 400px);
-  fill: rgba(133, 186, 69, 0.075);
+  fill: rgba(var(--sc-ridge, 133, 186, 69), 0.075);
   animation: ridge-drift 38s ease-in-out infinite alternate;
 }
 .scene-ridge-far {
   bottom: 12vh;
   height: clamp(140px, 32vh, 320px);
-  fill: rgba(133, 186, 69, 0.16);
+  fill: rgba(var(--sc-ridge, 133, 186, 69), 0.16);
   animation: ridge-drift 26s ease-in-out infinite alternate;
 }
 .scene-ridge-near {
   bottom: 6vh;
   height: clamp(80px, 18vh, 200px);
-  fill: rgba(133, 186, 69, 0.24);
+  fill: rgba(var(--sc-ridge, 133, 186, 69), 0.24);
   animation: ridge-drift 20s ease-in-out infinite alternate-reverse;
 }
 @keyframes ridge-drift {
@@ -4117,7 +4117,7 @@ input:focus, textarea:focus, select:focus {
   right: 0;
   width: 100%;
   height: clamp(60px, 12vh, 120px);
-  fill: rgba(111, 163, 54, 0.32);
+  fill: rgba(var(--sc-meadow, 111, 163, 54), 0.32);
 }
 /* ── Meadow grasses, bending on the same breeze as the toadstools ── */
 .scene-grass {
@@ -4128,7 +4128,7 @@ input:focus, textarea:focus, select:focus {
   width: 100%;
   height: clamp(45px, 9vh, 90px);
   fill: none;
-  stroke: rgba(111, 163, 54, 0.42);
+  stroke: rgba(var(--sc-meadow, 111, 163, 54), 0.42);
   stroke-width: 2.5;
   stroke-linecap: round;
   overflow: visible;
@@ -4150,9 +4150,9 @@ input:focus, textarea:focus, select:focus {
   overflow: visible;
 }
 .scene-shrooms .ss-stem { fill: #efe9dc; stroke: rgba(97, 103, 109, 0.35); stroke-width: 1.5; }
-.scene-shrooms .ss-cap  { fill: var(--red); stroke: rgba(97, 103, 109, 0.3); stroke-width: 1.5; }
-.scene-shrooms .ss-2 .ss-cap { fill: var(--green); }
-.scene-shrooms .ss-3 .ss-cap { fill: var(--yellow); }
+.scene-shrooms .ss-cap  { fill: var(--sc-cap1, var(--red)); stroke: rgba(97, 103, 109, 0.3); stroke-width: 1.5; }
+.scene-shrooms .ss-2 .ss-cap { fill: var(--sc-cap2, var(--green)); }
+.scene-shrooms .ss-3 .ss-cap { fill: var(--sc-cap3, var(--yellow)); }
 .scene-shrooms .ss-spot { fill: #f4efe4; }
 .scene-shrooms .ss { transform-origin: 50% 100%; transform-box: fill-box; }
 .scene-shrooms .ss-1 { animation: ss-sway 6s ease-in-out infinite; }
@@ -8651,6 +8651,17 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .en-pilgrim-2 { animation-delay: 1.9s; }
 .en-pilgrim-wave { transform-box: fill-box; transform-origin: 0% 100%; animation: en-wave 0.4s ease-in-out 1.6s infinite alternate; }
 @keyframes en-sway-step { from { transform: rotate(-2deg); } to { transform: rotate(2deg) translateY(-2%); } }
+.en-aurora { position: absolute; left: -15%; right: -15%; top: 0; height: 52%; filter: blur(14px); pointer-events: none; }
+.en-aurora span { position: absolute; left: 0; right: 0; height: 30%; border-radius: 50%; opacity: 0; }
+.en-aurora span:nth-child(1) { top: 6%; background: linear-gradient(90deg, transparent, rgba(110, 245, 190, 0.85) 25%, rgba(90, 210, 255, 0.75) 55%, transparent 85%); animation: en-aurora-in 1.4s ease 0.3s forwards, en-aurora 5s ease-in-out infinite alternate; }
+.en-aurora span:nth-child(2) { top: 22%; background: linear-gradient(90deg, transparent 10%, rgba(180, 140, 255, 0.7) 40%, rgba(110, 245, 200, 0.7) 70%, transparent); animation: en-aurora-in 1.4s ease 0.6s forwards, en-aurora 6s ease-in-out -2s infinite alternate-reverse; }
+.en-aurora span:nth-child(3) { top: 38%; background: linear-gradient(90deg, transparent 20%, rgba(90, 230, 255, 0.55) 50%, rgba(220, 150, 255, 0.5) 75%, transparent); animation: en-aurora-in 1.4s ease 0.9s forwards, en-aurora 7s ease-in-out -4s infinite alternate; }
+@keyframes en-aurora-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes en-aurora { 0% { transform: translateX(-5%) skewY(-5deg) scaleY(0.85); } 50% { transform: translateX(2%) skewY(4deg) scaleY(1.25); } 100% { transform: translateX(6%) skewY(-3deg) scaleY(0.95); } }
+.en-yeti-hole { position: absolute; left: 7%; bottom: 26%; height: clamp(80px, min(17vh, 22vw), 170px); width: calc(clamp(80px, min(17vh, 22vw), 170px) * 0.95); overflow: hidden; }
+.en-yeti { display: block; width: 100%; height: 100%; transform: translateY(100%); animation: en-yeti-pop 2.4s cubic-bezier(0.3, 1.4, 0.5, 1) 1.3s forwards; }
+.en-yeti-arm { transform-box: fill-box; transform-origin: 0% 100%; animation: en-wave 0.35s ease-in-out 1.9s infinite alternate; }
+@keyframes en-yeti-pop { 0% { transform: translateY(100%); } 30%, 100% { transform: translateY(4%); } }
 .en-star { position: absolute; border-radius: 50%; background: #fff8e0; box-shadow: 0 0 6px rgba(255, 248, 224, 0.9); animation: en-star 1.8s ease-in-out infinite alternate; }
 .en-light { animation: en-light 0.9s ease-in-out infinite alternate; }
 .en-glow { animation: en-glow 1.1s ease-in-out infinite alternate; }
@@ -8941,3 +8952,164 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .ent-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.15rem; }
 .ent-actions .esc-btn { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
 .ent-next { font-size: 0.88rem; color: var(--ink); background: var(--surface-alt); border-radius: 10px; padding: 0.6rem 0.8rem; margin-bottom: 0.6rem; line-height: 1.6; }
+
+/* Seasonal site backgrounds (switch seasonal_site; lib/seasonLooks.ts). <body data-season> carries
+   the --sc-* colours the valley above reads; staff pages keep their own look. */
+body[data-season]:not(:has(.admin-shell)) {
+  background:
+    radial-gradient(ellipse 900px 600px at 12% 0%, rgba(var(--sc-glow1), 0.07), transparent 70%),
+    radial-gradient(ellipse 700px 500px at 88% 100%, rgba(var(--sc-glow2), 0.06), transparent 70%),
+    var(--sc-sky1);
+}
+body[data-season] .scene-sky, body[data-season] .scene-ridge, body[data-season] .scene-meadow { transition: background 0.6s ease, fill 0.6s ease; }
+.site-foot { position: relative; z-index: 1; }
+.season-drift { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.season-drop { position: absolute; top: -6vh; width: var(--sz); height: calc(var(--sz) * 0.65); opacity: var(--op); will-change: transform; animation: season-fall 18s linear infinite; }
+.season-drift.k-leaf .season-drop { border-radius: 0 100% 0 100%; }
+.season-drift.k-petal .season-drop { border-radius: 100% 0 100% 0; height: calc(var(--sz) * 0.8); }
+.season-drift.k-snow .season-drop { height: var(--sz); border-radius: 50%; opacity: calc(var(--op) + 0.35); box-shadow: 0 0 0 1px rgba(150, 178, 204, 0.35), 0 0 5px rgba(120, 150, 180, 0.55); }
+.season-drift.k-confetti .season-drop { width: calc(var(--sz) * 0.5); height: var(--sz); border-radius: 2px; }
+.season-drift.k-heart .season-drop, .season-drift.k-shamrock .season-drop, .season-drift.k-star .season-drop { background: none; width: auto; height: auto; font-size: var(--sz); line-height: 1; }
+.season-drift.k-heart .season-drop { top: auto; bottom: -6vh; animation-name: season-rise; }
+@keyframes season-fall {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(var(--dx), 28vh) rotate(90deg); }
+  50% { transform: translate(0, 56vh) rotate(180deg); }
+  75% { transform: translate(calc(var(--dx) * -0.6), 84vh) rotate(270deg); }
+  100% { transform: translate(0, 114vh) rotate(360deg); }
+}
+@keyframes season-rise {
+  0% { transform: translate(0, 0) scale(0.8); }
+  50% { transform: translate(var(--dx), -56vh) scale(1); }
+  100% { transform: translate(0, -114vh) scale(0.9); }
+}
+/* Fewer on phones; none for anyone who asks for less motion. */
+@media (max-width: 640px) { .season-drop:nth-child(2n) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .season-drift { display: none; } }
+
+/* Trees on the hills behind the site (Scene). They ride the ridges (same drift) and take the
+   season's colours: --sc-tree (evergreens) and --sc-tree2 (leafy trees). */
+.scene-trees { position: absolute; inset: 0; pointer-events: none; will-change: transform; contain: layout paint; }
+.scene-trees-near { animation: ridge-drift 20s ease-in-out infinite alternate-reverse; }
+.scene-trees-far { animation: ridge-drift 26s ease-in-out infinite alternate; }
+.scene-tree { position: absolute; width: auto; transform: translateX(-50%); }
+.scene-trees-near .scene-tree { bottom: calc(6vh + (var(--f) - 0.035) * clamp(80px, 18vh, 200px)); height: calc(clamp(24px, 6.2vh, 62px) * var(--s, 1)); }
+.scene-trees-far .scene-tree { bottom: calc(12vh + (var(--f) - 0.025) * clamp(140px, 32vh, 320px)); height: calc(clamp(11px, 2.9vh, 28px) * var(--s, 1)); }
+.scene-tree .tr-trunk { fill: rgba(110, 82, 62, 0.32); }
+.scene-trees-near .t-pine .tr-a { fill: rgba(var(--sc-tree, 79, 128, 62), 0.36); }
+.scene-trees-near .t-pine .tr-b { fill: rgba(var(--sc-tree, 79, 128, 62), 0.5); }
+.scene-trees-near .t-round .tr-c { fill: rgba(var(--sc-tree2, 111, 163, 54), 0.36); }
+.scene-trees-near .t-round .tr-b2 { fill: rgba(var(--sc-tree2, 111, 163, 54), 0.48); }
+.scene-trees-far .t-pine .tr-a, .scene-trees-far .t-pine .tr-b { fill: rgba(var(--sc-tree, 79, 128, 62), 0.2); }
+.scene-trees-far .t-pine .tr-b { fill: rgba(var(--sc-tree, 79, 128, 62), 0.26); }
+.scene-trees-far .t-round .tr-c, .scene-trees-far .t-round .tr-b2 { fill: rgba(var(--sc-tree2, 111, 163, 54), 0.22); }
+.scene-trees-far .tr-trunk { fill: rgba(110, 82, 62, 0.16); }
+.scene-tree .tr-snow { display: none; fill: rgba(255, 255, 255, 0.9); }
+body[data-season="winter"] .scene-tree .tr-snow, body[data-season="holiday"] .scene-tree .tr-snow, body[data-season="newyear"] .scene-tree .tr-snow { display: inline; }
+@media (prefers-reduced-motion: reduce) { .scene-trees { animation: none; } }
+/* Narrow screens (2026-11-05): trees are placed by width but sized by height, so on a tall, narrow
+   phone they piled into one blur. Cap their size by the screen width too, and thin each stand to a pair. */
+.scene-trees-near .scene-tree { height: calc(min(clamp(24px, 6.2vh, 62px), 8.5vw) * var(--s, 1)); }
+.scene-trees-far .scene-tree { height: calc(min(clamp(11px, 2.9vh, 28px), 4.5vw) * var(--s, 1)); }
+@media (max-width: 900px) { .scene-tree.t-thin { display: none; } }
+
+/* Winter in the site background: northern lights and a peeking yeti (hidden in other seasons). */
+.scene-aurora, .scene-yeti-hole { display: none; }
+body[data-season="winter"] .scene-aurora { display: block; position: absolute; left: -10%; right: -10%; top: 0; height: 46vh; pointer-events: none; opacity: 0.5; }
+.scene-aurora span { position: absolute; left: 0; right: 0; height: 34%; border-radius: 50%; transform-origin: 50% 50%; will-change: transform; -webkit-mask: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 75%); mask: radial-gradient(ellipse 50% 50% at 50% 50%, #000 30%, transparent 75%); }
+.scene-aurora span:nth-child(1) { top: 8%; background: linear-gradient(90deg, transparent, rgba(110, 230, 190, 0.7) 25%, rgba(120, 200, 255, 0.6) 55%, transparent 85%); animation: aurora-wave 16s ease-in-out infinite alternate; }
+.scene-aurora span:nth-child(2) { top: 26%; background: linear-gradient(90deg, transparent 10%, rgba(170, 150, 255, 0.55) 40%, rgba(110, 230, 200, 0.55) 70%, transparent); animation: aurora-wave 21s ease-in-out -6s infinite alternate-reverse; }
+.scene-aurora span:nth-child(3) { top: 44%; background: linear-gradient(90deg, transparent 20%, rgba(120, 220, 255, 0.45) 50%, rgba(200, 160, 255, 0.4) 75%, transparent); animation: aurora-wave 26s ease-in-out -11s infinite alternate; }
+@keyframes aurora-wave { 0% { transform: translateX(-6%) skewY(-4deg) scaleY(0.8); opacity: 0.6; } 50% { transform: translateX(3%) skewY(3deg) scaleY(1.2); opacity: 1; } 100% { transform: translateX(7%) skewY(-2deg) scaleY(0.9); opacity: 0.7; } }
+body[data-season="winter"] .scene-yeti-hole { display: block; position: absolute; left: 86.5%; bottom: calc(6vh + 0.36 * clamp(80px, 18vh, 200px)); height: clamp(22px, 5vh, 46px); width: calc(clamp(22px, 5vh, 46px) * 1.3); transform: translateX(-50%); overflow: hidden; }
+.scene-yeti { display: block; height: 100%; width: auto; margin: 0 auto; transform: translateY(100%); animation: yeti-peek 18s ease-in-out 4s infinite; }
+.scene-yeti-arm { transform-box: fill-box; transform-origin: 0% 100%; animation: yeti-wave 18s ease-in-out 4s infinite; }
+@keyframes yeti-peek { 0%, 62%, 100% { transform: translateY(100%); } 68%, 90% { transform: translateY(6%); } }
+@keyframes yeti-wave { 0%, 70%, 88%, 100% { transform: rotate(0deg); } 73%, 79%, 85% { transform: rotate(-25deg); } 76%, 82% { transform: rotate(15deg); } }
+@media (prefers-reduced-motion: reduce) { .scene-aurora span, .scene-yeti, .scene-yeti-arm { animation: none !important; } body[data-season="winter"] .scene-yeti-hole { display: none; } }
+
+/* Staff "Preview background" bar (app/layout.tsx) */
+.season-preview-bar { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 0.7rem; max-width: calc(100vw - 24px);
+  padding: 0.45rem 0.55rem 0.45rem 0.95rem; border-radius: 999px; background: rgba(43, 47, 39, 0.88); color: #f6f6f1; font-family: var(--font-sans); font-size: 0.8rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+.season-preview-bar a { color: #2b2f27; background: #e7f2d6; border-radius: 999px; padding: 0.25rem 0.75rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+a.esc-btn { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* Product cards as frosted glass panes: the season's background glows through, photos just
+   slightly see-through (full strength on hover). */
+/* (No live backdrop blur: with an animated background behind, blurring every card on every scroll
+   frame made scrolling choppy. The frost is layered translucent gradients instead.) */
+.card {
+  background:
+    radial-gradient(120% 70% at 20% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+    linear-gradient(160deg, rgba(253, 253, 251, 0.82), rgba(246, 247, 243, 0.7));
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 10px 30px -12px rgba(60, 70, 60, 0.18);
+}
+.card .card-image { background: rgba(232, 229, 229, 0.35); }
+.card .card-image img { opacity: 0.9; transition: opacity 0.35s ease, transform 0.6s ease; }
+.card:hover .card-image img, .card:focus-within .card-image img { opacity: 1; }
+
+/* An opened product: the window is frosted glass, the photo fully solid. (Checkout keeps its solid form.) */
+.modal-backdrop:has(> .modal > .modal-image) { background: rgba(70, 76, 70, 0.32); }
+.modal:has(> .modal-image) {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(250, 250, 247, 0.74));
+  -webkit-backdrop-filter: blur(22px) saturate(1.3); backdrop-filter: blur(22px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 30px 80px rgba(60, 66, 60, 0.28);
+}
+.modal:has(> .modal-image) .modal-image { background: transparent; }
+.modal:has(> .modal-image) .modal-image img { opacity: 1; }
+
+/* Footer: a soft frosted panel so its links stay readable over the valley, trees and seasonal
+   backgrounds (it used to sit straight on the scene at 80% opacity). */
+.site-foot {
+  opacity: 1; color: #5d6268; max-width: 920px; margin-left: auto; margin-right: auto;
+  background: linear-gradient(180deg, rgba(251, 251, 249, 0.9), rgba(249, 249, 247, 0.84));
+  border: 1px solid rgba(97, 103, 109, 0.1); border-bottom: 0; border-radius: 18px 18px 0 0;
+  box-shadow: 0 -6px 24px rgba(97, 103, 109, 0.06);
+}
+.site-foot-made { opacity: 0.9; }
+@media (max-width: 640px) { .site-foot { margin-left: 10px; margin-right: 10px; padding-bottom: calc(3.2rem + env(safe-area-inset-bottom)); } } /* just enough to keep the links clear of the Concierge button (it sits beside the short last line) */
+/* Staff dark theme: the footer panel follows the dark surfaces instead of staying light. */
+html[data-admin-theme="dark"] .site-foot { background: var(--surface-alt); border-color: var(--rule-soft); color: var(--ink-soft); box-shadow: none; }
+/* Footer a little tighter top to bottom (phones keep their room for the Concierge button). */
+.site-foot { padding-top: 0.6rem; }
+@media (min-width: 641px) { .site-foot { padding-bottom: 0.75rem; } }
+.site-foot-links a { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.site-foot-made { margin-top: 0.15rem; }
+@media (pointer: coarse) { .site-foot-links a { padding-top: 0.4rem; padding-bottom: 0.4rem; } }
+/* Staff pages: no floating panel. A plain, quiet line under the content, centred on the
+   content column (beside the sidebar on wide screens), in both themes. */
+body:has(.admin-shell) .site-foot {
+  max-width: none; margin: 0; padding: 0.9rem 1.25rem 1.1rem; background: none; border: 0;
+  border-top: 1px solid var(--rule-soft); border-radius: 0; box-shadow: none; color: var(--ink-soft);
+}
+body:has(.admin-shell) .site-foot-links { gap: 0.15rem 1.1rem; }
+body:has(.admin-shell) .site-foot-links a { padding-top: 0.15rem; padding-bottom: 0.15rem; }
+body:has(.admin-shell) .site-foot-links a:hover { color: var(--ink); }
+body:has(.admin-shell) .site-foot-made { margin-top: 0.1rem; opacity: 0.8; }
+@media (min-width: 1100px) { body:has(.admin-shell) .site-foot { margin-left: 232px; } }
+@media (min-width: 1100px) and (max-width: 1280px) { body:has(.admin-shell) .site-foot { margin-left: 196px; } }
+@media (max-width: 640px) { body:has(.admin-shell) .site-foot { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }
+/* Footer text a touch heavier so it reads more easily. The site fonts have no
+   in-between weight, so a hairline stroke in the text colour gives the slight lift; size, colours
+   and spacing are unchanged. */
+.site-foot { -webkit-text-stroke: 0.25px currentColor; }
+
+/* Settings → Site requests */
+.sr-waiting { display: inline-block; margin: 0.2rem 0 0.6rem; padding: 0.25rem 0.7rem; border-radius: 999px; background: #fff3d6; color: #7a5a12; font-weight: 700; font-size: 0.85rem; }
+.sr-list { list-style: none; margin: 0.4rem 0 1rem; padding: 0; display: grid; gap: 0.5rem; }
+.sr-row { display: flex; gap: 0.8rem; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; padding: 0.7rem 0.85rem; border: 1px solid var(--rule-soft); border-radius: 12px; background: var(--surface, #fff); }
+.sr-row.is-needs-approval { border-color: #ecd58e; }
+.sr-main { min-width: 0; flex: 1 1 260px; display: grid; gap: 0.2rem; }
+.sr-title { font-weight: 700; color: var(--ink); text-decoration: none; }
+.sr-title:hover { text-decoration: underline; }
+.sr-meta { font-size: 0.82rem; color: var(--ink-soft); }
+.sr-status { font-weight: 700; }
+.sr-status.is-needs-approval { color: #9a6b0a; } .sr-status.is-ready, .sr-status.is-in-progress { color: #3f86c6; }
+.sr-status.is-on-stage, .sr-status.is-done { color: var(--accent-strong); } .sr-status.is-needs-attention { color: var(--danger-strong); } .sr-status.is-declined { color: var(--ink-faint); }
+.sr-details { margin: 0.15rem 0 0; font-size: 0.88rem; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sr-actions { display: flex; gap: 0.4rem; }
+.sr-form { display: grid; gap: 0.45rem; padding: 0.8rem; border: 1px dashed var(--rule); border-radius: 12px; }
+.sr-form input, .sr-form textarea, .sr-form select { font: inherit; padding: 0.5rem 0.65rem; border: 1px solid var(--rule-soft); border-radius: 8px; background: var(--surface, #fff); color: var(--ink); }
+.sr-form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; } .sr-form-row select { flex: 1 1 220px; }

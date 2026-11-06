@@ -123,7 +123,8 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
       <div className="en-sky" />
       <div className="en-world">
         {x.stars && <Stars />}
-        {!x.moon && !x.earth && <div className="en-rays" />}
+        {x.aurora && <div className="en-aurora"><span /><span /><span /></div>}
+        {!x.moon && !x.earth && !x.aurora && <div className="en-rays" />}
         {x.rainbow && <Rainbow />}
         <div className={`en-sun${x.moon ? " is-moon" : ""}${x.earth ? " is-earth" : ""}`} />
         {CLOUDS.map(([l, t, w], i) => (
@@ -164,12 +165,13 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
           <path d="M0,170 C360,150 620,182 800,166 C1060,150 1320,180 1600,160 L1600,330 L0,330 Z" fill="var(--en-meadow3, #4b7442)" />
           <path d="M786,2 C776,60 720,160 610,330 L990,330 C880,160 824,60 814,2 Z" fill="var(--en-path)" opacity="0.9" />
           {/* Big figures stand at the meadow's edges (turkey left; snowman, leprechaun, pilgrims right): keep those sides clear. */}
-          {SHROOMS.map(([gx, gy, gs], i) => (x.turkey && gx < 520) || ((x.snowman || x.leprechaun || x.pilgrims) && gx > 1080) ? null : groundItem(t.ground, gx, gy, gs, i))}
+          {SHROOMS.map(([gx, gy, gs], i) => ((x.turkey || x.yeti) && gx < 520) || ((x.snowman || x.leprechaun || x.pilgrims) && gx > 1080) ? null : groundItem(t.ground, gx, gy, gs, i))}
           {x.blooms && BLOOMS.map(([bx, by, bs], i) => <Flower key={`b${i}`} x={bx} y={by} s={bs} i={i} />)}
           {x.wheat && WHEAT.map(([wx, wy, ws], i) => <Wheat key={`w${i}`} x={wx} y={wy} s={ws} />)}
         </svg>
         {x.snowman && <Snowman />}
         {x.turkey && <Turkey />}
+        {x.yeti && <Yeti />}
         {x.pilgrims && <Pilgrims />}
         {x.leprechaun && <PotOfGold />}
         {Array.from({ length: 14 }).map((_, i) => {
@@ -666,5 +668,27 @@ function Pilgrims() {
         <path d="M122,90 C120,98 124,102 128,100 M158,90 C160,98 156,102 152,100" stroke="#ffffff" strokeWidth="4" fill="none" strokeLinecap="round" />
       </g>
     </svg>
+  );
+}
+
+/** Winter's Easter egg: a little yeti who pops up on the meadow and waves. */
+function Yeti() {
+  return (
+    <span className="en-yeti-hole" aria-hidden="true">
+      <svg className="en-yeti" viewBox="0 0 100 110">
+        <g className="en-yeti-arm"><path d="M74,52 C88,42 92,28 88,16" stroke="#f6fbff" strokeWidth="12" strokeLinecap="round" fill="none" /><circle cx="88" cy="14" r="7" fill="#cfe3f5" /></g>
+        <path d="M26,58 C14,66 12,78 16,86" stroke="#f6fbff" strokeWidth="12" strokeLinecap="round" fill="none" />
+        <path d="M16,110 C8,70 20,30 50,27 C80,30 92,70 84,110 Z" fill="#f6fbff" stroke="#c9dcef" strokeWidth="2.5" />
+        <path d="M24,42 l-7,-11 7,2 M76,42 l7,-11 -7,2" stroke="#f6fbff" strokeWidth="7" strokeLinecap="round" />
+        <path d="M30,34 q5,-6 10,0 q5,-6 10,0 q5,-6 10,0 q5,-6 10,0" stroke="#dcebf8" strokeWidth="3" fill="none" />
+        <ellipse cx="50" cy="56" rx="20" ry="17" fill="#bcd8f2" />
+        <circle cx="42" cy="52" r="3.6" fill="#22303f" /><circle cx="58" cy="52" r="3.6" fill="#22303f" />
+        <circle cx="43.2" cy="50.8" r="1.2" fill="#fff" /><circle cx="59.2" cy="50.8" r="1.2" fill="#fff" />
+        <path d="M42,62 Q50,69 58,62" stroke="#22303f" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+        <path d="M47,63.5 L48.5,67 L50,63.8 Z" fill="#ffffff" />
+        <circle cx="34" cy="60" r="3.4" fill="#ffc2d1" opacity="0.85" /><circle cx="66" cy="60" r="3.4" fill="#ffc2d1" opacity="0.85" />
+        <path d="M38,106 q4,-6 8,0 M54,106 q4,-6 8,0" stroke="#dcebf8" strokeWidth="3" fill="none" />
+      </svg>
+    </span>
   );
 }

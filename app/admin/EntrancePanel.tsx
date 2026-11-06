@@ -8,6 +8,8 @@ import type { AdminRefreshKey } from "@/lib/assistant/shared";
 
 type Status = {
   switchOn: boolean;
+  siteSwitchOn?: boolean;
+  siteShowing?: string;
   choice: EntranceChoice;
   showing: EntranceKey;
   showingLabel: string;
@@ -56,6 +58,11 @@ export default function EntrancePanel() {
         {st.switchOn ? (st.choice === "auto" ? " (Auto)." : ".") : ". Seasonal entrances are switched off, so it's always Classic."}
         <button type="button" className="esc-btn" onClick={() => setPlaying(st.showing)}>▶ Play it</button>
       </p>
+      <p className="field-hint">
+        {st.siteSwitchOn
+          ? <>The site&rsquo;s background follows the same theme (soft colours and a few leaves, snowflakes or petals drifting down): now <strong>{st.siteShowing}</strong>. Staff pages never change.</>
+          : <>Switch on <strong>Seasonal site backgrounds</strong> in Feature switches to have the site&rsquo;s background follow this theme too.</>}
+      </p>
       {!st.switchOn && (
         <p className="field-hint">Switch on <strong>Seasonal entrance animations</strong> in Feature switches to use the themes below. You can still preview them.</p>
       )}
@@ -82,6 +89,7 @@ export default function EntrancePanel() {
             <span className="ent-when">{t.when}</span>
             <div className="ent-actions">
               <button type="button" className="esc-btn" onClick={() => setPlaying(t.key)}>▶ Preview</button>
+              <a className="esc-btn" href={`/api/admin/season-preview?key=${t.key}&to=/`} target="_blank" rel="noopener" title="Open the site with this season's background, just for you (for an hour)">Preview background</a>
               <button type="button" className="esc-btn primary" disabled={busy || st.choice === t.key} onClick={() => choose(t.key)}>{st.choice === t.key ? "In use" : "Use"}</button>
             </div>
           </div>
@@ -99,6 +107,7 @@ export default function EntrancePanel() {
           ))}
         </div>
       )}
+      <p className="field-hint"><strong>▶ Preview</strong> plays the entrance here. <strong>Preview background</strong> opens the site in a new tab with that season&rsquo;s background, just for you, for up to an hour (nothing changes for anyone else; the bar at the top has Stop).</p>
       {msg && <p className="field-hint" role="status">{msg}</p>}
       <p className="field-hint">The entrance plays once per visit, right after a member signs in. Anyone who has asked their device to reduce motion doesn&rsquo;t see it.</p>
       {playing && <EntrancePlayer theme={playing} onDone={() => setPlaying(null)} />}

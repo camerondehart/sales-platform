@@ -1,3 +1,4 @@
+import { brand } from "./brand";
 import path from "path";
 import { VersionedStore } from "./versionedStore";
 import { isEnabled } from "./flags";
@@ -40,12 +41,25 @@ export async function currentEntrance(now = Date.now()): Promise<EntranceKey> {
   return resolveEntrance(choice, on, now);
 }
 
+/** The season the site background uses (switch `seasonal_site`; same choice as the entrance). null = the usual look. */
+export async function currentSiteSeason(now = Date.now()): Promise<EntranceKey | null> {
+  // "plain" decor has no scene to dress up, so the site keeps its plain look.
+  if (brand.decor !== "meadow") return null;
+  const [on, choice] = await Promise.all([isEnabled("seasonal_site").catch(() => false), getEntranceChoice().catch(() => "auto" as const)]);
+  if (!on) return null;
+  const key = resolveEntrance(choice, true, now);
+  return key === "classic" ? null : key;
+}
+
 /** Everything the Settings panel and the Concierge show. */
 export async function entranceStatus(now = Date.now()) {
   const [on, choice] = await Promise.all([isEnabled("seasonal_entrance").catch(() => false), getEntranceChoice()]);
   const showing = resolveEntrance(choice, on, now);
+  const siteOn = await isEnabled("seasonal_site").catch(() => false);
   return {
     switchOn: on,
+    siteSwitchOn: siteOn,
+    siteShowing: siteOn ? ENTRANCE_THEMES[resolveEntrance(choice, true, now)].label : "Classic",
     choice,
     showing,
     showingLabel: ENTRANCE_THEMES[showing].label,

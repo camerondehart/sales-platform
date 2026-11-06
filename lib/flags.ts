@@ -42,6 +42,7 @@ export const FLAG_KEYS = [
   "faq_page",
   "consultation_form",
   "seasonal_entrance",
+  "seasonal_site",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -192,6 +193,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   seasonal_entrance: {
     label: "Seasonal entrance animations",
     description: "The members' entrance animation changes with the seasons and holidays (fall leaves, winter snow and a snowman, spring blooms, Halloween bats, holiday lights, New Year fireworks…). Pick one or leave it on Auto in Settings → Entrance animation, where you can preview them all. Off = always the original (Classic) entrance.",
+    defaults: on,
+    built: true,
+  },
+  seasonal_site: {
+    label: "Seasonal site backgrounds",
+    description: "The valley behind the site gently changes colour with the seasons and holidays, with a few leaves, snowflakes, petals or hearts drifting down behind the page. Follows the same theme as the entrance animation (Settings → Entrance animation: Auto or a chosen one). Staff pages are never changed. Off = the usual look.",
     defaults: on,
     built: true,
   },
