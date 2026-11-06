@@ -135,7 +135,7 @@ export async function createRequest(input: { title: string; details: string; siz
   const ready = input.size === "small";
   const body = [
     SITE_MARKER,
-    `Requested by: **${input.requestedBy}** via the staff Concierge, ${new Date().toLocaleString("en-US", { timeZone: brand.timezone, dateStyle: "medium", timeStyle: "short", timeZoneName: "short" })}`,
+    `Requested by: **${input.requestedBy}** via the staff Concierge, ${new Date().toLocaleString("en-US", { timeZone: brand.timezone, dateStyle: "medium", timeStyle: "short" })} (${brand.timezone})`,
     sizeLine(input.size, input.bumped, input.page),
     "",
     "### What they asked for",
