@@ -9,6 +9,8 @@ import { listTemplates, TEMPLATE_CATEGORIES } from "../emailTemplates";
 import { listBundles } from "../bundleStore";
 import { bundleOfferLabel, setSavings } from "../bundles";
 import { listCampaigns, recipientsFor, inWindow } from "../campaignSchedule";
+import { entranceStatus } from "../entrance";
+import { ENTRANCE_KEYS, ENTRANCE_THEMES, autoSchedule, cleanEntranceChoice, isEntranceKey, resolveEntrance } from "../entranceThemes";
 import { THEME_KEYS, cleanThemeChoice, resolveTheme, themeForCategory } from "../campaignThemes";
 import { previewLine } from "../campaignPreview";
 import { resolveSegment, SEGMENTS, SEGMENT_KEYS } from "../segments";
@@ -155,6 +157,8 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
 
   // ------------------------------------------------------------ settings
   admin("propose_loyalty_settings", "Prepare changing loyalty points settings.", obj({ enabled: bool("Loyalty on/off"), points_per_dollar: num("Points earned per $1"), points_per_dollar_redeemed: num("Points that equal $1 off"), min_points_to_redeem: num("Minimum points before redeeming") })),
+  admin("entrance_status", "The members' entrance animation: which theme members see now, the saved choice (auto or a theme), whether the Seasonal entrance animations switch is on, the themes available and the next Auto changes.", obj({}, [])),
+  admin("propose_entrance", `Prepare changing the members' entrance animation (Settings → Entrance animation). choice: auto (holidays first, then the season) or one of ${ENTRANCE_KEYS.join(", ")} (classic = the original). The card has a Preview button. Needs the seasonal_entrance switch on to show anything but Classic (use propose_feature_switch for that).`, obj({ choice: str(`auto | ${ENTRANCE_KEYS.join(" | ")}`) }, ["choice"])),
   admin("propose_feature_switch", `Prepare turning a feature switch on or off (this environment only). Keys: ${FLAG_KEYS.join(", ")}.`, obj({ key: str("Switch key"), on: bool("true = on") }, ["key", "on"])),
   admin("propose_staff_change", "Prepare adding or removing someone from the staff sign-in list (who can get an emailed dashboard link).", obj({ add_email: str("Email to add"), add_name: str("Their name"), remove_email: str("Email to remove") })),
   admin("propose_reminder_settings", "Prepare changing payment reminder timing or wording (reminder number 1–6), or when unpaid orders move to Expired.", obj({ reminder: num("Which reminder (1 = first)"), after_hours: num("Hours after the order"), subject: str("Subject ({name} {ref} {total} fill in)"), message: str("Message"), expire_after_hours: num("Hours until Expired") })),
@@ -933,6 +937,32 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         examples: g.names,
         note: reach.length < g.emails.length ? "Campaigns reach mailing-list subscribers and members (members get them unless they've unsubscribed); non-member customers only if they're subscribed. Anyone who unsubscribed is always skipped. For the rest, personal notes (propose_member_message / propose_order_message) are the way." : undefined,
       };
+    }
+    case "entrance_status": {
+      return await entranceStatus();
+    }
+    case "propose_entrance": {
+      const raw = s(args.choice, 20).toLowerCase();
+      if (raw !== "auto" && !isEntranceKey(raw)) return { error: `Unknown theme. Use auto or one of ${ENTRANCE_KEYS.join(", ")}.` };
+      const choice = cleanEntranceChoice(raw);
+      const st = await entranceStatus();
+      const showing = resolveEntrance(choice, st.switchOn);
+      const t = ENTRANCE_THEMES[showing];
+      push(ctx, {
+        kind: "entrance_theme",
+        title: choice === "auto" ? "Entrance animation: Auto" : `Entrance animation: ${ENTRANCE_THEMES[choice].emoji} ${ENTRANCE_THEMES[choice].label}`,
+        lines: [
+          choice === "auto" ? "Changes by itself: holidays first, then the season" : `Stays on ${ENTRANCE_THEMES[choice].label} until you change it`,
+          `Members will see: ${t.emoji} ${t.label}`,
+          st.switchOn ? "" : "Seasonal entrance animations are switched off, so members keep seeing Classic until it's on",
+          choice === "auto" && st.switchOn ? `Next: ${autoSchedule(Date.now(), 3).map((c) => `${ENTRANCE_THEMES[c.key].label} from ${c.from}`).join(", ")}` : "",
+        ].filter(Boolean),
+        confirmLabel: "Use it",
+        busyLabel: "Saving…",
+        request: { method: "PUT", url: "/api/admin/entrance", body: { choice } },
+        refresh: ["entrance"],
+      });
+      return READY;
     }
     case "propose_campaign": {
       const templateRef = s(args.template_id, 120).toLowerCase();

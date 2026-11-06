@@ -32,4 +32,5 @@ npx tsc --noEmit && npx next build
 - Every new member is added to the mailing list at sign-up (Terms say so); unsubscribe stays in every marketing email.
 - Terms + Privacy: `/terms` and `/privacy` are built from `brand.config.ts` and must stay true to how the platform works: when sign-in, payments, the Concierge, consultations, emails or data handling change, update both pages and their dates.
 - Phone consultations (`lib/consultation.ts`, `/consultation`, switch `consultation_form`, on): requests go to Handed to the team (topic `consultation`). When the switch is off, `brand.consultationFormUrl` (an outside form) is linked instead, if set.
+- Seasonal entrances (switch `seasonal_entrance`, on): the classic entrance stays the default look; themes are variations of the same scene (`lib/entranceThemes.ts`), Auto by the date in `brand.timezone`. Only with `brand.decor === "meadow"` ("plain" has no entrance). New themes need an entry in `ENTRANCE_THEMES`, a rule in `autoEntranceOn` if Auto should use it, and the unit check `tests/unit/entrance-themes.cjs`.
 - If something unclear touches money, sign-in or customer data, stop and ask.

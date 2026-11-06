@@ -21,6 +21,7 @@ export type RowMenuItem = {
 export default function RowMenu({ items, label = "More" }: { items: RowMenuItem[]; label?: string }) {
   const [open, setOpen] = useState(false);
   const [up, setUp] = useState(false);
+  const [left, setLeft] = useState(false);
   const wrap = useRef<HTMLDivElement | null>(null);
   const btn = useRef<HTMLButtonElement | null>(null);
 
@@ -47,6 +48,9 @@ export default function RowMenu({ items, label = "More" }: { items: RowMenuItem[
       // Open upwards when there isn't room below (rows near the bottom of the screen).
       const r = btn.current.getBoundingClientRect();
       setUp(window.innerHeight - r.bottom < 60 + items.length * 44);
+      // It normally hangs left from the button's right edge; on a phone the button can be near the
+      // left of the screen, so line it up with the button's left edge instead when there's no room.
+      setLeft(r.right < 240 && window.innerWidth - r.left >= 240);
     }
     setOpen((o) => !o);
   }
@@ -57,7 +61,7 @@ export default function RowMenu({ items, label = "More" }: { items: RowMenuItem[
         {label} <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <div className={`row-menu-list${up ? " is-up" : ""}`} role="menu">
+        <div className={`row-menu-list${up ? " is-up" : ""}${left ? " is-left" : ""}`} role="menu">
           {items.map((it) => (
             <button
               key={it.label}

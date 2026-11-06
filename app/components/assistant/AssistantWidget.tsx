@@ -6,6 +6,8 @@ import Markdown from "./Markdown";
 import EmailPreview from "@/app/components/EmailPreview";
 import { rememberChange } from "@/app/admin/recentChanges";
 import { track } from "@/lib/track";
+import EntrancePlayer from "@/app/components/EntrancePlayer";
+import { ENTRANCE_THEMES, autoEntrance, isEntranceKey, type EntranceKey } from "@/lib/entranceThemes";
 import {
   CART_KEYS,
   EVT_ADD_TO_CART,
@@ -196,6 +198,8 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   const [status, setStatus] = useState<(AssistantStatus & { staffNote?: string }) | null>(null);
   const [path, setPath] = useState("");
   const [open, setOpen] = useState(false);
+  // Staff: an entrance theme being previewed from a Concierge card.
+  const [entrancePreview, setEntrancePreview] = useState<EntranceKey | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -617,6 +621,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
 
   return (
     <div className={`as-root${isAdmin ? " as-admin" : ""}${open ? " is-open" : ""}`}>
+      {entrancePreview && <EntrancePlayer theme={entrancePreview} onDone={() => setEntrancePreview(null)} />}
 
       <button
         className={`as-launcher${open ? " is-open" : ""}${!isAdmin && !open ? " is-labelled" : ""}`}
@@ -781,6 +786,15 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                           {isAdmin && a.kind === "template" && (() => {
                             const b = (a.request?.body || {}) as { subject?: string; body?: string };
                             return b.body ? <EmailPreview subject={b.subject || ""} body={b.body} /> : null;
+                          })()}
+                          {isAdmin && a.kind === "entrance_theme" && (() => {
+                            const c = (a.request?.body || {}) as { choice?: string };
+                            const key = c.choice === "auto" ? autoEntrance() : isEntranceKey(c.choice) ? c.choice : null;
+                            return key ? (
+                              <button type="button" className="email-preview-btn" onClick={() => setEntrancePreview(key)}>
+                                ▶ Preview {ENTRANCE_THEMES[key].label}
+                              </button>
+                            ) : null;
                           })()}
                           {isAdmin && (a.kind === "campaign_send" || a.kind === "campaign_test") && (() => {
                             const b = (a.request?.body || {}) as { subject?: string; body?: string; theme?: string };

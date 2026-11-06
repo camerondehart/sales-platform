@@ -41,6 +41,7 @@ export const FLAG_KEYS = [
   "member_passkeys",
   "faq_page",
   "consultation_form",
+  "seasonal_entrance",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -185,6 +186,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   consultation_form: {
     label: "Phone consultation requests",
     description: "Our own free phone consultation request form at /consultation , linked on the sign-up form and in the members' area, and the Concierge can take the same request in chat. Requests land in Assistant → Handed to the team (topic \"consultation\") and the team inbox; the customer gets a confirmation. Off = the page, links and Concierge option are hidden.",
+    defaults: on,
+    built: true,
+  },
+  seasonal_entrance: {
+    label: "Seasonal entrance animations",
+    description: "The members' entrance animation changes with the seasons and holidays (fall leaves, winter snow and a snowman, spring blooms, Halloween bats, holiday lights, New Year fireworks…). Pick one or leave it on Auto in Settings → Entrance animation, where you can preview them all. Off = always the original (Classic) entrance.",
     defaults: on,
     built: true,
   },

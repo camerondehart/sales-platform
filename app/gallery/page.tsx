@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { currentEntrance } from "@/lib/entrance";
 import { getApprovedVisitor, getVisitor, isAdmin } from "@/lib/auth";
 import { getProducts, isInternal } from "@/lib/storage";
 import { applyVideoFlag, isEnabled } from "@/lib/flags";
@@ -34,7 +35,7 @@ export default async function GalleryPage() {
   return (
     <>
       <Scene variant="soft" />
-      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={(await getVisitor())?.as} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} consult={await isEnabled("consultation_form").catch(() => false)} />
+      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={(await getVisitor())?.as} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} consult={await isEnabled("consultation_form").catch(() => false)} entranceTheme={await currentEntrance().catch(() => "classic" as const)} />
     </>
   );
 }

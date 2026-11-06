@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import NavIcon from "@/app/components/NavIcon";
 import ForestEntrance from "@/app/components/ForestEntrance";
+import type { EntranceKey } from "@/lib/entranceThemes";
 import { ambassadorRef } from "@/lib/ambassadorRef";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/storage";
@@ -142,6 +143,7 @@ export default function GalleryClient({
   stores = false,
   faceId = false,
   consult = false,
+  entranceTheme = "classic",
 }: {
   products: Product[];
   userName: string;
@@ -155,6 +157,8 @@ export default function GalleryClient({
   faceId?: boolean;
   /** consultation_form switch: the Phone Consultation footnote links to /consultation. */
   consult?: boolean;
+  /** Which entrance plays (Settings → Entrance animation, lib/entrance.ts). */
+  entranceTheme?: EntranceKey;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -484,7 +488,7 @@ export default function GalleryClient({
   return (
     <>
       {/* Entrance: the forest is brushed aside (app/components/ForestEntrance.tsx). Tap skips it. "plain" decor skips it. */}
-      {entering && brand.decor === "meadow" && <ForestEntrance onSkip={() => { setArrived(true); setEntering(false); }} />}
+      {entering && brand.decor === "meadow" && <ForestEntrance theme={entranceTheme} onSkip={() => { setArrived(true); setEntering(false); }} />}
 
       {actingAs && (
         <div className="admin-preview-bar act-as-bar">
