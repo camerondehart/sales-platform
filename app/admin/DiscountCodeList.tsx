@@ -18,6 +18,7 @@ type Code = {
   expiresAt?: number;
   maxUses?: number;
   minOrderAmount?: number;
+  perCustomerLimit?: number;
   publicShop?: boolean;
   active: boolean;
   uses: number;
@@ -42,6 +43,7 @@ export default function DiscountCodeList({
   onToggle,
   onTogglePublic,
   onDelete,
+  onEdit,
   formatDate,
 }: {
   discounts: Code[];
@@ -49,6 +51,8 @@ export default function DiscountCodeList({
   /** Whether a code also works in the public shop. */
   onTogglePublic?: (id: string, publicShop: boolean) => void;
   onDelete: (id: string, code: string) => void;
+  /** Fill the form above with this code to change it. */
+  onEdit?: (d: Code) => void;
   formatDate: (t: number) => string;
 }) {
   const [filter, setFilter] = useState<Filter>("live");
@@ -150,6 +154,7 @@ export default function DiscountCodeList({
                   </div>
                 </div>
                 <div className="user-actions">
+                  {onEdit && <button onClick={() => onEdit(d)}>Edit</button>}
                   {st !== "ended" && (
                     <button onClick={() => onToggle(d.id, !d.active)}>{d.active ? "Deactivate" : "Activate"}</button>
                   )}

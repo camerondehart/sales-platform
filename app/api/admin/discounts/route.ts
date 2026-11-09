@@ -7,7 +7,7 @@ import {
   generateCode,
   type Discount,
 } from "@/lib/discounts";
-import { audited } from "@/lib/audit";
+import { audited, auditDetail } from "@/lib/audit";
 
 export async function GET() {
   if (!(await isAdmin())) {
@@ -78,6 +78,54 @@ async function PATCH_handler(req: Request) {
   return NextResponse.json({ ok: true, discount });
 }
 
+/**
+ * Edit a code after it's made: amount, type, label, last day, limits and the
+ * public-shop setting. The code text itself stays (orders, use counts and any
+ * ambassador link point at it); uses so far are kept.
+ */
+async function PUT_handler(req: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const value = Number(body.value);
+  if (!Number.isFinite(value) || value <= 0) {
+    return NextResponse.json({ error: "Enter a discount value greater than zero." }, { status: 400 });
+  }
+  const type: Discount["type"] = body.type === "fixed" ? "fixed" : "percentage";
+  if (type === "percentage" && value > 100) {
+    return NextResponse.json({ error: "A percentage discount can't exceed 100%." }, { status: 400 });
+  }
+  const whole = (v: unknown) => (v ? Math.max(1, Math.floor(Number(v))) : undefined);
+  const expiresAt = body.expiresAt ? Number(body.expiresAt) : undefined;
+  if (expiresAt !== undefined && !Number.isFinite(expiresAt)) {
+    return NextResponse.json({ error: "That last day doesn't look right." }, { status: 400 });
+  }
+  const minOrderAmount = body.minOrderAmount ? Number(body.minOrderAmount) : undefined;
+  if (minOrderAmount !== undefined && (!Number.isFinite(minOrderAmount) || minOrderAmount < 0)) {
+    return NextResponse.json({ error: "The minimum order doesn't look right." }, { status: 400 });
+  }
+  const pick = (d: Discount) => ({ type: d.type, value: d.value, label: d.label, expiresAt: d.expiresAt, maxUses: d.maxUses, perCustomerLimit: d.perCustomerLimit, minOrderAmount: d.minOrderAmount, publicShop: d.publicShop });
+  let before: ReturnType<typeof pick> | null = null;
+  const discount = await mutateDiscounts((all) => {
+    const d = all.find((x) => x.id === body.id);
+    if (!d) return { data: null, result: null };
+    before = pick(d);
+    d.type = type;
+    d.value = value;
+    d.label = String(body.label || "").trim() || undefined;
+    d.expiresAt = expiresAt;
+    d.maxUses = whole(body.maxUses);
+    d.perCustomerLimit = whole(body.perCustomerLimit);
+    d.minOrderAmount = minOrderAmount;
+    d.publicShop = body.publicShop ? true : undefined;
+    return { data: all, result: d };
+  });
+  if (!discount) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  auditDetail({ targetId: discount.code, before: before || undefined, after: pick(discount) });
+  return NextResponse.json({ ok: true, discount });
+}
+
 async function DELETE_handler(req: Request) {
   if (!(await isAdmin())) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -92,3 +140,4 @@ async function DELETE_handler(req: Request) {
 export const POST = audited("discount.create", "discount", POST_handler);
 export const PATCH = audited("discount.toggle", "discount", PATCH_handler);
 export const DELETE = audited("discount.delete", "discount", DELETE_handler);
+export const PUT = audited("discount.edit", "discount", PUT_handler);

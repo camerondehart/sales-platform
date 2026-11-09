@@ -1,5 +1,6 @@
+import { getDiscounts, type Discount } from "../discounts";
+import { offerText } from "../discountText";
 import { getProducts, isExternal } from "../storage";
-import { getDiscounts } from "../discounts";
 import { isEnabled } from "../flags";
 import { cleanAmbassador, currentRate, DEFAULT_TERMS, getAmbassadors, termsOf, type Ambassador } from "../ambassadors";
 import { ambassadorStatsFor } from "../ambassadorData";
@@ -36,7 +37,6 @@ const TERMS = {
   growth_pct: num("Room-to-grow higher rate % (e.g. 20)"),
   growth_goal: str("Goals that earn the higher rate, in words"),
   growth_on: bool("true = goals met, new orders earn the higher rate"),
-  discount_pct: num("Community discount % given through their code (e.g. 10)"),
   trial_days: num("Trial length in days (0 = no trial)"),
   trial_reviewed: bool("true = the end-of-trial review has happened"),
   start_date: str("Start date YYYY-MM-DD"),
@@ -115,11 +115,13 @@ function range(period: ReportPeriod, startDate: string, now = Date.now()): { fro
 }
 const periodOf = (v: unknown): ReportPeriod => ((Object.keys(REPORT_PERIODS) as string[]).includes(String(v)) ? (String(v) as ReportPeriod) : "since-start");
 
-function termsLine(a: Ambassador): string {
+/** Their terms in one line. `offers` (code → "20% off") gives the community discount from the code itself. */
+function termsLine(a: Ambassador, offers?: Map<string, string | null>): string {
   const t = termsOf(a);
+  const offer = a.discountCode ? offers?.get(a.discountCode) : undefined;
   return [
     `${currentRate(t)}% commission${t.growthPct && !t.growthOn ? ` (→ ${t.growthPct}%${t.growthGoal ? ` once ${t.growthGoal}` : " after agreed goals"})` : ""}`,
-    typeof t.discountPct === "number" ? `${t.discountPct}% community discount${a.discountCode ? ` (code ${a.discountCode})` : ""}` : "",
+    offer ? `${offer} for their community (code ${a.discountCode})` : typeof t.discountPct === "number" && a.discountCode ? `${t.discountPct}% community discount (code ${a.discountCode})` : "",
     `${t.windowDays}-day window${t.repeatPurchases ? "" : ", first orders only"}`,
     t.trialDays ? `${t.trialDays}-day trial from ${t.startDate}` : `started ${t.startDate}`,
     `payouts ${t.payoutSchedule}`,
@@ -130,6 +132,7 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
   if (!AMBASSADOR_TOOL_NAMES.has(name)) return null;
   if (ctx.audience !== "admin") return { error: "Not available." };
   const list = await getAmbassadors();
+  const offers = new Map((await getDiscounts().catch(() => [] as Discount[])).map((d) => [d.code, offerText(d)] as [string, string | null]));
   const site = (process.env.NEXT_PUBLIC_SITE_URL || brand.siteUrl).replace(/\/$/, "");
 
   switch (name) {
@@ -143,7 +146,7 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
         const st = (await ambassadorStatsFor([a], range(period, termsOf(a).startDate)))[a.id];
         return {
           id: a.id, name: a.name, page: `${site}/${a.slug}`, live: a.active && switchOn, email: a.email || null, code: a.discountCode || null,
-          terms: termsLine(a),
+          terms: termsLine(a, offers),
           terms_notes: termsOf(a).notes || null,
           period: REPORT_PERIODS[period],
           numbers: {
@@ -225,7 +228,6 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
         ["growth_pct", "growthPct", Number, (v) => `Higher rate: ${v}%`],
         ["growth_goal", "growthGoal", (v) => s(v, 300), (v) => `Goals for the higher rate: ${v}`],
         ["growth_on", "growthOn", (v) => !!v, (v) => (v ? "Goals met: new orders earn the higher rate" : "Back to the base rate")],
-        ["discount_pct", "discountPct", Number, (v) => `Community discount: ${v}%`],
         ["trial_days", "trialDays", Number, (v) => `Trial: ${v} days`],
         ["trial_reviewed", "trialReviewed", (v) => !!v, (v) => (v ? "Trial review: done" : "Trial review: not yet")],
         ["start_date", "startDate", (v) => s(v, 10), (v) => `Started: ${v}`],
@@ -254,7 +256,7 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
           : [
               `Page: ${site.replace(/^https?:\/\//, "")}/${v.slug} (link/QR only, not in the menus)`,
               v.email ? `Reports go to ${v.email}` : "No email yet (needed for progress reports)",
-              `Terms: ${termsLine({ ...v, id: "x", createdAt: Date.now(), updatedAt: Date.now() } as Ambassador)}`,
+              `Terms: ${termsLine({ ...v, id: "x", createdAt: Date.now(), updatedAt: Date.now() } as Ambassador, offers)}`,
               ...changes.filter((x) => /^(Featured|Social|Linked)/.test(x)),
             ],
         confirmLabel: existing ? "Save" : "Add ambassador",

@@ -8,7 +8,7 @@ import type { PublicUser } from "@/lib/users";
 import type { Inquiry } from "@/lib/inquiries";
 import type { Order } from "@/lib/orders";
 import { normalizeStatus, isCompleted, type OrderStatus } from "@/lib/orderStatus";
-import { endOfPacificDay, lastNDaysStart, msToPacificInput, pacificToMs } from "@/lib/periods";
+import { endOfPacificDay, lastNDaysStart, msToPacificInput, pacificDay, pacificToMs } from "@/lib/periods";
 import { rememberChange, applyRecentChanges } from "./recentChanges";
 import AssistantWidget from "@/app/components/assistant/AssistantWidget";
 import AssistantPanel from "./AssistantPanel";
@@ -906,6 +906,23 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
   const [dcPublic, setDcPublic] = useState(false);
   const [dcSaving, setDcSaving] = useState(false);
   const [dcMsg, setDcMsg] = useState("");
+  // Editing an existing code (the form above the list fills with it).
+  const [dcEditId, setDcEditId] = useState<string | null>(null);
+  const dcFormRef = useRef<HTMLFormElement | null>(null);
+  function clearDiscountForm() {
+    setDcEditId(null);
+    setDcCode(""); setDcType("percentage"); setDcValue(""); setDcLabel(""); setDcExpires("");
+    setDcMaxUses(""); setDcPerCustomer(""); setDcMinOrder(""); setDcPublic(false);
+  }
+  function startEditDiscount(d: any) {
+    setDcEditId(d.id);
+    setDcCode(d.code); setDcType(d.type === "fixed" ? "fixed" : "percentage"); setDcValue(String(d.value ?? ""));
+    setDcLabel(d.label || ""); setDcExpires(d.expiresAt ? pacificDay(d.expiresAt) : "");
+    setDcMaxUses(d.maxUses ? String(d.maxUses) : ""); setDcPerCustomer(d.perCustomerLimit ? String(d.perCustomerLimit) : "");
+    setDcMinOrder(d.minOrderAmount ? String(d.minOrderAmount) : ""); setDcPublic(!!d.publicShop);
+    setDcMsg("");
+    requestAnimationFrame(() => dcFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
 
   async function loadDiscounts() {
     try {
@@ -919,6 +936,38 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     e.preventDefault();
     setDcSaving(true);
     setDcMsg("");
+    if (dcEditId) {
+      try {
+        const res = await adminFetch("/api/admin/discounts", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: dcEditId,
+            type: dcType,
+            value: dcValue,
+            label: dcLabel,
+            expiresAt: dcExpires ? endOfPacificDay(dcExpires) : undefined,
+            maxUses: dcMaxUses || undefined,
+            perCustomerLimit: dcPerCustomer || undefined,
+            minOrderAmount: dcMinOrder || undefined,
+            publicShop: dcPublic || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setDiscounts(discounts.map((d) => (d.id === data.discount.id ? data.discount : d)));
+          clearDiscountForm();
+          setDcMsg(`Saved ${data.discount.code}.`);
+          setTimeout(() => setDcMsg(""), 3000);
+        } else {
+          setDcMsg(data.error || "Could not save the code.");
+        }
+      } catch {
+        setDcMsg("Network error.");
+      }
+      setDcSaving(false);
+      return;
+    }
     try {
       const res = await adminFetch("/api/admin/discounts", {
         method: "POST",
@@ -3863,10 +3912,15 @@ We just finished a new run and wanted you to hear it first.
           Usage is tracked per code so you can see who's driving sales.
         </div>
 
-        <form className="admin-form" onSubmit={createDiscount}>
+        <form className="admin-form" onSubmit={createDiscount} ref={dcFormRef}>
+          {dcEditId && (
+            <div className="field full dc-editing">
+              <span className="dc-editing-title">Editing {dcCode}</span> (used {discounts.find((d) => d.id === dcEditId)?.uses ?? 0} {discounts.find((d) => d.id === dcEditId)?.uses === 1 ? "time" : "times"} so far). Changes apply from the next checkout; past orders keep what they got.
+            </div>
+          )}
           <div className="field">
-            <label>Code (blank = auto-generate)</label>
-            <input value={dcCode} onChange={(e) => setDcCode(e.target.value.toUpperCase())} placeholder="SPRING15" />
+            <label>{dcEditId ? "Code (can't be changed: make a new code to rename it)" : "Code (blank = auto-generate)"}</label>
+            <input value={dcCode} readOnly={!!dcEditId} onChange={(e) => setDcCode(e.target.value.toUpperCase())} placeholder="SPRING15" />
           </div>
           <div className="field">
             <label>Type</label>
@@ -3905,14 +3959,17 @@ We just finished a new run and wanted you to hear it first.
           </div>
           <div className="full">
             <button type="submit" className="submit" disabled={dcSaving}>
-              {dcSaving ? "Creating…" : "Create code"}
+              {dcEditId ? (dcSaving ? "Saving…" : "Save changes") : dcSaving ? "Creating…" : "Create code"}
             </button>
+            {dcEditId && (
+              <button type="button" className="esc-btn" style={{ marginLeft: "0.6rem" }} onClick={() => { clearDiscountForm(); setDcMsg(""); }}>Cancel</button>
+            )}
             {dcMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{dcMsg}</span>}
           </div>
         </form>
 
         <div style={{ marginTop: "1.5rem" }}>
-          <DiscountCodeList discounts={discounts} onToggle={toggleDiscount} onTogglePublic={togglePublicShop} onDelete={deleteDiscount} formatDate={formatDate} />
+          <DiscountCodeList discounts={discounts} onToggle={toggleDiscount} onTogglePublic={togglePublicShop} onDelete={deleteDiscount} onEdit={startEditDiscount} formatDate={formatDate} />
         </div>
       </section>
       )}

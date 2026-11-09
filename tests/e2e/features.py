@@ -774,6 +774,30 @@ check("membership request: /#join opens the request form on the homepage", 'id="
 _h=page("/mayarose")[1]
 check("ambassador page: their working promo code (MAYA10, 10%) is called out in the hero with Copy", 'class="amb-offer' in _h and ">MAYA10</span>" in _h and ">10% off</strong>" in _h, 'amb-offer' in _h)
 check("ambassador page: the site's seasonal valley sits behind it (soft, like the members' gallery)", 'class="scene scene-soft"' in _h)
+check("ambassador page: the whole-shop link moves to the bottom on phones (kept by the heading on desktop)", 'class="amb-shop-top"' in _h and 'class="amb-more"' in _h)
+# Discount codes can be edited after they're made; the community discount always follows the code
+_dl=req("/api/admin/discounts")[1]["discounts"]; _dm=[d for d in _dl if d["code"]=="MAYA10"][0]
+_s,_x=req("/api/admin/discounts", {"id":_dm["id"],"type":"percentage","value":15,"label":"Maya","maxUses":50}, cookie=MEMBER, method="PUT")
+check("discount edit: staff only", _s==401, _s)
+_s,_x=req("/api/admin/discounts", {"id":_dm["id"],"type":"percentage","value":0}, method="PUT")
+check("discount edit: a zero amount is refused", _s==400, (_s,_x))
+_s,_x=req("/api/admin/discounts", {"id":_dm["id"],"type":"percentage","value":15,"label":"Maya","maxUses":50}, method="PUT")
+check("discount edit: amount, label and limits change; the code and its uses stay", _s==200 and _x["discount"]["code"]=="MAYA10" and _x["discount"]["value"]==15 and _x["discount"]["maxUses"]==50 and _x["discount"]["uses"]==_dm["uses"], (_s,_x))
+check("discount edit: the ambassador page shows the new amount straight away", ">15% off</strong>" in page("/mayarose")[1])
+_a=[a for a in req("/api/admin/ambassadors")[1]["ambassadors"] if a["slug"]=="mayarose"][0]
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"terms":{**(_a.get("terms") or {}),"discountPct":3}}, method="PUT")
+check("ambassador terms: the community discount is taken from their code, not typed separately", _s==200 and _x["ambassador"]["terms"]["discountPct"]==15, (_s,_x.get("ambassador",{}).get("terms")))
+_r=atool("ambassadors", {"ambassador":"Maya"})
+check("concierge ambassadors: terms quote the code's real amount", "15% off for their community (code MAYA10)" in json.dumps(_r), json.dumps(_r)[:300])
+req("/api/admin/discounts", {"id":_dm["id"],"type":"percentage","value":10}, method="PUT")
+# Per-ambassador welcome on/off
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"welcome":False}, method="PUT")
+_h=page("/mayarose")[1]
+check("ambassador welcome: can be switched off for one ambassador (page keeps its look)", _s==200 and _x["ambassador"].get("welcome") is False and 'class="amb-welcome' not in _h and 'amb-look-' in _h, (_s,_x.get("error")))
+_s,_x=req("/api/admin/ambassadors", {**_base,"id":_amb["id"]}, method="PUT")
+check("ambassador welcome: saving without it keeps the choice", _x["ambassador"].get("welcome") is False)
+req("/api/admin/ambassadors", {**_base,"id":_amb["id"],"welcome":True}, method="PUT")
+check("ambassador welcome: back on", 'class="amb-welcome' in page("/mayarose")[1])
 req("/api/admin/flags", {"key":"ambassador_welcome","on":False})
 _h=page("/mayarose")[1]
 check("ambassador welcome: switched off = no welcome (the look still styles the page)", 'class="amb-welcome' not in _h and 'data-amb-welcome' not in _h and 'amb-look-' in _h)

@@ -164,7 +164,8 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
             <path d="M2,9 C40,2 70,13 110,7 C150,1 180,12 218,5" />
           </svg>
         </div>
-        <a href="/retail">See the whole shop&nbsp;→</a>
+        {/* On phones this sits at the bottom of the page instead (amb-more), so shoppers stay with their picks. */}
+        <a className="amb-shop-top" href="/retail">See the whole shop&nbsp;→</a>
       </div>
     </section>
   );
@@ -173,7 +174,7 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
     <div className={`amb-page amb-look-${look}`}>
       {/* The site's valley, softened behind the shop like the members' gallery; it follows the seasons like every page. */}
       <Scene variant="soft" />
-      {welcomeOn && (
+      {welcomeOn && a.welcome !== false && (
         <>
           <script dangerouslySetInnerHTML={{ __html: welcomeScript(a.slug, force) }} />
           <AmbassadorWelcome slug={a.slug} look={look} title={title} name={a.name} photo={a.photo} emoji={emoji} force={force} />
@@ -187,6 +188,7 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
         pickedBy={featured.length ? first : undefined}
         intro={intro}
         outro={
+          <>
           <section className="amb-join amb-rv" style={{ "--d": "0.2s" } as CSSProperties}>
             <span className="amb-join-mark" aria-hidden="true">{emoji || "🌿"}</span>
             <div className="amb-join-text">
@@ -196,6 +198,8 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
             </div>
             <a className="amb-join-go" href="/#join">Request membership&nbsp;→</a>
           </section>
+          <p className="amb-more"><a href="/retail">Browse everything in the shop&nbsp;→</a></p>
+          </>
         }
         pickup={pickup}
       />

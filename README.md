@@ -3,7 +3,7 @@
 A complete small-business commerce platform: a public shop, a members-only
 catalogue with approval-based sign-up, invoicing by email, events with
 registration and waitlists, a mailing list with campaigns and templates, loyalty
-points, mix-and-match bundles, discount codes (including cash-pickup-only
+points, mix-and-match bundles, discount codes (editable after creation; including cash-pickup-only
 sales), a store-locator map, stock counts, Venmo payment matching, ambassador
 pages with commission tracking, a staff dashboard with analytics, and an AI
 "Concierge" for customers and staff (with photos and voice). Staff can sign in
@@ -151,7 +151,7 @@ All behind switches in Settings → Feature switches (live-site defaults in brac
 | Seasonal entrance animations [on] | The members' entrance changes with the seasons and holidays (Auto by the date in `brand.timezone`, or pick one in Settings → Entrance animation, with previews). Meadow decor only |
 | Seasonal site backgrounds [on] | The meadow background softly follows the same theme (pale tints, a few drifting leaves/snow/petals; winter northern lights). Never on staff pages; staff can preview a season's background just for themselves |
 | Site change requests [on] | Staff ask the Concierge (or Settings → Site requests) for website changes; they become GitHub issues for the build worker below |
-| Ambassador welcome animations [on] | Each ambassador page gets a look (Cosmic, Botanical, Blossom, Golden hour; Auto from their emoji), a short once-per-visit welcome, their emoji (pick or switch off), "<name>'s pick" ribbons, their working discount code called out, the seasonal background, and a gentle membership card linking to `/#join` |
+| Ambassador welcome animations [on] | Each ambassador page gets a look (Cosmic, Botanical, Blossom, Golden hour; Auto from their emoji), a short once-per-visit welcome, their emoji (pick or switch off), "<name>'s pick" ribbons, their working discount code called out (the community discount always follows the linked code), the seasonal background, and a gentle membership card linking to `/#join`; the welcome can be turned off per ambassador |
 
 Campaigns can include uploaded photos (composer "Upload photo", or a photo sent to the Concierge). Campaigns get a seasonal look (banner art, colours, dividers; `auto` picks one from the words or the season) with a live preview, drag-to-arrange blocks and photo sizes, and scheduled campaigns can be edited until they start sending. The art lives in `public/email-art/` and is copied once to the Blob store for inboxes. The Concierge can build campaigns from saved templates (`template_id`), and links like `[Shop](/retail)` become full site links. A Smart FAQ page (`/faq`, Settings → FAQ page) shows the business's approved answers, and the Concierge answers from them. New members join the mailing list automatically. Campaigns carry a hidden inbox preview line (your own, or the first sentence). Customers can ask for a free phone consultation at `/consultation` or through the Concierge (requests land in Assistant → Handed to the team); set `consultationAcknowledgement` in `brand.config.ts` for the statement they sign. `/terms` and `/privacy` are filled in from `brand.config.ts` (including `legal.state` / `legal.county`); have each client's counsel review them. `package.json` pins `@peculiar/asn1-schema` with `overrides` so passkey signatures can be read; run `npm ci` after pulling.
 

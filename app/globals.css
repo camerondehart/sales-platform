@@ -9281,3 +9281,14 @@ html[data-amb-welcome="play"] .amb-rv { animation-delay: calc(var(--d, 0s) + 3.6
 .amb-code-text { font-family: var(--font-sans); font-weight: 800; letter-spacing: 0.14em; font-size: 0.95rem; }
 .amb-code-copy { padding: 0.25rem 0.65rem; border-radius: 999px; background: rgba(255, 255, 255, 0.2); font-family: var(--font-sans); font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 @media (max-width: 640px) { .amb-offer { margin-left: auto; margin-right: auto; justify-content: center; text-align: center; } }
+/* Marketing → Discount codes: editing an existing code */
+.dc-editing { padding: 0.6rem 0.8rem; border-radius: 10px; background: rgba(133, 186, 69, 0.1); border: 1px solid rgba(133, 186, 69, 0.35); font-size: 0.9rem; color: var(--ink); }
+.amb-derived { padding: 0.6rem 0.75rem; border: 1px dashed var(--rule); border-radius: 8px; font-size: 0.92rem; color: var(--ink); background: var(--surface-alt, transparent); }
+/* Ambassador pages: "the whole shop" link. Desktop keeps it by the heading; phones get a quiet one at the bottom. */
+.amb-more { display: none; margin: 1.4rem 0 0.4rem; text-align: center; }
+.amb-more a { color: var(--ink-soft); font-family: var(--font-sans); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 0.15rem; }
+@media (max-width: 640px) {
+  .amb-shop-top { display: none; }
+  .amb-more { display: block; }
+}
+.dc-editing-title { font-weight: 700; }

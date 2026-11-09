@@ -7,6 +7,7 @@ import type { AmbassadorStats } from "@/lib/ambassadorStats";
 import { qrSvg } from "@/lib/qr";
 import MediaUpload from "./MediaUpload";
 import { AMBASSADOR_LOOKS, cleanEmoji, emojiFor, firstEmoji, lookFor, type LookChoice } from "@/lib/ambassadorLooks";
+import { offerText } from "@/lib/discountText";
 import { useAdminRefresh } from "./useAdminRefresh";
 import type { AdminRefreshKey } from "@/lib/assistant/shared";
 import { brand, isOwnHost, TEAM } from "@/lib/brand";
@@ -27,7 +28,7 @@ type Form = {
   name: string; slug: string; slugTouched: boolean; email: string;
   headline: string; bio: string; photo: string;
   look: LookChoice;
-  emoji: string; showEmoji: boolean;
+  emoji: string; showEmoji: boolean; welcome: boolean;
   productIds: string[];
   socials: Array<{ url: string; label: string }>;
   discountCode: string;
@@ -40,7 +41,7 @@ const blankTerms = (): TermsForm => ({
   commissionPct: "15", growthPct: "20", growthGoal: "", growthOn: false, discountPct: "10",
   trialDays: "90", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
 });
-const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
+const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, welcome: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
 
 const numStr = (n: number | undefined) => (typeof n === "number" ? String(n) : "");
 function termsForm(a: Ambassador): TermsForm {
@@ -53,7 +54,7 @@ function termsForm(a: Ambassador): TermsForm {
   };
 }
 const toForm = (a: Ambassador): Form => ({
-  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "", look: a.look || "auto", emoji: a.emoji || "", showEmoji: a.showEmoji !== false,
+  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "", look: a.look || "auto", emoji: a.emoji || "", showEmoji: a.showEmoji !== false, welcome: a.welcome !== false,
   productIds: a.productIds.slice(), socials: a.socials.length ? a.socials.map((s) => ({ url: s.url, label: s.label || "" })) : [{ url: "", label: "" }],
   discountCode: a.discountCode || "", active: a.active, terms: termsForm(a),
 });
@@ -84,6 +85,8 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
   const [stats, setStats] = useState<Record<string, AmbassadorStats>>({});
   const [overview, setOverview] = useState<Overview | null>(null);
   const [codes, setCodes] = useState<string[]>([]);
+  // Every code's amount (active or not), so the community discount always shows what the code really gives.
+  const [offers, setOffers] = useState<Record<string, string | null>>({});
   const [switchOn, setSwitchOn] = useState<boolean | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -113,7 +116,11 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
     load();
     fetch("/api/admin/discounts", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setCodes(((d?.discounts || []) as Array<{ code: string; active: boolean }>).filter((x) => x.active).map((x) => x.code)))
+      .then((d) => {
+        const all = (d?.discounts || []) as Array<{ code: string; active: boolean; type: string; value: number }>;
+        setCodes(all.filter((x) => x.active).map((x) => x.code));
+        setOffers(Object.fromEntries(all.map((x) => [x.code, offerText(x)])));
+      })
       .catch(() => {});
     fetch("/api/admin/flags", { cache: "no-store" })
       .then((r) => r.json())
@@ -165,7 +172,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
     if (!form) return;
     const t = form.terms;
     const body = {
-      id: form.id, name: form.name, slug: form.slug, email: form.email, headline: form.headline, bio: form.bio, photo: form.photo, look: form.look, emoji: form.emoji, showEmoji: form.showEmoji,
+      id: form.id, name: form.name, slug: form.slug, email: form.email, headline: form.headline, bio: form.bio, photo: form.photo, look: form.look, emoji: form.emoji, showEmoji: form.showEmoji, welcome: form.welcome,
       productIds: form.productIds, socials: form.socials.filter((s) => s.url.trim()), discountCode: form.discountCode, active: form.active,
       terms: { ...t },
     };
@@ -279,11 +286,14 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
                 <option key={k} value={k}>{v.label}: {v.hint}</option>
               ))}
             </select>
-            {form.id && form.slug && (
+            {form.id && form.slug && form.welcome && (
               <a className="esc-btn" href={`/${form.slug}?welcome=1`} target="_blank" rel="noopener noreferrer">Preview welcome ↗</a>
             )}
           </div>
-          <div className="field-hint">Colours their page and the short welcome animation visitors see when they arrive (once per visit). Save first to preview a change.</div>
+          <label className="amb-emoji-toggle" style={{ marginTop: "0.5rem" }}>
+            <input type="checkbox" checked={form.welcome} onChange={(e) => set({ welcome: e.target.checked })} /> Play a welcome animation when visitors arrive
+          </label>
+          <div className="field-hint">The look colours their page{form.welcome ? " and the short welcome animation visitors see when they arrive (once per visit)" : "; with the welcome off, the page opens straight away"}. Save first to preview a change.</div>
         </div>
         <div className="field full">
           <label htmlFor="amb-emoji">Their emoji</label>
@@ -381,15 +391,22 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
             {form.discountCode && !codes.includes(form.discountCode) && <option value={form.discountCode}>{form.discountCode} (not active)</option>}
             {codes.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <div className="field-hint">Members who use it are credited to them. Make the code (e.g. 10% off) under Marketing → Discount codes.</div>
+          <div className="field-hint">Anyone who uses it (members or the public shop) is credited to them, and it&rsquo;s filled in for people who come through their page. Make the code under Marketing → Discount codes.</div>
+        </div>
+        <div className="field">
+          <label>Their community&rsquo;s discount</label>
+          <div className="amb-derived">
+            {form.discountCode
+              ? offers[form.discountCode]
+                ? <><strong>{offers[form.discountCode]}</strong> with {form.discountCode}</>
+                : <>Set by {form.discountCode}</>
+              : "None: link a code to give their community a discount."}
+          </div>
+          <div className="field-hint">Always the same as their code. To change it, edit the code under Marketing → Discount codes.</div>
         </div>
         <div className="field">
           <label htmlFor="amb-rate">Commission %</label>
           <input id="amb-rate" inputMode="decimal" value={form.terms.commissionPct} onChange={(e) => setT({ commissionPct: e.target.value })} />
-        </div>
-        <div className="field">
-          <label htmlFor="amb-disc">Community discount % (their code)</label>
-          <input id="amb-disc" inputMode="decimal" value={form.terms.discountPct} onChange={(e) => setT({ discountPct: e.target.value })} />
         </div>
         <div className="field">
           <label htmlFor="amb-grow">Room to grow: higher rate %</label>
@@ -549,7 +566,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           <h4 style={{ marginTop: "1.1rem" }}>Terms</h4>
           <ul className="amb-terms">
             <li>{rateOf(open)}% commission{open.terms?.growthPct && !open.terms.growthOn ? `, rising to ${open.terms.growthPct}%${open.terms.growthGoal ? ` once ${open.terms.growthGoal}` : " after agreed goals"}` : ""}</li>
-            {typeof open.terms?.discountPct === "number" && <li>{open.terms.discountPct}% off for their community{open.discountCode ? ` (code ${open.discountCode})` : ""}</li>}
+            {open.discountCode && <li>{offers[open.discountCode] || "Discount"} for their community with code {open.discountCode}</li>}
             <li>Orders count for {termsForm(open).windowDays || "30"} days after visiting their page{open.terms?.repeatPurchases === false ? ", first order per customer only" : ", repeat purchases included"}</li>
             <li>Started {ymdLong(termsForm(open).startDate)}{os.trial.length ? `, ${os.trial.length}-day trial` : ""}</li>
             {open.terms?.notes && <li className="amb-notes">{open.terms.notes}</li>}

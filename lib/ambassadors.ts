@@ -1,3 +1,4 @@
+import { findDiscountByCode } from "./discounts";
 import { cleanEmoji, cleanLook, type LookChoice } from "./ambassadorLooks";
 import path from "path";
 import { VersionedStore } from "./versionedStore";
@@ -86,6 +87,8 @@ export type Ambassador = {
   emoji?: string;
   /** false = no emoji at all (badge, welcome drift). */
   showEmoji?: boolean;
+  /** false = no welcome animation on their page (the look still styles it). */
+  welcome?: boolean;
   /** Existing discount code that also credits them (members' checkout). */
   discountCode?: string;
   /** Where progress reports go. */
@@ -238,6 +241,7 @@ export function cleanAmbassador(input: Record<string, unknown>, others: Ambassad
       ...(input.look !== undefined ? { look: cleanLook(input.look) } : {}),
       ...(input.emoji !== undefined ? { emoji: cleanEmoji(input.emoji) || undefined } : {}),
       ...(input.showEmoji !== undefined ? { showEmoji: input.showEmoji !== false } : {}),
+      ...(input.welcome !== undefined ? { welcome: input.welcome !== false } : {}),
       discountCode: discountCode || undefined,
       email: email || undefined,
       ...(terms.value ? { terms: terms.value } : {}),
@@ -302,6 +306,11 @@ export async function saveAmbassador(id: string | undefined, input: Record<strin
   if (id && !existing) return { ok: false, error: "That ambassador no longer exists.", status: 404 };
   const c = cleanAmbassador(input, all.filter((a) => a.id !== id));
   if (!c.ok) return { ok: false, error: c.error, status: 400 };
+  // Their community discount is whatever their linked code gives: never a separate number that can drift.
+  const code = c.value.discountCode ? await findDiscountByCode(c.value.discountCode).catch(() => undefined) : undefined;
+  const pctFromCode = code && code.type === "percentage" ? code.value : undefined;
+  const baseTerms = c.value.terms ?? (existing ? existing.terms : undefined);
+  if (baseTerms) c.value.terms = { ...baseTerms, discountPct: pctFromCode };
   const now = Date.now();
   const saved = await store.mutate<Ambassador | "taken" | null>((rows) => {
     // Checked again inside the save, in case two people pick the same address at once.
