@@ -876,11 +876,11 @@ check("ambassadors: a member using their linked code is credited to them", _s==2
 _s,_v=req("/api/admin/ambassadors")
 _st=(_v.get("stats") or {}).get(_amb.get("id"),{})
 check("ambassadors: staff see their orders, units and commission waiting on payment", _s==200 and _st.get("orders")==2 and _st.get("units")==2 and _st.get("pending")>0 and _st.get("earned")==0 and len(_st.get("list",[]))==2, _st)
-check("ambassadors: credited orders keep the rate they were placed at (15% by default)", all(o.get("ambassador",{}).get("rate")==15 for o in jl("orders.json",[]) if (o.get("ambassador") or {}).get("id")==_amb.get("id")))
+check("ambassadors: credited orders keep the rate they were placed at (10% by default)", all(o.get("ambassador",{}).get("rate")==10 for o in jl("orders.json",[]) if (o.get("ambassador") or {}).get("id")==_amb.get("id")))
 # Paid orders earn commission: net = total − shipping, × rate
 _mine=[o for o in jl("orders.json",[]) if (o.get("ambassador") or {}).get("id")==_amb.get("id")]
 for _o in _mine: req("/api/admin/orders", {"id":_o["id"],"status":"paid"}, method="PATCH")
-_exp=round(sum(round((o["total"]-o.get("shippingCost",0))*0.15,2) for o in _mine),2)
+_exp=round(sum(round((o["total"]-o.get("shippingCost",0))*0.10,2) for o in _mine),2)
 _st=req("/api/admin/ambassadors")[1]["stats"][_amb["id"]]
 check("ambassadors: paid orders earn commission on product sales after discounts, without shipping", _st["earned"]==_exp and _st["owed"]==_exp and _st["pending"]==0, (_st["earned"],_exp))
 # Visits and QR scans are counted (no personal data)
@@ -922,7 +922,7 @@ check("ambassadors: first-order-only terms don't credit a repeat purchase", _s==
 _s,_x=req("/api/admin/ambassadors", {**_amb, "terms":{**_terms,"growthOn":True}}, method="PUT")
 _amb=_x.get("ambassador") or _amb
 _s,_o=rcheck2("second@example.com","10.71.0.8",_new)
-check("ambassadors: once goals are met, new orders get the higher rate (older ones keep theirs)", _s==200 and _o.get("ambassador",{}).get("rate")==20 and any((o.get("ambassador") or {}).get("rate")==15 for o in jl("orders.json",[]) if (o.get("ambassador") or {}).get("id")==_amb["id"]), _o.get("ambassador"))
+check("ambassadors: once goals are met, new orders get the higher rate (older ones keep theirs)", _s==200 and _o.get("ambassador",{}).get("rate")==20 and any((o.get("ambassador") or {}).get("rate")==10 for o in jl("orders.json",[]) if (o.get("ambassador") or {}).get("id")==_amb["id"]), _o.get("ambassador"))
 # Progress report
 _s,_rp=req("/api/admin/ambassadors/report", {"id":_amb["id"],"period":"since-start","note":"You're amazing!"})
 _html=_rp.get("html","")
@@ -1004,7 +1004,7 @@ _q=_c["request"]; _s,_x=req(_q["url"], _q["body"], method=_q["method"], headers=
 check("concierge: confirming changes their terms and keeps the rest", _s==200 and _x["ambassador"]["terms"]["commissionPct"]==18 and _x["ambassador"]["discountCode"]=="MAYA10" and len(_x["ambassador"]["payouts"])==2, (_s,_x))
 _r=atool("propose_ambassador", {"name":"Toni Nagy","email":"toni@example.com","products":["Harmony Blend Extract","Secret Member Tincture"],"socials":["instagram.com/toni"],"start_date":"2026-01-01","trial_days":30})
 _c=(_r.get("actions") or [None])[0]
-check("concierge: add-ambassador card (default terms, public products only)", _c and _c["title"]=="Add ambassador: Toni Nagy" and _c["request"]["body"]["productIds"]==["p_pub"] and _c["request"]["body"]["terms"]["commissionPct"]==15 and _c["request"]["body"]["terms"]["discountPct"]==10, _c and _c["request"]["body"])
+check("concierge: add-ambassador card (default terms: 10%, no higher rate; public products only)", _c and _c["title"]=="Add ambassador: Toni Nagy" and _c["request"]["body"]["productIds"]==["p_pub"] and _c["request"]["body"]["terms"]["commissionPct"]==10 and _c["request"]["body"]["terms"].get("growthPct") is None and _c["request"]["body"]["terms"]["discountPct"]==10, _c and _c["request"]["body"])
 _q=_c["request"]; _s,_x=req(_q["url"], _q["body"], method=_q["method"], headers={"x-fp-source":"assistant","x-fp-proposal":_c["kind"]})
 check("concierge: confirming adds them", _s==200 and _x["ambassador"]["slug"]=="toninagy", (_s,_x))
 _r=atool("propose_discount_code", {"code":"TONI10","type":"percentage","value":10,"public_shop":True})

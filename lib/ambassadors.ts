@@ -55,8 +55,8 @@ export type AmbassadorTerms = {
 export type Payout = { id: string; at: number; amount: number; note?: string };
 
 export const DEFAULT_TERMS: Omit<AmbassadorTerms, "startDate"> = {
-  commissionPct: 15,
-  growthPct: 20,
+  // 10% and no higher rate unless staff set something else for this ambassador (2026-11-13).
+  commissionPct: 10,
   growthGoal: "",
   growthOn: false,
   discountPct: 10,

@@ -38,7 +38,7 @@ type Form = {
 
 const todayPacific = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 const blankTerms = (): TermsForm => ({
-  commissionPct: "15", growthPct: "20", growthGoal: "", growthOn: false, discountPct: "10",
+  commissionPct: "10", growthPct: "", growthGoal: "", growthOn: false, discountPct: "10",
   trialDays: "90", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
 });
 const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, welcome: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
@@ -68,7 +68,7 @@ const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigi
 const day = (t: number) => new Date(t).toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", year: "numeric" });
 const ymdLong = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 const monthLabel = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "long", year: "numeric" });
-const rateOf = (a: Ambassador) => (a.terms?.growthOn && typeof a.terms.growthPct === "number" ? a.terms.growthPct : a.terms?.commissionPct ?? 15);
+const rateOf = (a: Ambassador) => (a.terms?.growthOn && typeof a.terms.growthPct === "number" ? a.terms.growthPct : a.terms?.commissionPct ?? 10);
 
 type Sort = "owed" | "sales" | "newest" | "name";
 type Period = "this-month" | "last-month" | "30-days" | "since-start";
@@ -414,6 +414,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           <label className="check-row" style={{ marginTop: "0.4rem" }}>
             <input type="checkbox" checked={form.terms.growthOn} onChange={(e) => setT({ growthOn: e.target.checked })} /> <span>Goals met: use the higher rate from now on</span>
           </label>
+          <div className="field-hint">Leave blank if there is no higher rate.</div>
         </div>
         <div className="field">
           <label htmlFor="amb-goal">Goals for the higher rate</label>
