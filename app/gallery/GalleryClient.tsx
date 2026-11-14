@@ -1012,7 +1012,19 @@ export default function GalleryClient({
                         )}
                       </div>
                       {o.trackingNumber && (
-                        <div className="my-order-note">📦 Tracking: {o.trackingNumber}</div>
+                        <div className="my-order-note">
+                          📦 Tracking:{" "}
+                          <a
+                            href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(o.trackingNumber)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="tracking-link"
+                            title="Open USPS tracking"
+                            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "0.2em" }}
+                          >
+                            {o.trackingNumber}
+                          </a>
+                        </div>
                       )}
                       {o.status === "pending" && o.paymentToken && (
                         <a className="my-order-pay" href={`/pay/${o.paymentToken}`}>

@@ -3101,7 +3101,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                     </div>
                     <div className="user-meta">
                       {formatDateTime(o.createdAt)} · {o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
-                      {o.trackingNumber ? ` · Tracking ${o.trackingNumber}` : ""}
+                      {o.trackingNumber && <> · Tracking <TrackingLink n={o.trackingNumber} /></>}
                     </div>
                   </div>
                   <div className="user-actions">
@@ -5200,7 +5200,7 @@ function OrderDetailModal({
                     Download label
                   </a>
                   <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
-                    {order.shippedService}{order.trackingNumber ? ` · Tracking ${order.trackingNumber}` : ""}
+                    {order.shippedService}{order.trackingNumber && <> · Tracking <TrackingLink n={order.trackingNumber} /></>}
                   </div>
                 </div>
               ) : !address ? (
@@ -5345,6 +5345,23 @@ function OrderReminders({ order, onRefreshed }: { order: Order; onRefreshed: (o:
       )}
       {msg && <div className="field-hint">{msg}</div>}
     </div>
+  );
+}
+
+/** A tracking number that opens the USPS tracking page (every label we buy is USPS). */
+function TrackingLink({ n }: { n: string }) {
+  return (
+    <a
+      href={`https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(n)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="tracking-link"
+      title="Open USPS tracking"
+      onClick={(e) => e.stopPropagation()}
+      style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "0.2em" }}
+    >
+      {n}
+    </a>
   );
 }
 
