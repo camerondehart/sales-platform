@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef } from "react";
 import type { Product } from "@/lib/storage";
-import { parsePrice, effectivePrice, onSale, promoLabel, asCash } from "@/lib/pricing";
+import { parsePrice, effectivePrice, onSale, promoLabel, asCash, PERCENT_OFF_CAP, CAP_NOTE } from "@/lib/pricing";
 import { priceCart, nextBundleHint, type AppliedBundle, type Bundle } from "@/lib/bundles";
 import { ProductFlags, PriceTag, RestockNote } from "@/app/components/ProductPrice";
 import FormattedDescription from "@/app/components/FormattedDescription";
@@ -327,12 +327,12 @@ export default function RetailClient({
                   </div>
                   {priced.bundles.map((b) => (
                     <div key={b.id} className="cart-subtotal cart-savings">
-                      <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}</span><strong>−${b.savings.toFixed(2)}</strong>
+                      <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}{b.capped ? CAP_NOTE : ""}</span><strong>−${b.savings.toFixed(2)}</strong>
                     </div>
                   ))}
                   {priced.promoSavings > 0 && (
                     <div className="cart-subtotal cart-savings">
-                      <span>Promo savings</span><strong>−${priced.promoSavings.toFixed(2)}</strong>
+                      <span>Promo savings{priced.promoCapped ? CAP_NOTE : ""}</span><strong>−${priced.promoSavings.toFixed(2)}</strong>
                     </div>
                   )}
                   {bundleHint && <div className="cart-bundle-hint">🌿 {bundleHint}</div>}
@@ -414,7 +414,7 @@ function RetailCheckout({
   const [codeInput, setCodeInput] = useState("");
   const [codeChecking, setCodeChecking] = useState(false);
   const [codeError, setCodeError] = useState("");
-  const [applied, setApplied] = useState<null | { code: string; amount: number; fromAmbassador?: boolean }>(null);
+  const [applied, setApplied] = useState<null | { code: string; amount: number; fromAmbassador?: boolean; capped?: boolean }>(null);
   async function applyCode(raw = codeInput, fromAmbassador = false) {
     const code = raw.trim();
     if (!code) return;
@@ -427,7 +427,7 @@ function RetailCheckout({
         body: JSON.stringify({ code, subtotal: Math.max(0, subtotal - discount) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.ok) setApplied({ code: data.code, amount: data.amount, fromAmbassador });
+      if (data.ok) setApplied({ code: data.code, amount: data.amount, fromAmbassador, capped: data.type === "percentage" && data.amount >= PERCENT_OFF_CAP });
       else {
         setApplied(null);
         // An ambassador's code that no longer works stays quiet; one they typed says why.
@@ -538,17 +538,17 @@ function RetailCheckout({
                 ))}
                 {bundleLines.map((b) => (
                   <div key={b.id} className="pay-item pay-savings">
-                    <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}</span><span>−${b.savings.toFixed(2)}</span>
+                    <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}{b.capped ? CAP_NOTE : ""}</span><span>−${b.savings.toFixed(2)}</span>
                   </div>
                 ))}
                 {discount - bundleLines.reduce((n, b) => n + b.savings, 0) > 0.004 && (
                   <div className="pay-item pay-savings">
-                    <span>Promo savings</span><span>−${(discount - bundleLines.reduce((n, b) => n + b.savings, 0)).toFixed(2)}</span>
+                    <span>Promo savings{pricedCart.promoCapped ? CAP_NOTE : ""}</span><span>−${(discount - bundleLines.reduce((n, b) => n + b.savings, 0)).toFixed(2)}</span>
                   </div>
                 )}
                 {codeSavings > 0 && applied && (
                   <div className="pay-item pay-savings">
-                    <span>Code {applied.code}</span><span>−${codeSavings.toFixed(2)}</span>
+                    <span>Code {applied.code}{applied.capped ? CAP_NOTE : ""}</span><span>−${codeSavings.toFixed(2)}</span>
                   </div>
                 )}
                 <div className="pay-item"><span>{isPickup ? "Local pickup" : "Shipping"}</span><span>{isPickup ? "Free" : `$${SHIPPING_FLAT.toFixed(2)}`}</span></div>
@@ -561,7 +561,7 @@ function RetailCheckout({
                   <div className="field-hint" style={{ margin: 0 }}>Your bundle savings are applied. Discount codes can&apos;t be combined with a bundle.</div>
                 ) : applied ? (
                   <div className="code-applied">
-                    <span>✓ <strong>{applied.code}</strong> applied, saving ${applied.amount.toFixed(2)}</span>
+                    <span>✓ <strong>{applied.code}</strong> applied, saving ${applied.amount.toFixed(2)}{applied.capped ? CAP_NOTE : ""}</span>
                     <button type="button" onClick={() => { setApplied(null); setCodeInput(""); }}>Remove</button>
                   </div>
                 ) : (

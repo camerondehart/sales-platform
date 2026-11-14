@@ -7,7 +7,7 @@ import type { EntranceKey } from "@/lib/entranceThemes";
 import { ambassadorRef } from "@/lib/ambassadorRef";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/storage";
-import { parsePrice, effectivePrice, promoLabel, asCash } from "@/lib/pricing";
+import { parsePrice, effectivePrice, promoLabel, asCash, PERCENT_OFF_CAP, CAP_NOTE } from "@/lib/pricing";
 import { priceCart, nextBundleHint, type Bundle } from "@/lib/bundles";
 import { ProductFlags, PriceTag, RestockNote } from "@/app/components/ProductPrice";
 import FormattedDescription from "@/app/components/FormattedDescription";
@@ -863,13 +863,13 @@ export default function GalleryClient({
                   {bundleHint && <div className="cart-bundle-hint">🌿 {bundleHint}</div>}
                   {cartPriced.bundles.map((b) => (
                     <div key={b.id} className="cart-subtotal" style={{ color: "var(--accent-strong)", fontSize: "0.9rem" }}>
-                      <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}</span>
+                      <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}{b.capped ? CAP_NOTE : ""}</span>
                       <strong>−${b.savings.toFixed(2)}</strong>
                     </div>
                   ))}
                   {cartPriced.promoSavings > 0 && (
                     <div className="cart-subtotal" style={{ color: "var(--accent-strong)", fontSize: "0.9rem" }}>
-                      <span>Promo savings</span>
+                      <span>Promo savings{cartPriced.promoCapped ? CAP_NOTE : ""}</span>
                       <strong>−${cartPriced.promoSavings.toFixed(2)}</strong>
                     </div>
                   )}
@@ -1190,7 +1190,7 @@ function CheckoutModal({
   const [codeInput, setCodeInput] = useState("");
   const [codeChecking, setCodeChecking] = useState(false);
   const [codeError, setCodeError] = useState("");
-  const [applied, setApplied] = useState<null | { code: string; amount: number }>(null);
+  const [applied, setApplied] = useState<null | { code: string; amount: number; capped?: boolean }>(null);
   // Came through an ambassador's page: their code is ready in the box (press Apply).
   useEffect(() => {
     const code = ambassadorRef()?.code;
@@ -1210,7 +1210,7 @@ function CheckoutModal({
       });
       const data = await res.json();
       if (data.ok) {
-        setApplied({ code: data.code, amount: data.amount });
+        setApplied({ code: data.code, amount: data.amount, capped: data.type === "percentage" && data.amount >= PERCENT_OFF_CAP });
         setCodeError("");
       } else {
         setApplied(null);
@@ -1430,25 +1430,25 @@ function CheckoutModal({
                 ))}
                 {!isInquiry && priced.bundles.map((b) => (
                   <div key={b.id} className="pay-item" style={{ color: "var(--accent-strong)" }}>
-                    <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}</span>
+                    <span>{b.name} bundle{b.sets > 1 ? ` ×${b.sets}` : ""}{b.capped ? CAP_NOTE : ""}</span>
                     <span>−${b.savings.toFixed(2)}</span>
                   </div>
                 ))}
                 {priced.promoSavings > 0 && (
                   <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
-                    <span>Promo savings</span>
+                    <span>Promo savings{priced.promoCapped ? CAP_NOTE : ""}</span>
                     <span>−${priced.promoSavings.toFixed(2)}</span>
                   </div>
                 )}
                 {bundleSavings > 0 && (
                   <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
-                    <span>Bundle &amp; save ({settings?.bundleRulePercent}% off {priced.ruleItems} items)</span>
+                    <span>Bundle &amp; save ({settings?.bundleRulePercent}% off {priced.ruleItems} items){priced.ruleCapped ? CAP_NOTE : ""}</span>
                     <span>−${bundleSavings.toFixed(2)}</span>
                   </div>
                 )}
                 {codeSavings > 0 && applied && (
                   <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
-                    <span>Code {applied.code}</span>
+                    <span>Code {applied.code}{applied.capped ? CAP_NOTE : ""}</span>
                     <span>−${codeSavings.toFixed(2)}</span>
                   </div>
                 )}
@@ -1534,7 +1534,7 @@ function CheckoutModal({
                     <label>Discount code (optional)</label>
                     {applied ? (
                       <div className="code-applied">
-                        <span>✓ <strong>{applied.code}</strong> applied — saving ${applied.amount.toFixed(2)}</span>
+                        <span>✓ <strong>{applied.code}</strong> applied — saving ${applied.amount.toFixed(2)}{applied.capped ? CAP_NOTE : ""}</span>
                         <button
                           type="button"
                           onClick={() => { setApplied(null); setCodeInput(""); }}

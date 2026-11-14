@@ -39,6 +39,17 @@ export function formatMoney(n: number): string {
 }
 
 /**
+ * The most any percentage-off code or deal can take off (2026-11-12):
+ * a percentage code per order, a percent sale per unit, BOGO per product in
+ * an order, a percent bundle per order, and the "buy N, save X%" rule per
+ * order. Fixed-dollar codes, fixed sale prices and set-price bundles are not capped.
+ */
+export const PERCENT_OFF_CAP = 100;
+export const capPercentOff = (amount: number): number => Math.min(amount, PERCENT_OFF_CAP);
+/** Shown beside a saving that reached the cap, so the customer understands the amount. */
+export const CAP_NOTE = ` (max ${formatMoney(PERCENT_OFF_CAP)} off)`;
+
+/**
  * The unit price a customer actually pays:
  * a fixed sale price wins, then a percent-off promo, then the regular price.
  */
@@ -46,7 +57,9 @@ export function effectivePrice(product: Priced): string {
   const p = deal(product);
   if (p.salePrice?.trim()) return p.salePrice.trim();
   if (p.promo?.type === "percent" && p.promo.percent > 0) {
-    return formatMoney(parsePrice(p.price) * (1 - p.promo.percent / 100));
+    const full = parsePrice(p.price);
+    if (full * (p.promo.percent / 100) > PERCENT_OFF_CAP) return formatMoney(full - PERCENT_OFF_CAP);
+    return formatMoney(full * (1 - p.promo.percent / 100));
   }
   return p.price;
 }
@@ -59,7 +72,7 @@ export function lineDiscount(product: Priced, quantity: number): number {
   const p = deal(product);
   if (p.promo?.type === "bogo" && p.promo.percent > 0 && quantity >= 2) {
     const unit = parsePrice(effectivePrice(p));
-    return Math.round(Math.floor(quantity / 2) * unit * (p.promo.percent / 100) * 100) / 100;
+    return capPercentOff(Math.round(Math.floor(quantity / 2) * unit * (p.promo.percent / 100) * 100) / 100);
   }
   return 0;
 }

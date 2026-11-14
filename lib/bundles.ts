@@ -15,13 +15,15 @@
  *    saves the customer the most (the best bundle wins).
  *  - Units in a bundle don't also get BOGO or the cart-wide "buy N, save X%"
  *    rule: that rule counts and discounts only the items outside bundles.
+ *  - Percentage savings are capped at $100 (PERCENT_OFF_CAP in lib/pricing.ts):
+ *    each percent bundle per order, BOGO per product, and the cart rule.
  *  - A bundle OR a discount code, never both (enforced at checkout).
  *    Loyalty points still apply.
  *
  * With no bundles in play, the result is exactly the old calculation.
  */
 
-import { effectivePrice, lineDiscount, parsePrice, type Priced } from "./pricing";
+import { PERCENT_OFF_CAP, capPercentOff, effectivePrice, lineDiscount, parsePrice, type Priced } from "./pricing";
 
 export type BundleItem = { productId: string; qty: number };
 export type Bundle = {
@@ -41,7 +43,8 @@ export type Bundle = {
 export type CartLine = { product: Priced & { id: string }; quantity: number };
 export type CartRule = { enabled: boolean; minItems: number; percent: number } | null;
 
-export type AppliedBundle = { id: string; name: string; sets: number; savings: number };
+/** `capped`: a percent bundle that reached the $100 cap (only set when true). */
+export type AppliedBundle = { id: string; name: string; sets: number; savings: number; capped?: true };
 
 export type CartPricing = {
   /** Sum of unit price × quantity (sale prices included). */
@@ -55,6 +58,9 @@ export type CartPricing = {
   ruleSavings: number;
   /** promo + bundle + rule savings. */
   discount: number;
+  /** A BOGO product / the cart rule reached the $100 cap (only set when true). */
+  promoCapped?: true;
+  ruleCapped?: true;
 };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -96,6 +102,10 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
     for (const i of b.items) next.set(i.productId, (next.get(i.productId) || 0) - i.qty * n);
     return next;
   };
+  // What n sets of bundle k save: a percent bundle saves at most $100 per order
+  // (set-price bundles are not capped).
+  const saved = (k: number, n: number) =>
+    live[k].b.type === "percent" ? capPercentOff(r2(live[k].per * n)) : r2(live[k].per * n);
   let bestTotal = -1;
   let bestPlan: number[] = [];
   let budget = 20_000;
@@ -110,7 +120,7 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
     }
     for (let n = maxSets(live[k].b, left); n >= 0; n--) {
       plan.push(n);
-      search(k + 1, n ? take(live[k].b, n, left) : left, plan, r2(total + live[k].per * n));
+      search(k + 1, n ? take(live[k].b, n, left) : left, plan, r2(total + saved(k, n)));
       plan.pop();
     }
   };
@@ -123,7 +133,7 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
       if (n) left = take(b, n, left);
       return n;
     });
-    const greedyTotal = r2(greedy.reduce((t, n, k) => t + live[k].per * n, 0));
+    const greedyTotal = r2(greedy.reduce((t, n, k) => t + saved(k, n), 0));
     if (greedyTotal > bestTotal) bestPlan = greedy;
   }
   const remaining = new Map(have);
@@ -132,7 +142,8 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
     const n = bestPlan[k] || 0;
     if (n <= 0) return;
     for (const i of b.items) remaining.set(i.productId, (remaining.get(i.productId) || 0) - i.qty * n);
-    applied.push({ id: b.id, name: b.name, sets: n, savings: r2(per * n) });
+    const hitCap = b.type === "percent" && r2(per * n) >= PERCENT_OFF_CAP;
+    applied.push({ id: b.id, name: b.name, sets: n, savings: saved(k, n), ...(hitCap ? { capped: true as const } : {}) });
   });
   const bundleSavings = r2(applied.reduce((n, a) => n + a.savings, 0));
 
@@ -140,6 +151,7 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
   const covered = new Map<string, number>();
   for (const [id, q] of Array.from(have.entries())) covered.set(id, q - (remaining.get(id) || 0));
   let promo = 0;
+  let promoCapped = false;
   let outsideItems = 0;
   let outsideValue = 0;
   for (const l of lines) {
@@ -147,13 +159,15 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
     covered.set(l.product.id, (covered.get(l.product.id) || 0) - take);
     const q = l.quantity - take;
     if (q <= 0) continue;
-    promo += lineDiscount(l.product, q);
+    const off = lineDiscount(l.product, q);
+    if (off >= PERCENT_OFF_CAP) promoCapped = true;
+    promo += off;
     outsideItems += q;
     outsideValue += unit(l.product.id) * q;
   }
   promo = r2(promo);
   const ruleSavings =
-    rule && rule.enabled && outsideItems >= rule.minItems ? r2(Math.max(0, outsideValue - promo) * (rule.percent / 100)) : 0;
+    rule && rule.enabled && outsideItems >= rule.minItems ? capPercentOff(r2(Math.max(0, outsideValue - promo) * (rule.percent / 100))) : 0;
 
   return {
     subtotal,
@@ -163,6 +177,8 @@ export function priceCart(lines: CartLine[], bundles: Bundle[], rule: CartRule, 
     ruleItems: outsideItems,
     ruleSavings,
     discount: r2(promo + bundleSavings + ruleSavings),
+    ...(promoCapped ? { promoCapped: true as const } : {}),
+    ...(ruleSavings >= PERCENT_OFF_CAP ? { ruleCapped: true as const } : {}),
   };
 }
 

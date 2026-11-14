@@ -26,7 +26,7 @@ for (let t=0;t<3000;t++){
   const unit=id=>parseFloat((P.find(p=>p.id===id).salePrice||P.find(p=>p.id===id).price).slice(1));
   const have={}; lines.forEach(l=>have[l.product.id]=(have[l.product.id]||0)+l.quantity);
   const per=bundles.map(b=>{const c=b.items.reduce((s,i)=>s+unit(i.productId)*i.qty,0); return b.type==="percent"?Math.round(c*b.value)/100:Math.max(0,Math.round((c-b.value)*100)/100);});
-  let best=0; const rec=(k,left,tot)=>{ if(k===bundles.length){best=Math.max(best,tot);return;} const b=bundles[k]; let m=Math.min(...b.items.map(i=>Math.floor((left[i.productId]||0)/i.qty))); for(let s=0;s<=m;s++){const L={...left}; b.items.forEach(i=>L[i.productId]-=i.qty*s); rec(k+1,L,tot+per[k]*s);} };
+  let best=0; const rec=(k,left,tot)=>{ if(k===bundles.length){best=Math.max(best,tot);return;} const b=bundles[k]; let m=Math.min(...b.items.map(i=>Math.floor((left[i.productId]||0)/i.qty))); for(let s=0;s<=m;s++){const L={...left}; b.items.forEach(i=>L[i.productId]-=i.qty*s); rec(k+1,L,tot+(b.type==="percent"?Math.min(100,per[k]*s):per[k]*s));} };
   rec(0,have,0);
   const sub=lines.reduce((s,l)=>s+unit(l.product.id)*l.quantity,0);
   if (Math.abs(best-r.bundleSavings)>0.011 || r.discount>sub+1e-9 || r.discount<0) { bad++; if(bad<4) console.log("MISMATCH",best,r.bundleSavings,JSON.stringify(bundles),JSON.stringify(lines.map(l=>[l.product.id,l.quantity]))); }

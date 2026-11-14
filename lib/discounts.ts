@@ -7,6 +7,7 @@ import path from "path";
 import { VersionedStore } from "./versionedStore";
 import { isEnabled, isEnabledStrict } from "./flags";
 import { singleton } from "./assistant/singleton";
+import { capPercentOff } from "./pricing";
 
 export type DiscountType = "percentage" | "fixed";
 
@@ -216,9 +217,10 @@ export function validateDiscount(
     };
   }
 
+  // A percentage code takes at most $100 off an order; fixed-dollar codes are not capped.
   const raw =
     discount.type === "percentage"
-      ? subtotal * (discount.value / 100)
+      ? capPercentOff(subtotal * (discount.value / 100))
       : discount.value;
   // Never discount below zero.
   const amount = Math.min(Math.round(raw * 100) / 100, subtotal);

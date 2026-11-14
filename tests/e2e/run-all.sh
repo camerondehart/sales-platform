@@ -41,6 +41,8 @@ echo "Staff sign-in lockout per device (unit): $(node "$REPO/tests/unit/rate-lim
 node "$REPO/tests/unit/rate-limit.cjs" >/dev/null 2>&1 || { echo "Rate limit unit check failed"; exit 1; }
 echo "Cash pickup deals (unit): $(node "$REPO/tests/unit/cash-pricing.cjs" | tail -1)"
 node "$REPO/tests/unit/cash-pricing.cjs" >/dev/null 2>&1 || { echo "Cash pickup pricing unit check failed"; exit 1; }
+echo "Percentage discounts cap at \$100 (unit): $(node "$REPO/tests/unit/percent-cap.cjs" | tail -1)"
+node "$REPO/tests/unit/percent-cap.cjs" >/dev/null 2>&1 || { echo "Percent cap unit check failed"; exit 1; }
 echo "Backorders & restock needs (unit): $(node "$REPO/tests/unit/stock-math.cjs" | tail -1)"
 node "$REPO/tests/unit/stock-math.cjs" >/dev/null 2>&1 || { echo "Stock maths unit check failed"; exit 1; }
 echo "Suspicious activity signals (unit): $(node "$REPO/tests/unit/suspicion.cjs" | tail -1)"
