@@ -174,6 +174,7 @@
   <a class="nav-link" href="#tab-events"><span class="nav-ico">🎟</span>Events</a>
   <a class="nav-link" href="#tab-marketing"><span class="nav-ico">✦</span>Marketing</a>
   <a class="nav-link" href="#tab-ambassadors"><span class="nav-ico">★</span>Ambassadors</a>
+  <a class="nav-link" href="#tab-retail"><span class="nav-ico">🏪</span>Retail</a>
   <a class="nav-link" href="#tab-analytics"><span class="nav-ico">📈</span>Analytics</a>
   <a class="nav-link" href="#tab-assistant"><span class="nav-ico">✧</span>Assistant</a>
   <a class="nav-link" href="#tab-settings"><span class="nav-ico">⚙</span>Settings</a>
@@ -253,7 +254,7 @@ Statuses can be changed back. Products can be edited. Emails only send when a se
 </ol>
 
 <h3>The daily staff password</h3>
-<p>The staff password changes every day at midnight Pacific. It's two words and two numbers, like <code>maple-otter-42</code>. You'll find it in two places:</p>
+<p>The staff password changes every day at midnight {{TZ}} time. It's two words and two numbers, like <code>maple-otter-42</code>. You'll find it in two places:</p>
 <ul>
 <li>At the top of each morning's <strong>nightly report email</strong>, under <em>Today's staff password</em>.</li>
 <li>In <strong>Settings → Steward password</strong> whenever you're signed in (with Face ID or the email link, say). It's always there, so a missing email never locks anyone out.</li>
@@ -468,6 +469,10 @@ Checking once each morning keeps that promise easily.
 <strong>If their email is already in the system</strong>
 The site tells you and does nothing, so you cannot end up with two accounts for one person. If they have a request waiting, approve that instead. If they were rejected, find them under <strong>Rejected</strong> and use <strong>Approve after all</strong>.
 </div>
+
+<h3>Suspicious activity</h3>
+<p>In the Members tab, under Member requests, <strong>Suspicious activity</strong> is a line you tap to open (the number beside it is how many need a look). It lists accounts and orders that look fake, each with the reasons in plain words: several requests or orders from the same internet address, emails that are really one mailbox (dots or +tags), numbered emails, the same sign-up note, three or more emails at one shipping address or phone number, a throwaway inbox, a burst of requests, orders that are never paid, many orders in an hour, or a first order far bigger than normal. People who look connected are grouped into one card. <em>Strong signs</em> means several reasons agree; <em>Worth a look</em> is milder.</p>
+<p><strong>Nothing is blocked.</strong> It is only a heads-up before you approve a request or ship an order, and real customers sometimes share an address or a wifi. <kbd>Find member</kbd> jumps to that person. Tap <kbd>Looks fine</kbd> once you've checked; the card moves to <em>Looked at</em> and returns only if something new turns up for the same people. Internet addresses are noted for 180 days, starting from when this was switched on.</p>
 
 <h3>Rejecting a request</h3>
 <p>Each waiting request has three buttons. <strong>Approve</strong> lets them in. <strong>Reject</strong> turns them down but keeps their record. <strong>Delete</strong> removes them completely and cannot be undone. When in doubt, reject rather than delete.</p>
@@ -880,9 +885,9 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
   <ul>
   <li><strong>Their email</strong>: where progress reports go.</li>
   <li><strong>Their discount code</strong>: make the code first under Marketing → Discount codes (e.g. 10% off), then pick it here. It works for their community in the public shop and the members’ shop, and anyone who opens their page finds it already filled in at checkout.</li>
-  <li><strong>Commission %</strong> (e.g. 15).</li>
+  <li><strong>Commission %</strong>: starts at 10 unless you change it.</li>
   <li><strong>Their community&rsquo;s discount</strong> isn&rsquo;t typed in: it&rsquo;s always whatever their code gives (shown under the code, e.g. <em>20% off with TONI3</em>). To change it, <kbd>Edit</kbd> the code under Marketing → Discount codes, and their page, terms and reports follow.</li>
-  <li><strong>Room to grow</strong>: the higher rate (e.g. 20) and the goals that earn it. Tick <em>Goals met</em> when they get there. New orders then earn the higher rate, and earlier orders keep the rate they were placed at.</li>
+  <li><strong>Room to grow</strong>: optional. The higher rate (e.g. 20) and the goals that earn it; leave the rate blank if there isn&rsquo;t one. Tick <em>Goals met</em> when they get there. New orders then earn the higher rate, and earlier orders keep the rate they were placed at.</li>
   <li><strong>Started on</strong> and <strong>trial</strong> length (e.g. 90 days; 0 = none).</li>
   <li><strong>Attribution window</strong>: how many days after visiting their page an order still counts (e.g. 30). Untick <em>Repeat purchases count</em> if only each customer’s first order should.</li>
   <li><strong>Payouts</strong>: monthly, quarterly or on request.</li>
@@ -936,6 +941,41 @@ On stage the link and QR code point at stage. The panel warns you when that’s 
 <strong>Before the switch is on</strong>
 Everything here works with the <strong>Ambassador pages</strong> switch off, so you can set people up and preview their pages first. Customers can only open the pages, and orders are only credited, once it’s on in Settings → Feature switches.
 </div>
+</section>
+
+<!-- ===== RETAIL TAB ===== -->
+<section id="tab-retail">
+<h2 class="sec">Retail</h2>
+<span class="where">Dashboard → Retail</span>
+<p class="lede">Shops that stock {{SHORT}} get their own store portal at <strong>{{HOST}}/store-portal</strong>. They sign in, request more stock, follow each request and see everything we’ve shipped them. The portal never shows prices or money. This tab is where you set them up, handle their requests and manage the store map.</p>
+<p>Stores can also use the little shop icon in the top-left corner of the members’ sign-in card, or simply sign in there with their store email and password: they’re taken straight to the store portal. In the portal they can tap any product to see its picture and description.</p>
+
+<h3>Adding a store</h3>
+<ol class="steps">
+<li>Press <kbd>+ Add a store account</kbd>. Give the store’s name and, if it’s on the store map, pick it under <strong>On the store map</strong> (its address and hours then show in their portal).</li>
+<li>Add a login for each person at the shop (name + email). Each person gets their own password.</li>
+<li>Leave <em>Email each login a link to set their password</em> ticked and press <kbd>Add store account</kbd>. They get an email with a <kbd>Set my password</kbd> button (it works once, for 30 days).</li>
+</ol>
+<p>After that they sign in the same ways members do: password, an emailed 6-digit code, or Face ID / Touch ID once they add it in their portal. A store login can’t open the members’ site or this dashboard. <kbd>Send link</kbd> emails a fresh set-password link (also handy if they forget their password); <kbd>Switch off</kbd> stops a login, or a whole store, from signing in straight away.</p>
+
+<h3>Stock requests</h3>
+<ol class="steps">
+<li>A new request emails the team inbox (the same one as new orders), shows on the Overview’s <strong>Today</strong> list, and puts a number on the Retail tab.</li>
+<li><kbd>Approve</kbd> it when you’ve seen it. <kbd>Note</kbd> adds a message the store sees on that request (e.g. a delivery day or tracking number).</li>
+<li>When it goes out, press <kbd>Mark shipped</kbd>, fix any quantities you sent differently, and press <kbd>Mark shipped</kbd> again.</li>
+<li>If any of those products are in <strong>Products → Stock counts</strong>, it then <strong>asks</strong> whether to take the units off the counts. <kbd>Yes, take them off</kbd> if they came out of the website’s stock; <kbd>No, leave the counts</kbd> if not. Nothing comes off the counts unless you say yes. <kbd>Not shipped yet</kbd> moves it back and asks whether to put those units back.</li>
+<li>The store presses <em>It arrived</em> when it lands (or you can <kbd>Mark received</kbd>). <kbd>Decline</kbd> (with a note) if you can’t fill it. Stores can cancel a request only while it’s still waiting for review.</li>
+</ol>
+
+<h3>What stores see</h3>
+<p>Their open requests, each request’s status and your notes, a <strong>Shipped to you</strong> table (units per product, last shipped, units per month) and their store details. To change their details they press <em>Message the team</em>, which emails the team inbox; reply to that email to answer them. Their portal also has the Concierge, which can do all of this for them (request stock, cancel, confirm a delivery, message the team) with a button they press to confirm.</p>
+
+<h3>The store map</h3>
+<p>The same <strong>Store locations</strong> list as Settings sits at the bottom of this tab, so you can add, edit or hide map pins here too. See <a href="#tab-settings">Settings → Store locations</a>.</p>
+
+<h3>Asking the Concierge</h3>
+<p>Ask the staff Concierge <em>“Any stock requests from stores?”</em> and it lists them. It can prepare a card to approve, decline or move a request along, but it never changes stock counts: for that, use <kbd>Mark shipped</kbd> here.</p>
+<p>The portal is behind the <strong>Retail store portal</strong> switch (Settings → Feature switches). Off = stores can’t sign in; their accounts and requests stay saved.</p>
 </section>
 
 <!-- ===== ANALYTICS TAB ===== -->
@@ -1124,7 +1164,7 @@ Flags are deliberately sensitive, so expect the odd false alarm. <strong>Red</st
 <tr><td>Minimum to redeem</td><td>Points needed before spending any</td><td>100</td></tr>
 </table>
 <p>With those values, $100 spent earns 100 points, worth $1 off — a deliberately conservative 1%. Raise "points per dollar" to be more generous.</p>
-<p>Members see their balance and history under <strong>Points &amp; rewards</strong> in their account menu, and can slide points onto an order at checkout. Points are awarded automatically when an order becomes Paid or Completed, and never twice for the same order. You can also add or subtract points by hand with a reason, which is recorded in their history.</p>
+<p>Members see their balance and history under <strong>Points &amp; rewards</strong> in their account menu, and can slide points onto an order at checkout. Points are added automatically an hour after an order is marked <strong>Completed</strong> (one per $1 of products, not shipping), and never twice for the same order. Pending and Paid orders earn nothing yet, and a customer tapping "I've paid" doesn't add points. If an order stops being Completed its points are taken back; cancelling also returns any points spent on it, and setting it back from cancelled undoes that. <strong>Points check</strong> (below the rules) checks every member against this for orders since Nov 1, 2026; the site runs it every 15 minutes and fixes any order that doesn't match, and the Fix button does it straight away. You can also add or subtract points by hand with a reason, which is recorded in their history.</p>
 
 <h3>Store locations (the “Find us in stores” map)</h3>
 <p>Open <strong>Settings → Store locations</strong>. These are the shops that carry {{SHORT}}. They appear on the public <strong>/stores</strong> map once the <strong>Store locator</strong> switch is on.</p>
@@ -1161,6 +1201,8 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Seasonal site backgrounds</strong> (on): the site's background softly follows the same season or holiday as the entrance, with a few things drifting down. Off = the usual look.</li>
 <li><strong>Site change requests</strong> (on): staff can ask the Concierge (or Settings → Site requests) for website changes; small ones are built onto stage automatically, bigger ones wait for your developer. Off hides the panel and the Concierge stops taking requests. Needs setting up first (Settings → Site requests shows what's missing).</li>
 <li><strong>Ambassador welcome animations</strong> (on): each ambassador’s page opens with their short welcome. Off = the page opens straight away (it keeps its look).</li>
+<li><strong>Suspicious activity flags</strong> (on): Members → Suspicious activity lists accounts and orders that look fake, with the reasons. It never blocks anyone. Off hides the list and stops noting internet addresses.</li>
+<li><strong>Events note for locals</strong> (on): members who sign in near the town in <em>Settings → Events popup</em> (the business's home town, 100 miles, to start) get one small note about the next upcoming event, with a link to the Events page. Each member sees it once, until you press <em>Show it again to everyone</em> there. Change the town, the miles and the heading there too; after Save it shows <em>Found:</em> with the place the map matched (US towns only), so check that it's the right one. Each event has a <em>Show in the events popup for locals</em> tick, in that panel and in the event form, with its own town and miles if you like (blank = the main area). Off = no note.</li>
 <li><strong>Member sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Members get the one-tap sign-in and the popup offering it after they sign in. Off hides both; saved devices stay saved.</li>
 <li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>
@@ -1198,7 +1240,7 @@ It arrives automatically every night with revenue for today, 7 days, 30 days and
 <tr><th>You see</th><th>Means</th><th>Do</th></tr>
 <tr><td><strong>Sure</strong></td><td>The Venmo note had the order number, and the amount fits</td><td>Tap <kbd>Mark paid</kbd></td></tr>
 <tr><td><strong>Likely</strong></td><td>Same amount and a similar name, but no order number</td><td>Check the name and order, then <kbd>Mark paid</kbd> or <kbd>Not a match</kbd></td></tr>
-<tr><td><strong>No sure match</strong></td><td>Couldn't tell which order</td><td>Pick the order it pays for, or dismiss it if it isn't for an order</td></tr>
+<tr><td><strong>No sure match</strong></td><td>Couldn't tell which order</td><td>Pick the order it pays for. If it was a real sale made away from the site, tap <kbd>Handled off-site</kbd>: it counts as revenue without needing an order (tapped it by mistake? <kbd>Undo</kbd> is under <strong>Recently done</strong>). Dismiss it if it isn't a sale at all</td></tr>
 <tr><td><strong>Quarantined</strong></td><td>Failed the security check (may not really be from Venmo)</td><td>Check the Venmo app itself before marking anything paid</td></tr>
 </table>
 <p>Nothing is ever marked paid until someone taps. The Today list shows Venmo payments waiting, and the Concierge can prepare the same confirm cards. One-time setup (forwarding the Venmo emails from the inbox that receives them) is under <strong>Setup</strong> at the bottom of that panel.</p>
@@ -1220,7 +1262,7 @@ Open Venmo or Zelle and confirm the money landed. If it hasn't, set the order ba
 <ol class="steps">
 <li>Open the order.</li>
 <li>Click <kbd>✓ Mark paid</kbd>.</li>
-<li>Loyalty points are awarded automatically if points are switched on.</li>
+<li>Loyalty points come later, an hour after the order is marked Completed.</li>
 </ol>
 
 <h3>Re-sending the payment link</h3>
@@ -1348,7 +1390,7 @@ A sale-priced product, in a qualifying bundle, with a code applied, plus points 
 
 <h3>How it works</h3>
 <ul>
-<li><strong>Earning:</strong> members earn points for every $1 they spend on products (shipping doesn't count). The points are added automatically when an order becomes <strong>Paid</strong> or <strong>Completed</strong>, and never twice for the same order.</li>
+<li><strong>Earning:</strong> members earn points for every $1 they spend on products (shipping doesn't count). The points are added automatically an hour after an order is marked <strong>Completed</strong>, and never twice for the same order. Pending and Paid orders earn nothing yet. If the order is later <strong>cancelled</strong>, its points are taken back (and any points spent on it are returned).</li>
 <li><strong>Spending:</strong> at checkout in the members' area they slide points onto the order once they have the minimum. The points come off the total as dollars.</li>
 <li><strong>Members only:</strong> the public shop doesn't earn or use points. It's one of the reasons to join {{MEMBERS}}.</li>
 </ul>
@@ -1376,7 +1418,7 @@ A sale-priced product, in a qualifying bundle, with a code applied, plus points 
 
 <h3>If points look wrong</h3>
 <ul>
-<li><strong>No points after an order?</strong> They're added when the order is marked Paid or Completed, not when it's placed. Check loyalty is switched on in Settings.</li>
+<li><strong>No points after an order?</strong> They're added an hour after the order is marked Completed, not when it's placed or paid. Settings → Sales &amp; loyalty rules → Points check shows any order that doesn't match. Check loyalty is switched on in Settings.</li>
 <li><strong>Can't use points at checkout?</strong> They need at least the minimum, and they must be shopping in the members' area.</li>
 <li>Points stack with sales, bundles and codes. Build a test basket to see the total line by line.</li>
 </ul>
