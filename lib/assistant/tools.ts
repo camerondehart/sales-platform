@@ -1971,13 +1971,14 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       // automatic reminder) are left alone so they don't come back every morning.
       // Expired orders are left out: the automatic reminders already gave up on
       // them, so they belong in "close out" (cancel or revive), not another nudge.
-      const { toChase: overdue, quiet } = await splitChased(unpaid.filter((o) => !o.expiredAt && now - o.createdAt > 2 * DAY), now);
+      // Cash-at-pickup orders are paid when collected, so they're never chased.
+      const { toChase: overdue, quiet } = await splitChased(unpaid.filter((o) => !o.expiredAt && o.paymentMethod !== "cash" && now - o.createdAt > 2 * DAY), now);
       if (overdue.length)
         tasks.push({
           priority: overdue.some((o) => now - o.createdAt > 7 * DAY) ? "now" : "today",
           task: `Chase ${overdue.length} unpaid order${overdue.length === 1 ? "" : "s"} older than 2 days (${money(overdue.reduce((n, o) => n + o.total, 0))})`,
           items: [
-            ...overdue.slice(0, 10).map((o) => `${orderRef(o)} ${o.userName} ${money(o.total)} — ${days(o.createdAt)}d${o.paymentMethod === "cash" ? " (cash at pickup)" : ""} {id:${o.id}}`),
+            ...overdue.slice(0, 10).map((o) => `${orderRef(o)} ${o.userName} ${money(o.total)} — ${days(o.createdAt)}d {id:${o.id}}`),
             ...(quiet.length ? [`${quiet.length} more already chased in the last ${CHASE_QUIET_DAYS} days — left alone for now`] : []),
           ],
           one_click: "propose_order_message (reminder with pay button) or propose_resend_invoice per order — only the orders listed with an {id}; the 'already chased' ones are skipped on purpose",

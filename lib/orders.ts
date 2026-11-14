@@ -86,6 +86,8 @@ export type Order = {
   labelUrl?: string;
   shippoTransactionId?: string;
   shippedService?: string;
+  /** When this order's file was last saved (guards against stale reads, see updateOrder). */
+  savedAt?: number;
   /** Units this order took from Stock counts (put back if it's cancelled). */
   stockTaken?: Array<{ productId: string; qty: number }>;
   /** When a cancel put stockTaken back (cleared if the order is un-cancelled and takes it again). */
@@ -110,6 +112,35 @@ async function blobPutOrder(order: Order): Promise<void> {
     allowOverwrite: true, // required by @vercel/blob 2.x to update a blob in place
     cacheControlMaxAge: 60,
   });
+}
+
+// Orders this server instance saved in the last few minutes. A read that
+// comes back older than our own save (the overwrite hasn't spread yet) uses
+// our copy instead, so a second change moments after the first can't undo it.
+const recentSaves = new Map<string, Order>();
+const RECENT_MS = 5 * 60_000;
+
+function remember(order: Order) {
+  const cutoff = Date.now() - RECENT_MS;
+  for (const [id, o] of recentSaves) if ((o.savedAt || 0) < cutoff) recentSaves.delete(id);
+  recentSaves.set(order.id, order);
+}
+
+function newest(order: Order): Order {
+  const mine = recentSaves.get(order.id);
+  if (!mine || (mine.savedAt || 0) < Date.now() - RECENT_MS) return order;
+  return (mine.savedAt || 0) > (order.savedAt || 0) ? mine : order;
+}
+
+/**
+ * True when the file was overwritten in the last two minutes and the copy we
+ * read predates that upload (5s slack for clock drift). Older uploads have
+ * settled, so reads of untouched orders never wait.
+ */
+function isStale(order: Order, uploadedAt: number): boolean {
+  if (!Number.isFinite(uploadedAt) || Date.now() - uploadedAt > 120_000) return false;
+  const saved = order.savedAt || order.createdAt || 0;
+  return uploadedAt - saved > 5_000;
 }
 
 async function blobReadLegacy(): Promise<Order[]> {
@@ -150,7 +181,7 @@ async function blobReadAll(): Promise<Order[]> {
       }
     })
   );
-  const orders = results.filter((o): o is Order => !!o && !!o.id);
+  const orders = results.filter((o): o is Order => !!o && !!o.id).map(newest);
 
   // Merge legacy single-file orders that haven't been migrated yet.
   // Per-order files always win over their legacy copy.
@@ -189,9 +220,11 @@ export async function addOrder(
     paymentToken: crypto.randomBytes(24).toString("hex"),
     createdAt: Date.now(),
   };
+  order.savedAt = order.createdAt;
   if (useBlob) {
     // Append-only: a brand-new file can't race with or overwrite anything.
     await blobPutOrder(order);
+    remember(order);
   } else {
     const all = await fsRead();
     all.push(order);
@@ -203,19 +236,39 @@ export async function addOrder(
 // Fetch ONE order by reading its own file directly — one list call scoped to
 // the exact path plus one fetch, instead of listing and downloading every
 // order in the store. This is what makes admin actions fast.
-async function blobReadOne(id: string): Promise<Order | null> {
+async function blobReadOne(id: string, forWrite = false): Promise<Order | null> {
+  let stillStale = false;
   try {
     const { list } = await import("@vercel/blob");
     const key = `${ORDERS_PREFIX}${id}.json`;
     const { blobs } = await list({ prefix: key });
     const match = blobs.find((b) => b.pathname === key);
     if (match) {
-      const res = await fetch(bust(match.url), { cache: "no-store" });
-      if (res.ok) return (await res.json()) as Order;
+      // An overwrite can take up to ~60s to reach every reader, so a read
+      // soon after a save may still return the older copy. Writing changes
+      // onto that copy would undo the save (e.g. a customer's "I've paid"
+      // flipped back to Pending by the points stamp a moment later, so
+      // payment reminders kept going out). The listing's uploadedAt is
+      // current, so retry briefly while the copy is clearly older than it.
+      const uploaded = new Date(match.uploadedAt).getTime();
+      let got: Order | null = null;
+      for (let i = 0; i < 5; i++) {
+        if (i) await new Promise((r) => setTimeout(r, 500 * i));
+        const res = await fetch(bust(match.url), { cache: "no-store" });
+        if (!res.ok) continue;
+        got = newest((await res.json()) as Order);
+        if (!isStale(got, uploaded)) break;
+      }
+      if (got) {
+        stillStale = isStale(got, uploaded);
+        if (!stillStale || !forWrite) return got;
+      }
     }
   } catch (err) {
     console.error(`Failed targeted read for order ${id}:`, err);
   }
+  // Saving onto an out-of-date copy would undo someone else's change, so refuse instead.
+  if (stillStale) throw new Error(`Order ${id.slice(-6).toUpperCase()} was changed a moment ago. Please try again in a minute.`);
   // Not migrated yet (or the read failed) — it may still live in legacy
   // orders.json, so fall back to the merged view.
   const all = await blobReadAll();
@@ -227,11 +280,12 @@ export async function updateOrder(
   changes: Partial<Omit<Order, "id" | "createdAt" | "paymentToken" | "userId">>
 ): Promise<Order | null> {
   if (useBlob) {
-    const existing = await blobReadOne(id);
+    const existing = await blobReadOne(id, true);
     if (!existing) return null;
-    const updated: Order = { ...existing, ...changes };
+    const updated: Order = { ...existing, ...changes, savedAt: Date.now() };
     // Writes (or migrates) this order's own file; other orders untouched.
     await blobPutOrder(updated);
+    remember(updated);
     return updated;
   }
   const all = await fsRead();

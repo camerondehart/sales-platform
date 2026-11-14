@@ -1,7 +1,7 @@
 import path from "path";
 import { Resend } from "resend";
 import { VersionedStore } from "./versionedStore";
-import { getOrders, updateOrder, type Order } from "./orders";
+import { getOrderById, getOrders, updateOrder, type Order } from "./orders";
 import { escapeHtml, itemsTable } from "./invoiceEmail";
 import { flagOnSince, isEnabled } from "./flags";
 
@@ -167,6 +167,14 @@ export async function runReminders(siteUrl: string, opts: { now?: number; force?
       if (ageH >= s.afterHours) due = i;
     });
     if (due < 0 || done.has(due)) continue;
+
+    // Re-read this one order fresh before emailing: the full list can lag a
+    // just-saved change (e.g. the customer tapped "I've paid" minutes ago).
+    const fresh = await getOrderById(o.id).catch(() => null);
+    if (!fresh || !eligible(fresh, since)) {
+      out.skipped.push(`${o.id}:${due} no longer unpaid`);
+      continue;
+    }
 
     if (!(await claim(o.id, due))) {
       out.skipped.push(`${o.id}:${due} already claimed`);
