@@ -7,6 +7,7 @@ import { runScheduledCampaigns } from "@/lib/campaignSchedule";
 import { pruneTranscripts } from "@/lib/assistant/transcripts";
 import { flushTraffic } from "@/lib/traffic";
 import { runNotesReview } from "@/lib/assistant/notesReview";
+import { fixPoints } from "@/lib/loyalty";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -61,19 +62,28 @@ export async function GET(req: Request) {
   } catch (err) {
     failures.push(`notes review: ${err instanceof Error ? err.message : err}`);
   }
+  // Loyalty points: add them to orders completed over an hour ago, and put
+  // right any order whose points don't match the rule (lib/loyalty.ts).
+  try {
+    const pts = await fixPoints();
+    if (pts.length) out.points = pts;
+  } catch (err) {
+    failures.push(`points: ${err instanceof Error ? err.message : err}`);
+  }
   await flushTraffic(true).catch(() => {});
 
   const r = out.reminders as { sent?: number; failed?: number; expired?: number } | undefined;
   const c = out.campaigns as { sent?: number; failed?: number } | undefined;
   const iv = out.invites as { sent?: number; failed?: number } | undefined;
-  const didWork = (r && (r.sent || r.failed || r.expired)) || (c && (c.sent || c.failed)) || (iv && (iv.sent || iv.failed));
+  const pts = out.points as Array<{ earned: number; takenBack: number }> | undefined;
+  const didWork = (r && (r.sent || r.failed || r.expired)) || (c && (c.sent || c.failed)) || (iv && (iv.sent || iv.failed)) || (pts && pts.length);
   // Log runs that did something or failed; quiet runs aren't worth 96 rows a day.
   if (didWork || failures.length) {
     await auditSystem({
       action: "job.tick",
       targetType: "job",
       ok: failures.length === 0 && !(r?.failed || c?.failed),
-      note: [failures.join(" · "), r ? `reminders sent ${r.sent || 0}, failed ${r.failed || 0}, expired ${r.expired || 0}` : "", c ? `campaign emails sent ${c.sent || 0}, failed ${c.failed || 0}` : "", iv && (iv.sent || iv.failed) ? `set-password invites sent ${iv.sent || 0}, failed ${iv.failed || 0}` : ""].filter(Boolean).join(" · "),
+      note: [failures.join(" · "), r ? `reminders sent ${r.sent || 0}, failed ${r.failed || 0}, expired ${r.expired || 0}` : "", c ? `campaign emails sent ${c.sent || 0}, failed ${c.failed || 0}` : "", iv && (iv.sent || iv.failed) ? `set-password invites sent ${iv.sent || 0}, failed ${iv.failed || 0}` : "", pts && pts.length ? `points: ${pts.filter((p) => p.earned).length} orders earned, ${pts.filter((p) => p.takenBack).length} taken back` : ""].filter(Boolean).join(" · "),
       after: out,
     });
   }

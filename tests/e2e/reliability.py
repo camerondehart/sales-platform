@@ -67,12 +67,31 @@ check("admin toggle discount", s==200 and r["discount"]["active"]==False, r)
 # ---------- loyalty: points only on COMPLETED orders, never twice (2026-11-10)
 def member(): return next(u for u in json.load(open(D+"users.json")) if u["id"]=="u_member")
 def order2(): return next(o for o in json.load(open(D+"orders.json")) if o["id"]=="ord_2_zzzzzz")
+def age(oid, hours=2):
+    # pretend the order was marked Completed `hours` ago
+    orders=json.load(open(D+"orders.json"))
+    for o in orders:
+        if o["id"]==oid: o["completedAt"]=int(time.time()*1000)-hours*3600000
+    json.dump(orders, open(D+"orders.json","w"))
+def fix(): return req("/api/admin/loyalty/check", {}, cookie=ADMIN)
 before=member()["loyaltyPoints"]
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"paid"}, cookie=ADMIN, method="PATCH")
 check("paid: no points yet", s==200 and member()["loyaltyPoints"]==before, (before,member()["loyaltyPoints"],r))
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"completed"}, cookie=ADMIN, method="PATCH")
+check("completed: no points for the first hour", s==200 and member()["loyaltyPoints"]==before and bool(order2().get("completedAt")), (before,member()["loyaltyPoints"],order2()))
+s,r=req("/api/admin/loyalty/check", cookie=ADMIN, method="GET")
+check("points check: a just-completed order is waiting, not wrong", s==200 and r["rows"]==[], r)
+s,r=fix()
+check("fix inside the hour adds nothing", s==200 and r["done"]==[] and member()["loyaltyPoints"]==before, (r,member()["loyaltyPoints"]))
+age("ord_2_zzzzzz", 0.9)
+fix()
+check("still under the hour (54 min): nothing", member()["loyaltyPoints"]==before, member()["loyaltyPoints"])
+age("ord_2_zzzzzz")
+s,r=req("/api/cron/tick", cookie=ADMIN)
 after1=member()["loyaltyPoints"]
-check("completed: one point per $1 of products", s==200 and after1==before+80, (before,after1,r))
+check("15-minute job: completed over an hour -> one point per $1 of products", s==200 and after1==before+80 and r.get("points")==[{"name":r["points"][0]["name"],"ref":"ZZZZZZ","earned":80,"takenBack":0}], (before,after1,r.get("points"),r.get("failures")))
+s,r=req("/api/cron/tick", cookie=ADMIN)
+check("15-minute job again: nothing more", s==200 and member()["loyaltyPoints"]==after1 and not r.get("points"), (member()["loyaltyPoints"],r.get("points")))
 # simulate a stale read: the order file loses its loyaltyPointsEarned marker
 orders=json.load(open(D+"orders.json"))
 for o in orders:
@@ -80,12 +99,15 @@ for o in orders:
 json.dump(orders, open(D+"orders.json","w"))
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"completed"}, cookie=ADMIN, method="PATCH")
 u=member()
-check("no double award on stale order read", s==200 and u["loyaltyPoints"]==after1, (after1,u["loyaltyPoints"]))
+check("no double award on stale order read (and Completed again keeps its hour)", s==200 and u["loyaltyPoints"]==after1, (after1,u["loyaltyPoints"]))
 check("points history has one earn for the order", sum(1 for h in u["pointsHistory"] if h.get("orderId")=="ord_2_zzzzzz" and h["amount"]>0)==1, u["pointsHistory"])
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"paid"}, cookie=ADMIN, method="PATCH")
 check("completed -> paid: points taken back until it's completed", s==200 and member()["loyaltyPoints"]==before, member()["loyaltyPoints"])
+check("leaving Completed clears its time", not order2().get("completedAt"), order2())
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"completed"}, cookie=ADMIN, method="PATCH")
-check("completed again: points back, once", s==200 and member()["loyaltyPoints"]==after1 and order2().get("loyaltyPointsEarned")==80, (member()["loyaltyPoints"],order2()))
+check("completed again: waits the hour again", s==200 and member()["loyaltyPoints"]==before, member()["loyaltyPoints"])
+age("ord_2_zzzzzz"); fix()
+check("completed again, an hour on: points back, once", member()["loyaltyPoints"]==after1 and order2().get("loyaltyPointsEarned")==80, (member()["loyaltyPoints"],order2()))
 
 # ---------- loyalty: a cancelled order keeps no points
 users=json.load(open(D+"users.json"))
@@ -103,14 +125,16 @@ check("cancel: order stamped with the points taken back", order2().get("loyaltyP
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"cancelled"}, cookie=ADMIN, method="PATCH")
 check("cancel twice: nothing moves again", s==200 and member()["loyaltyPoints"]==b0-80+100, member()["loyaltyPoints"])
 s,r=req("/api/admin/orders", {"id":"ord_2_zzzzzz","status":"completed"}, cookie=ADMIN, method="PATCH")
+check("un-cancel to completed: points spent again straight away", s==200 and member()["loyaltyPoints"]==b0-80, (b0,member()["loyaltyPoints"]))
+age("ord_2_zzzzzz"); fix()
 u=member()
-check("un-cancel to completed: points spent again and earned again", s==200 and u["loyaltyPoints"]==b0, (b0,u["loyaltyPoints"]))
+check("un-cancel, an hour on: earned again", u["loyaltyPoints"]==b0, (b0,u["loyaltyPoints"]))
 check("un-cancel: order no longer marked as taken back", s==200 and not order2().get("loyaltyPointsTakenBack") and order2().get("loyaltyPointsEarned")==80, order2())
 
 # ---------- loyalty: the customer's "I've paid" earns nothing; the Points check
 orders=json.load(open(D+"orders.json"))
 o3=dict(order2()); o3.update({"id":"ord_3_pppppp","status":"pending","paymentToken":"t3pts","shippingMethod":"ship","shippingCost":10,"total":50,"subtotal":50})
-for k in ("loyaltyPointsEarned","loyaltyPointsTakenBack","paidAt","shippedAt","pickedUpAt","stockTaken","stockReturnedAt"): o3.pop(k,None)
+for k in ("loyaltyPointsEarned","loyaltyPointsTakenBack","paidAt","shippedAt","pickedUpAt","completedAt","stockTaken","stockReturnedAt"): o3.pop(k,None)
 o4=dict(o3); o4.update({"id":"ord_4_oldold","paymentToken":"t4pts","status":"paid","createdAt":1760000000000})  # Oct 2025: before the rule
 orders += [o3, o4]
 json.dump(orders, open(D+"orders.json","w"))
@@ -136,6 +160,7 @@ check("points check: flags the paid-not-completed order only", s==200 and len(r[
 s,r=req("/api/admin/loyalty/check", {}, cookie=ADMIN)
 check("points check fix: takes back just that order", s==200 and r["done"]==[{"name":r["done"][0]["name"],"ref":"PPPPPP","earned":0,"takenBack":40}] and member()["loyaltyPoints"]==b2-40 and r["check"]["rows"]==[], (r, member()["loyaltyPoints"]))
 s,r=req("/api/admin/orders", {"id":"ord_3_pppppp","status":"completed"}, cookie=ADMIN, method="PATCH")
+age("ord_3_pppppp"); fix()
 check("completed with shipping: products only ($50 - $10 = 40)", s==200 and member()["loyaltyPoints"]==b2, (b2, member()["loyaltyPoints"]))
 s,r=req("/api/admin/loyalty/check", cookie=ADMIN, method="GET")
 check("points check: all match again", s==200 and r["rows"]==[], r)

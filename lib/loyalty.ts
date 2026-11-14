@@ -1,11 +1,13 @@
 // Loyalty points — earned on completed orders, redeemable as store credit at
 // checkout. Points live on the user record.
 //
-// The rule (2026-11-10): every $1 a member spends on products (not
-// shipping) in a COMPLETED order placed since Nov 1, 2026 is one point.
-// Pending or paid orders earn nothing yet; an order that stops being completed
-// gives its points back. syncOrderPoints() applies the rule to one order and
-// checkPoints() verifies every member against it.
+// The rule (2026-11-10/11): every $1 a member spends on products (not
+// shipping) in an order placed since Nov 1, 2026 that has been COMPLETED for
+// over an hour is one point. Pending or paid orders earn nothing; an order
+// that stops being completed gives its points back. syncOrderPoints() applies
+// the rule to one order, checkPoints() verifies every member against it, and
+// the 15-minute job (/api/cron/tick) runs fixPoints() so points are added
+// after the hour and any drift is corrected on its own.
 
 import { mutateUsers, getUsers, type User } from "./users";
 import { getSettings } from "./settings";
@@ -15,6 +17,13 @@ import { pacificToMs } from "./periods";
 
 /** Orders placed from here on follow the completed-orders rule exactly. */
 export const POINTS_RULE_SINCE = pacificToMs("2026-11-01");
+/** How long an order must stay Completed before it earns (2026-11-11). */
+export const POINTS_DELAY_MS = 60 * 60 * 1000;
+
+/** When the order became Completed (older orders: when it shipped / was picked up / paid). */
+export function completedSince(o: Pick<Order, "completedAt" | "shippedAt" | "pickedUpAt" | "paidAt" | "createdAt">): number {
+  return o.completedAt || Math.max(o.shippedAt || 0, o.pickedUpAt || 0) || o.paidAt || o.createdAt || 0;
+}
 
 export type PointsEntry = {
   amount: number; // positive = earned, negative = redeemed
@@ -100,9 +109,9 @@ export async function pointsForOrder(productTotal: number): Promise<number> {
   return Math.max(0, Math.floor(productTotal * s.pointsPerDollar));
 }
 
-/** Does this order earn points under the rule (completed, member, not an inquiry)? */
-export function orderEarns(o: Pick<Order, "userId" | "isInquiry" | "status">): boolean {
-  return !!o.userId && !o.isInquiry && isCompleted(o.status);
+/** Does this order earn points under the rule (member order, completed for over an hour)? */
+export function orderEarns(o: Order, now = Date.now()): boolean {
+  return !!o.userId && o.userId !== "retail" && o.source !== "retail" && !o.isInquiry && isCompleted(o.status) && now - completedSince(o) >= POINTS_DELAY_MS;
 }
 
 /** Points the rule gives an order: $1 of products (total minus shipping) = pointsPerDollar. */
@@ -116,8 +125,8 @@ export type SyncResult = { earned: number; takenBack: number; returned: number; 
  * Bring one order's points in line with the rule, inside one safe write on the
  * member's record (their points history is the source of truth, so running it
  * twice, or on a stale order, never double-counts):
- * - completed (placed since Nov 1): it holds exactly its product dollars in points;
- * - any other status (placed since Nov 1): it holds none;
+ * - completed over an hour ago (placed since Nov 1): it holds exactly its product dollars in points;
+ * - anything else, including completed under an hour (placed since Nov 1): it holds none;
  * - cancelled (any date): it holds none, and points spent on it are returned;
  * - set back from cancelled: those spent points are spent again.
  * Orders placed before Nov 1 keep what they earned unless cancelled.

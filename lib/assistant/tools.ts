@@ -1157,7 +1157,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const perDollar = Math.max(1, settings.pointsPerDollarRedeemed || 100);
       const loyalty = settings.loyaltyEnabled
         ? {
-            how_it_works: `Members earn ${settings.pointsPerDollar} point${settings.pointsPerDollar === 1 ? "" : "s"} for every $1 spent on products (not shipping), added once the order is completed. ${perDollar} points = $1 off. They can be used at checkout in the members' area once you have at least ${settings.minPointsToRedeem} points.`,
+            how_it_works: `Members earn ${settings.pointsPerDollar} point${settings.pointsPerDollar === 1 ? "" : "s"} for every $1 spent on products (not shipping), added an hour after the order is completed. ${perDollar} points = $1 off. They can be used at checkout in the members' area once you have at least ${settings.minPointsToRedeem} points.`,
             members_only: true,
             ...(ctx.audience === "member" && ctx.user
               ? (() => {
@@ -1518,7 +1518,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           `Order ${orderRef(o)} · ${o.userName} · ${money(o.total)} · placed ${fmtDate(o.createdAt)}`,
           `Match: ${strength}${p.match?.orderId === o.id ? ` (${p.match.why})` : ""}`,
           differs ? `⚠ The amounts differ (paid ${money(p.amount || 0)}, order ${money(o.total)}). Check before confirming.` : "",
-          "Payment reminders stop. Loyalty points are added once the order is completed.",
+          "Payment reminders stop. Loyalty points are added an hour after the order is completed.",
         ].filter(Boolean),
         confirmLabel: "Mark paid",
         danger: differs,
@@ -1546,7 +1546,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           `${o.userName} · ${o.userEmail}`,
           `${money(o.total)} · ${o.items.map((i) => `${i.productName} ×${i.quantity}`).join(", ")}`,
           `Currently ${was}${o.expiredAt && was === "pending" ? " (expired)" : ""} · placed ${fmtDate(o.createdAt)}`,
-          status === "completed" ? "Loyalty points are added (one per $1 of products)." : status === "paid" ? "Loyalty points are added once it's completed." : "",
+          status === "completed" ? "Loyalty points are added an hour from now (one per $1 of products)." : status === "paid" ? "Loyalty points are added an hour after it's completed." : "",
           // Cancelling only changes the status: say plainly what it does and doesn't do.
           cancelling && !wasPaid ? "Unpaid: it leaves Pending payment and its payment reminders stop." : "",
           cancelling && wasPaid ? "Already paid: refund them yourself (Venmo, Zelle or cash). The site doesn't move money." : "",

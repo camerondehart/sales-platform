@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { getOrders, getOrderById, updateOrder, type OrderStatus } from "@/lib/orders";
 
 import { syncOrderPoints } from "@/lib/loyalty";
+import { normalizeStatus } from "@/lib/orderStatus";
 import { audited, auditDetail } from "@/lib/audit";
 import { returnStock, takeStock } from "@/lib/stock";
 
@@ -48,6 +49,10 @@ async function PATCH_handler(req: Request) {
     else changes.shippedAt = Date.now();
     // A completed order is settled, so make sure it's marked paid too.
     if (existing && !existing.paidAt) changes.paidAt = Date.now();
+    // Loyalty points wait an hour from here (lib/loyalty.ts).
+    if (!existing || normalizeStatus(existing.status) !== "completed" || !existing.completedAt) changes.completedAt = Date.now();
+  } else {
+    changes.completedAt = undefined;
   }
 
   // Stock counts: a cancel puts the order's units back; un-cancelling takes them again.

@@ -52,8 +52,8 @@ export default function PointsCheckPanel() {
     <div className="field full points-check" style={{ borderTop: "1px solid var(--rule-soft)", paddingTop: "1rem" }}>
       <label>Points check</label>
       <p style={{ margin: "0.3rem 0 0.6rem", color: "var(--ink-soft)" }}>
-        The rule: every $1 of products (not shipping) in a <strong>completed</strong> order since Nov 1, 2026 is {data?.rate === 1 || !data ? "one point" : `${data.rate} points`}.
-        Pending and paid orders earn nothing yet, and an order that stops being completed gives its points back.
+        The rule: every $1 of products (not shipping) in an order since Nov 1, 2026 that has been <strong>completed for over an hour</strong> is {data?.rate === 1 || !data ? "one point" : `${data.rate} points`}.
+        Pending and paid orders earn nothing, and an order that stops being completed gives its points back. The site runs this check every 15 minutes and fixes what it finds; the button does it now.
       </p>
       {!data && !msg && <p style={{ fontStyle: "italic" }}>Checking…</p>}
       {data && !data.enabled && <p>Loyalty points are switched off, so nothing is checked.</p>}

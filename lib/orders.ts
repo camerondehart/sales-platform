@@ -65,6 +65,8 @@ export type Order = {
   // Loyalty
   loyaltyPointsRedeemed?: number;
   loyaltyPointsEarned?: number;
+  /** When it was last marked Completed (cleared when it leaves Completed). Points wait an hour after this. */
+  completedAt?: number;
   /** Points taken back when the order was cancelled (cleared if it's set back to paid). */
   loyaltyPointsTakenBack?: number;
   paymentToken: string; // random token for the public mark-paid link

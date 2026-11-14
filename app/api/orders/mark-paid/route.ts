@@ -65,11 +65,12 @@ export async function POST(req: Request) {
   const updated = await updateOrder(
     order.id,
     isCashPickup
-      ? { status: "completed", pickedUpAt: now, paidAt: now }
+      ? { status: "completed", pickedUpAt: now, paidAt: now, completedAt: now }
       : { status: "paid", paidAt: now }
   );
   // The customer saying "I've paid" earns nothing: points come once the order
-  // is completed (a cash pickup they confirm lands on completed).
+  // has been completed for an hour (a cash pickup they confirm lands on
+  // completed; the 15-minute job adds its points after the hour).
   if (updated) await syncOrderPoints(updated).catch((err) => console.error("[mark-paid] points", err));
 
   // Notify the admin — best-effort.
