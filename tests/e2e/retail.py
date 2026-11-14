@@ -220,6 +220,6 @@ au=[json.loads(l) for l in open(D+"audit.jsonl")] if os.path.exists(D+"audit.jso
 acts={a["action"] for a in au}
 check("activity log records account + request changes", {"retail.account_create","retail.request_status","retail.request"}<=acts and not any("rae-strong-pass" in json.dumps(a) for a in au), sorted(a for a in acts if a.startswith("retail")))
 s,html,_=req("/privacy", cookie=None, raw=True)
-check("privacy page covers retail store accounts", "Retail store accounts" in html and "November 10, 2026" in html, s)
+check("privacy page covers retail store accounts", "Retail store accounts" in html and "November 14, 2026" in html, s)
 
 print(f"{sum(res)}/{len(res)} passed")

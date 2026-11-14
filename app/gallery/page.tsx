@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { localEventNoteFor } from "@/lib/localEventsNote";
 import { currentEntrance } from "@/lib/entrance";
 import { getApprovedVisitor, getVisitor, isAdmin } from "@/lib/auth";
 import { getProducts, isInternal } from "@/lib/storage";
@@ -32,10 +34,14 @@ export default async function GalleryPage() {
   }
   // Members see internal + shared products, never external-only ones.
   const products = await applyStockFlag(await applyVideoFlag((await getProducts()).filter(isInternal)));
+  const actingAs = (await getVisitor())?.as;
+  // One-time events note for members signing in near the Events popup town (lib/localEvents.ts).
+  const h = headers();
+  const localEvent = await localEventNoteFor(user, (n) => h.get(n), actingAs);
   return (
     <>
       <Scene variant="soft" />
-      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={(await getVisitor())?.as} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} consult={await isEnabled("consultation_form").catch(() => false)} entranceTheme={await currentEntrance().catch(() => "classic" as const)} />
+      <GalleryClient products={products} userName={user.name} userEmail={user.email} actingAs={actingAs} localEvent={localEvent} stores={stores} faceId={await isEnabled("member_passkeys").catch(() => false)} consult={await isEnabled("consultation_form").catch(() => false)} entranceTheme={await currentEntrance().catch(() => "classic" as const)} />
     </>
   );
 }

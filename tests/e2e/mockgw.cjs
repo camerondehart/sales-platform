@@ -60,13 +60,14 @@ http.createServer((req, res) => {
     // Fake Nominatim geocoder for the store locator: counts calls so tests can prove caching.
     if (req.url.startsWith("/nominatim/search")) {
       const q = decodeURIComponent((req.url.match(/[?&]q=([^&]*)/) || [])[1] || "").toLowerCase();
-      geoCalls.push({ q, ua: req.headers["user-agent"] || "" });
+      geoCalls.push({ q, ua: req.headers["user-agent"] || "", us: /[?&]countrycodes=us\b/.test(req.url) });
       if (q.includes("geofail")) { res.writeHead(503); return res.end("down"); }
       // Like OpenStreetMap: suite numbers and spelled-out street numbers don't match; "unknownst" streets don't exist.
       if (/ ste |suite|eighth|unknownst/.test(q)) { res.writeHead(200, { "content-type": "application/json" }); return res.end("[]"); }
       if (q.includes("nowhere")) { res.writeHead(200, { "content-type": "application/json" }); return res.end("[]"); }
       res.writeHead(200, { "content-type": "application/json" });
-      return res.end(JSON.stringify([{ lat: q.includes("chico") ? "39.7285" : "34.0211", lon: q.includes("chico") ? "-121.8375" : "-118.3965", display_name: "Mock place" }]));
+      const at = q.includes("chico") ? ["39.7285", "-121.8375"] : q.includes("springfield") ? ["39.7817", "-89.6501"] : ["34.0211", "-118.3965"];
+      return res.end(JSON.stringify([{ lat: at[0], lon: at[1], display_name: "Mock place" }]));
     }
     // Resend receiving: the received email points at its raw message (written by venmo-sign.cjs).
     if (req.url.startsWith("/emails/receiving/") && req.method === "GET") {

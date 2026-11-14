@@ -47,6 +47,7 @@ export const FLAG_KEYS = [
   "ambassador_welcome",
   "suspicious_activity",
   "retail_portal",
+  "local_events_note",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -228,6 +229,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     label: "Retail store portal",
     description: "Shops that carry our products sign in at /store-portal (password, emailed code or Face ID) to request more stock, see each request's progress and everything we've shipped them, with the Concierge to do any of it for them. No prices or money in the portal. Staff create store accounts, review requests and manage the store map in the Retail tab; new requests email the team and show on the Today list. Off = the portal is closed (accounts and requests stay saved; the Retail tab still works).",
     defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  local_events_note: {
+    label: "Events note for locals",
+    description: "Members who sign in near the town in Settings → Events popup (the brand's home town, 100 miles, to start) get one small note about the next upcoming event, with a link to the Events page, once (until you press Show it again to everyone). Each event can be left out or given its own town and miles, there or in the event form. The area comes from their internet address (rough, city-level) and is never stored; the browser never asks for their location. Only shows when a published event is coming up. Off = no note.",
+    defaults: on,
     built: true,
   },
   member_passkeys: {

@@ -18,6 +18,8 @@ import { AskAboutProduct, AskAssistantLink } from "@/app/components/assistant/As
 import { brand } from "@/lib/brand";
 import StoreHint from "@/app/components/StoreHint";
 import { FaceIdDevices, FaceIdIcon, FaceIdPrompt, useFaceIdPrompt } from "@/app/components/MemberFaceId";
+import LocalEventNote from "@/app/components/LocalEventNote";
+import type { LocalEventNote as LocalEventNoteData } from "@/lib/localEvents";
 
 // ------------------------------------------------------------------
 // Cart — persisted in localStorage so it survives refreshes.
@@ -144,6 +146,7 @@ export default function GalleryClient({
   faceId = false,
   consult = false,
   entranceTheme = "classic",
+  localEvent = null,
 }: {
   products: Product[];
   userName: string;
@@ -159,6 +162,8 @@ export default function GalleryClient({
   consult?: boolean;
   /** Which entrance plays (Settings → Entrance animation, lib/entrance.ts). */
   entranceTheme?: EntranceKey;
+  /** local_events_note: the one-time events note for members near the Events popup town (lib/localEvents.ts). */
+  localEvent?: LocalEventNoteData | null;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -1044,6 +1049,9 @@ export default function GalleryClient({
 
       {/* Password change modal */}
       {faceIdPrompt.show && !faceIdOpen && <FaceIdPrompt email={userEmail} onClose={faceIdPrompt.close} />}
+      {localEvent && settled && !entering && !faceIdPrompt.show && !faceIdOpen && !isAdminPreview && !actingAs && (
+        <LocalEventNote event={localEvent} />
+      )}
       {faceIdOpen && (
         <div className="history-backdrop" onClick={() => setFaceIdOpen(false)}>
           <div className="history-modal" onClick={(e) => e.stopPropagation()}>

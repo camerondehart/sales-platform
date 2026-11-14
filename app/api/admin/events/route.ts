@@ -12,6 +12,7 @@ import {
 } from "@/lib/events";
 import { audited, auditDetail } from "@/lib/audit";
 import { cleanupMedia } from "@/lib/media";
+import { withEventNote } from "@/lib/localEventsNote";
 
 export async function GET(req: Request) {
   if (!(await isAdmin())) {
@@ -63,11 +64,14 @@ async function POST_handler(req: Request) {
     published: b.published !== false,
     createdAt: Date.now(),
   };
+  // Events popup for locals: in it or not, and its own area (lib/localEvents.ts).
+  const noted = await withEventNote(event, b);
+  if (noted.error) return NextResponse.json({ error: noted.error }, { status: 400 });
 
   const all = await getEventsForUpdate();
-  all.unshift(event);
+  all.unshift(noted.event);
   await saveEvents(all);
-  return NextResponse.json({ ok: true, event });
+  return NextResponse.json({ ok: true, event: noted.event });
 }
 
 async function PATCH_handler(req: Request) {
@@ -117,6 +121,9 @@ async function PATCH_handler(req: Request) {
     image: b.image === undefined ? all[idx].image : b.image.trim() || undefined,
     published: b.published !== undefined ? !!b.published : all[idx].published,
   };
+  const noted = await withEventNote(all[idx], b);
+  if (noted.error) return NextResponse.json({ error: noted.error }, { status: 400 });
+  all[idx] = noted.event;
   await saveEvents(all);
   if (oldImage && oldImage !== all[idx].image) await cleanupMedia([oldImage]);
   return NextResponse.json({ ok: true, event: all[idx] });

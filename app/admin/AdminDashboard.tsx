@@ -33,6 +33,7 @@ import TodayBulletin from "./TodayBulletin";
 import QaIcon, { type QaIconName } from "./QaIcon";
 import FaqPanel from "./FaqPanel";
 import EntrancePanel from "./EntrancePanel";
+import EventsNotePanel, { EventNoteControls } from "./EventsNotePanel";
 import SiteRequestsPanel from "./SiteRequestsPanel";
 import SuspiciousPanel from "./SuspiciousPanel";
 import ShippingWeights from "./ShippingWeights";
@@ -337,6 +338,7 @@ export default function AdminDashboard({
   const [evWaitlist, setEvWaitlist] = useState("10");
   const [evType, setEvType] = useState("class");
   const [evImage, setEvImage] = useState("");
+  const [evNote, setEvNote] = useState({ on: true, place: "", miles: "" });
   const [evSaving, setEvSaving] = useState(false);
   const [evMsg, setEvMsg] = useState("");
 
@@ -352,6 +354,7 @@ export default function AdminDashboard({
   const [edType, setEdType] = useState("class");
   const [edImage, setEdImage] = useState("");
   const [edPublished, setEdPublished] = useState(true);
+  const [edNote, setEdNote] = useState({ on: true, place: "", miles: "" });
   const [edSaving, setEdSaving] = useState(false);
   const [edMsg, setEdMsg] = useState("");
   const [regEvent, setRegEvent] = useState<any | null>(null);
@@ -379,13 +382,14 @@ export default function AdminDashboard({
           location: evLocation, price: evPrice,
           capacity: evCapacity, waitlistCapacity: evWaitlist,
           type: evType, image: evImage,
+          notePopup: evNote.on, notePlace: evNote.on ? evNote.place : "", noteMiles: evNote.miles,
         }),
       });
       const data = await res.json();
       if (res.ok) {
         setEvents([{ ...data.event, registeredCount: 0, waitlistedCount: 0 }, ...events]);
         setEvTitle(""); setEvDesc(""); setEvDate(""); setEvLocation("");
-        setEvPrice(""); setEvImage("");
+        setEvPrice(""); setEvImage(""); setEvNote({ on: true, place: "", miles: "" });
         setEvMsg("Event created.");
         setTimeout(() => setEvMsg(""), 3000);
       } else {
@@ -414,6 +418,7 @@ export default function AdminDashboard({
     setEdType(e.type || "class");
     setEdImage(e.image || "");
     setEdPublished(e.published !== false);
+    setEdNote({ on: e.notePopup !== false, place: e.noteArea?.place || "", miles: e.noteArea ? String(e.noteArea.miles) : "" });
     setEdMsg("");
   }
 
@@ -439,6 +444,9 @@ export default function AdminDashboard({
       type: edType,
       image: edImage.trim(),
       published: edPublished,
+      notePopup: edNote.on,
+      notePlace: edNote.on ? edNote.place.trim() : (editEvent.noteArea?.place || ""),
+      noteMiles: edNote.on ? edNote.miles : (editEvent.noteArea ? String(editEvent.noteArea.miles) : ""),
     };
     setEvents(events.map((e) => (e.id === editEvent.id ? { ...e, ...patch } : e)));
 
@@ -451,6 +459,7 @@ export default function AdminDashboard({
       setEdSaving(false);
       if (res.ok) {
         setEditEvent(null);
+        loadEvents(); // picks up the saved popup area
       } else {
         setEvents(previous);
         const data = await res.json().catch(() => ({}));
@@ -3620,6 +3629,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           <div className="field"><label>Capacity (0 = unlimited)</label><input type="number" min="0" value={evCapacity} onChange={(e) => setEvCapacity(e.target.value)} /></div>
           <div className="field"><label>Waitlist size (0 = unlimited)</label><input type="number" min="0" value={evWaitlist} onChange={(e) => setEvWaitlist(e.target.value)} /></div>
           <div className="field full"><label>Description</label><textarea rows={3} value={evDesc} onChange={(e) => setEvDesc(e.target.value)} /></div>
+          <EventNoteControls on={evNote.on} place={evNote.place} miles={evNote.miles} onChange={setEvNote} />
           <div className="full">
             <button type="submit" className="submit" disabled={evSaving}>{evSaving ? "Creating…" : "Create event"}</button>
             {evMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{evMsg}</span>}
@@ -4157,6 +4167,7 @@ We just finished a new run and wanted you to hear it first.
             ) },
             { key: "site-requests", icon: "🛠️", title: "Site requests", summary: "Changes to the website staff have asked for, and the developer's approvals.", render: () => <SiteRequestsPanel /> },
             { key: "entrance", icon: "🌲", title: "Entrance animation", summary: "Seasonal and holiday versions of the members' entrance: preview them and choose one, or Auto.", render: () => <EntrancePanel /> },
+            { key: "events-note", icon: "🎟️", title: "Events popup", summary: "The small note about upcoming events for members nearby: town, miles, heading, which events.", render: () => <EventsNotePanel /> },
             { key: "faq", icon: "❓", title: "FAQ page", summary: "Questions and answers for /faq, which the Concierge also uses.", render: () => <FaqPanel /> },
             { key: "stores", icon: "📍", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
             { key: "activity", icon: "📜", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
@@ -4395,6 +4406,7 @@ We just finished a new run and wanted you to hear it first.
                     </div>
                   )}
                 <div className="field"><label>Description</label><textarea rows={4} value={edDesc} onChange={(e) => setEdDesc(e.target.value)} /></div>
+                <EventNoteControls on={edNote.on} place={edNote.place} miles={edNote.miles} found={editEvent.noteArea || null} onChange={setEdNote} />
                 <div className="field">
                   <label className="check-row">
                     <input type="checkbox" checked={edPublished} onChange={(e) => setEdPublished(e.target.checked)} />

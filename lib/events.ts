@@ -5,6 +5,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
 import { VersionedStore } from "./versionedStore";
+import type { NoteArea } from "./localEvents";
 
 export type EventType = "class" | "workshop" | "vendor" | "other";
 
@@ -22,6 +23,10 @@ export type SiteEvent = {
   image?: string;
   published: boolean;
   createdAt: number;
+  /** Events popup for locals (lib/localEvents.ts): false = never in it. Unset = in it. */
+  notePopup?: boolean;
+  /** This event's own popup area; unset = the main one in Settings → Events popup. */
+  noteArea?: NoteArea;
 };
 
 export type RegistrationStatus = "registered" | "waitlisted" | "cancelled";

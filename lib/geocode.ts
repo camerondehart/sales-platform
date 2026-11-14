@@ -36,11 +36,12 @@ function throttled<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-export const nominatim: Geocoder = {
-  name: "nominatim",
+function makeNominatim(name: string, extra = ""): Geocoder {
+  return {
+  name,
   async geocode(query) {
     return throttled(async () => {
-      const url = `${BASE}/search?format=jsonv2&limit=1&addressdetails=0&q=${encodeURIComponent(query)}`;
+      const url = `${BASE}/search?format=jsonv2&limit=1&addressdetails=0${extra}&q=${encodeURIComponent(query)}`;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
       try {
@@ -56,7 +57,12 @@ export const nominatim: Geocoder = {
       }
     });
   },
-};
+  };
+}
+
+export const nominatim: Geocoder = makeNominatim("nominatim");
+/** US places only (the events popup's town: "San Jose" means California, not Costa Rica). */
+export const nominatimUS: Geocoder = makeNominatim("nominatim-us", "&countrycodes=us");
 
 type CacheRow = { id: string; lat?: number; lng?: number; label?: string; at: number; miss?: boolean };
 
@@ -75,7 +81,8 @@ const keyOf = (q: string) => q.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().
  * { point: null, error } so a store still saves without a pin.
  */
 export async function geocodeCached(query: string, geocoder: Geocoder = nominatim): Promise<{ point: GeoPoint | null; cached: boolean; error?: string }> {
-  const key = keyOf(query);
+  // Each geocoder keeps its own cache rows (a US-only answer can differ from a worldwide one).
+  const key = keyOf(query) && (geocoder.name === "nominatim" ? "" : `${geocoder.name} `) + keyOf(query);
   if (!key) return { point: null, cached: false, error: "No address to look up." };
   try {
     const hit = (await cache.read()).data.find((r) => r.id === key);

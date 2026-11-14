@@ -29,6 +29,8 @@ export type User = {
   approvedAt?: number;
   /** Set once the welcome email is sent, so approving again won't re-send it. */
   welcomeEmailSentAt?: number;
+  /** When the one-time events note for locals was shown (lib/localEvents.ts). */
+  eventsNoteSeenAt?: number;
   // ---------- imported customers (e.g. from a previous Shopify store) ----------
   phone?: string;
   company?: string;

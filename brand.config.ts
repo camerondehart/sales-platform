@@ -77,6 +77,15 @@ const brandConfig = {
   /** Business hours copy for the Concierge. */
   businessHours: "Mon–Fri, 8am–5pm",
 
+  /**
+   * Events popup for locals (switch local_events_note, Settings → Events popup):
+   * members who sign in within `miles` of this town get one small note about the
+   * next upcoming event. This is only the starting value; staff change the town
+   * and miles in Settings. lat/lon = the town's position on the map; `found` = the
+   * full place name shown in the panel.
+   */
+  eventsArea: { place: "Springfield, IL", lat: 39.7817, lon: -89.6501, miles: 100, found: "Springfield, Sangamon County, Illinois, United States" },
+
   /** Flat shipping copy ("Flat $10 shipping per order"). Keep in sync with lib/pricing.ts. */
   shippingNote: "Flat $10 shipping per order.",
 } as const;

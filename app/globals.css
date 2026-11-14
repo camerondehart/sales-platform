@@ -9522,3 +9522,44 @@ html[data-admin-theme="dark"] .rt-form { background: var(--surface-alt); border-
 @media (max-width: 640px) {
   .rt-form-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ─────────────── Events note for locals (switch local_events_note, 2026-11-14) ───────────────
+   A small corner card, not a blocking pop-up. Bottom-left so it never covers the
+   Concierge and basket buttons on the right. */
+.lev-card { position: fixed; left: 1.4rem; bottom: calc(1.4rem + env(safe-area-inset-bottom)); z-index: 84; width: 300px; padding: 1rem 1.15rem 0.95rem; border-radius: 14px; background: var(--white); color: var(--ink); border: 1px solid var(--rule-soft); border-top: 2px solid var(--accent); box-shadow: 0 14px 38px rgba(32, 36, 30, 0.16), 0 2px 6px rgba(32, 36, 30, 0.06); font-family: var(--font-sans); animation: lev-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.lev-leaving { animation: lev-out 0.28s ease both; }
+@keyframes lev-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes lev-out { to { opacity: 0; transform: translateY(10px); } }
+.lev-close { position: absolute; top: 0.4rem; right: 0.45rem; width: 28px; height: 28px; min-height: 0; padding: 0; display: grid; place-items: center; border-radius: 50%; background: transparent; color: var(--ink-faint); font-size: 1.2rem; line-height: 1; }
+.lev-close:hover { color: var(--ink); background: rgba(97, 103, 109, 0.08); }
+.lev-kicker { margin-bottom: 0.2rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-strong); }
+.lev-title { margin: 0 1.6rem 0.6rem 0; font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 1.22rem; line-height: 1.2; color: var(--dark-grey); }
+.lev-event { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0 0.55rem 0.7rem; border-left: 2px solid rgba(133, 186, 69, 0.35); }
+.lev-event strong { font-size: 0.9rem; font-weight: 700; color: var(--ink); }
+.lev-event span { font-size: 0.8rem; color: var(--ink-soft); }
+.lev-more { margin: 0.45rem 0 0; font-size: 0.78rem; color: var(--ink-soft); font-style: italic; }
+.lev-go { display: inline-flex; align-items: center; gap: 0.35rem; margin-top: 0.75rem; font-size: 0.84rem; font-weight: 700; color: var(--accent-strong); text-decoration: none; }
+.lev-go:hover { color: var(--green); }
+.lev-go span { transition: transform 0.2s ease; }
+.lev-go:hover span { transform: translateX(3px); }
+@media (max-width: 640px) {
+  /* Leave the right-hand column to the Concierge and basket buttons. */
+  .lev-card { left: 0.75rem; right: calc(0.75rem + 70px); width: auto; bottom: calc(0.9rem + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .lev-card, .lev-leaving { animation: none; } }
+/* Settings → Events popup + the popup controls in the event forms */
+.evn-h3 { margin: 1.4rem 0 0.6rem; font-size: 1rem; }
+.evn-area { display: grid; grid-template-columns: minmax(0, 1fr) 120px; gap: 0.5rem; margin-top: 0.5rem; }
+.evn-area input { min-width: 0; width: 100%; padding: 0.6rem 0.75rem; border: 1px solid var(--rule-soft); border-radius: 6px; background: var(--white); color: var(--ink); font: inherit; font-size: 0.9rem; }
+.evn-area input:focus { outline: none; border-color: var(--accent); }
+.evn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.evn-list li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 0.8rem 1.2rem; align-items: start; padding: 0.75rem 0.9rem; border: 1px solid var(--rule-soft); border-radius: 10px; }
+.evn-list li.is-off { opacity: 0.7; }
+.evn-ev-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.evn-ev-main small { color: var(--ink-soft); font-size: 0.8rem; }
+.evn-ev-main .evn-reach { color: var(--accent-strong); }
+.evn-list li.is-off .evn-reach { color: var(--ink-soft); }
+.evn-found { display: block; margin-top: 0.35rem; font-size: 0.78rem; color: var(--ink-soft); line-height: 1.4; }
+.evn-found strong { color: var(--ink); font-weight: 600; }
+.evn-save { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
+@media (max-width: 720px) { .evn-list li { grid-template-columns: minmax(0, 1fr); } }
