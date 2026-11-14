@@ -6,6 +6,7 @@ import { syncOrderPoints } from "@/lib/loyalty";
 import { normalizeStatus } from "@/lib/orderStatus";
 import { audited, auditDetail } from "@/lib/audit";
 import { returnStock, takeStock } from "@/lib/stock";
+import { venmoLinks } from "@/lib/venmoInbox";
 
 const VALID_STATUSES: OrderStatus[] = [
   "inquiry", "pending", "paid", "completed", "cancelled",
@@ -21,7 +22,9 @@ export async function GET(req: Request) {
   let orders = await getOrders();
   if (userId) orders = orders.filter((o) => o.userId === userId);
   orders.sort((a, b) => b.createdAt - a.createdAt);
-  return NextResponse.json({ orders });
+  // Response only (never saved): which orders a verified Venmo email backs up.
+  const links = await venmoLinks().catch(() => new Map());
+  return NextResponse.json({ orders: links.size ? orders.map((o) => (links.has(o.id) ? { ...o, venmo: links.get(o.id) } : o)) : orders });
 }
 
 async function PATCH_handler(req: Request) {

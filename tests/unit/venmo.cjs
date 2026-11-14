@@ -21,7 +21,7 @@ const check = (name, ok, d) => { ok ? pass++ : fail++; console.log(`${ok ? "PASS
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "venmo-"));
   process.env.DKIM_TEST_KEYS_FILE = path.join(dir, "keys.json");
-  process.env.VENMO_ACCOUNT_EMAIL = "nicole@example.com";
+  process.env.VENMO_ACCOUNT_EMAIL = "owner@example.com";
   delete process.env.VERCEL;
   const mk = async (id, o = {}) => fs.readFileSync((await build(dir, repo, id, o)).file, "utf8");
 
@@ -33,11 +33,32 @@ const check = (name, ok, d) => { ok ? pass++ : fail++; console.log(`${ok ? "PASS
   check("parse: HTML-only, base64, accents, $1,234.50", p.ok && p.payer === "Ana María López" && p.amount === 1234.5 && p.note === "thank you!" && !p.txnId, p);
   p = parse.parseVenmo(await mk("fwd", { fwd: true }));
   check("parse: a 'Fwd:' subject still reads", p.ok && p.payer === "Shannon Garrett", p);
+  p = parse.parseVenmo(await mk("newfmt", { subject: "Jess Miley-Rhoades paid $150.00 to your Venmo account", payer: "Jess Miley-Rhoades", amount: 150, note: "Consultation for Jess Rhoades #ABC123" }));
+  check("parse: newer 'paid $X to your …' subject", p.ok && p.payer === "Jess Miley-Rhoades" && p.amount === 150 && p.note === "Consultation for Jess Rhoades #ABC123", p);
+  p = parse.parseVenmo((await mk("newfmt2", { subject: "Marisa Strong paid $1,130.00 to your Venmo Business profile", payer: "Marisa Strong", amount: 1130 })).replace(/Marisa Strong paid you/g, "Marisa Strong paid $1,130.00 to your Venmo Business profile"));
+  check("parse: newer format in subject and body, $1,130.00", p.ok && p.payer === "Marisa Strong" && p.amount === 1130, p);
+  p = parse.parseVenmo(await mk("youpaid2", { subject: "You paid Shannon Garrett $64.00 to your …" }));
+  check("parse: 'You paid …' still isn't a payment to us", !p.ok, p);
+  let g = parse.guessVenmo(await mk("odd", { subject: "Money from Venmo: Dana Ray sent $42.50 to Sam", note: "for order #AB12CD thanks" }));
+  check("guess: unfamiliar layout → amount, payer, #ref note", g.amount === 42.5 && g.payer === "Dana Ray", g);
+  check("guess: note line with the #ref", /#AB12CD/.test(g.note), g);
+  g = parse.guessVenmo(await mk("odd2", { subject: "Your receipt", note: "x" }));
+  check("guess: no name in subject → payer from the body line", g.payer === "Shannon Garrett" && g.amount === 64, g);
+  // Venmo's 2026 HTML layout (made-up names): headline twice, amount split up,
+  // a pay-link note with + for spaces, a letters-and-digits transaction id.
+  const layout2026 = (note) => ["From: Venmo <venmo@venmo.com>", "To: owner@example.com", "Subject: Dana Ray-Lopez paid $150.00 to your Venmo account", "Date: Wed, 11 Nov 2026 20:00:00 +0000", "Content-Type: text/html; charset=utf-8", "", `<html><head><title>Dana ray-lopez paid you $150.00</title></head><body><div>Dana ray-lopez paid you $150.00</div><table><tr><td><p>Dana ray-lopez paid you</p></td></tr><tr><td><div>$</div><div>150</div><div style="display:none">.</div><div>00</div></td></tr><tr><td><p class="transaction-note">${note}</p></td></tr><tr><td><a href="https://venmo.com/x">See transaction</a></td></tr></table><p>Transaction details</p><p>Date</p><p>Nov 11, 2026</p><p>Transaction ID</p><p>1NL67631CH793934Y</p><p>Sent to</p><p>@shop-owner</p></body></html>`].join("\r\n");
+  p = parse.parseVenmo(layout2026("Box of choc. TY"));
+  check("parse: 2026 layout → payer, amount, note (not the repeated headline), letter+digit transaction id", p.ok && p.payer === "Dana Ray-Lopez" && p.amount === 150 && p.note === "Box of choc. TY" && p.txnId === "1NL67631CH793934Y", p);
+  p = parse.parseVenmo(layout2026("Consultation+for+Dana+ray+#5ZCNN6"));
+  check("parse: a + for spaces note reads as words and keeps the #ref", p.ok && p.note === "Consultation for Dana ray #5ZCNN6", p);
   p = parse.parseVenmo(await mk("youpaid", { subject: "You paid Shannon Garrett $64.00" }));
   check("parse: 'You paid …' isn't a payment to us", !p.ok, p);
   p = parse.parseVenmo(await mk("request", { subject: "Shannon Garrett requests $64.00", note: "x" }).then((m) => m.replace(/paid you/g, "requests")));
   check("parse: a request isn't a payment", !p.ok, p);
   check("parse: encoded subject words", parse.decodeWords("=?utf-8?Q?Ana_Mar=C3=ADa?= =?utf-8?B?IHBhaWQgeW91?=") === "Ana María paid you", parse.decodeWords("=?utf-8?Q?Ana_Mar=C3=ADa?= =?utf-8?B?IHBhaWQgeW91?="));
+
+  check("names: double-barrelled surname (Jess Miley-Rhoades ~ Jess Rhoades)", match.namesMatch("Jess Miley-Rhoades", "Jess Rhoades") && match.namesMatch("Jess Rhoades", "Jess Miley-Rhoades"), null);
+  check("names: different first name with that surname doesn't match", !match.namesMatch("Kim Miley-Rhoades", "Jess Rhoades"), null);
 
   // ---- security
   let v = await verify.verifyVenmo(good);
@@ -58,6 +79,28 @@ const check = (name, ok, d) => { ok ? pass++ : fail++; console.log(`${ok ? "PASS
   check("dkim: a second Subject added on top → quarantined", !v.ok && /Subject/.test(v.reason), v);
   v = await verify.verifyVenmo(await mk("t8", { bodyLength: 40 }));
   check("dkim: signature covering only part of the body (l=) → quarantined", !v.ok, v);
+
+  // ---- through a Google Group (VENMO_ACCOUNT_EMAIL is the group, e.g. support@)
+  v = await verify.verifyVenmo(await mk("g1", { group: {} }));
+  check("group: From rewritten by the group, Google's ARC shows Venmo passed → passes", v.ok, v);
+  p = parse.parseVenmo(await mk("g1b", { group: { footer: true }, payer: "Kelly Huber", amount: 200 }));
+  check("group: still reads payer and amount (with a group footer)", p.ok && p.payer === "Kelly Huber" && p.amount === 200, p);
+  v = await verify.verifyVenmo(await mk("g1c", { group: { footer: true } }));
+  check("group: a group footer added to the body still passes", v.ok, v);
+  v = await verify.verifyVenmo(await mk("g2", { group: { tamper: ["$64.00", "$640.00"] } }));
+  check("group: amount changed after Google sealed it → quarantined", !v.ok, v);
+  v = await verify.verifyVenmo(await mk("g3", { group: { sealer: "attacker.test" } }));
+  check("group: record sealed by someone other than Google → quarantined", !v.ok && /not only by Google/.test(v.reason), v);
+  v = await verify.verifyVenmo(await mk("g4", { group: { firstDkim: "attacker.test" }, signDomain: "attacker.test" }));
+  check("group: first hop shows a non-Venmo signature → quarantined", !v.ok && /Venmo's signature/.test(v.reason), v);
+  v = await verify.verifyVenmo(await mk("g5", { group: { firstDmarc: "fail" } }));
+  check("group: first hop shows DMARC failing → quarantined", !v.ok, v);
+  v = await verify.verifyVenmo(await mk("g6", { group: { noArc: true } }));
+  check("group: group From with no Google record → quarantined", !v.ok && /no Google forwarding record/.test(v.reason), v);
+  v = await verify.verifyVenmo(await mk("g7", { group: { address: "someone-else@example.com" }, to: "someone-else@example.com" }));
+  check("group: a different group/account → quarantined", !v.ok && /Not from Venmo/.test(v.reason), v);
+  v = await verify.verifyVenmo(await mk("g8", { group: { tamper: ["To: owner@example.com", "To: owner@example.com, x@example.com"] } }));
+  check("group: To changed after Google sealed it → quarantined", !v.ok, v);
   const was = process.env.VENMO_ACCOUNT_EMAIL; delete process.env.VENMO_ACCOUNT_EMAIL;
   v = await verify.verifyVenmo(good);
   check("dkim: without VENMO_ACCOUNT_EMAIL everything is quarantined", !v.ok && /VENMO_ACCOUNT_EMAIL/.test(v.reason), v);

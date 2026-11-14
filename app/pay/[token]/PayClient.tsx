@@ -214,7 +214,7 @@ export default function PayClient({ token }: { token: string }) {
                         Pay ${order.total.toFixed(2)} with Venmo
                       </a>
                       <div className="pay-ref">
-                        Put <strong>#{order.shortId}</strong> in your Venmo note so we can match your payment.
+                        <span><strong>Please don&rsquo;t change the Venmo note.</strong> It has your order number, <strong>#{order.shortId}</strong>, and we use it to match your payment.</span>
                         <CopyRef text={`#${order.shortId}`} />
                       </div>
                     </>

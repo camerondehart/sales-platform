@@ -4,7 +4,9 @@
 //
 //   node venmo-sign.cjs <outDir> <appDir> <id> '<json options>'
 // options: payer, amount, note, txn, to, from, signDomain, subject, tamper
-//          [from, to], extraSubject, unsigned, bodyLength, html (HTML-only body), fwd
+//          [from, to], extraSubject, unsigned, bodyLength, html (HTML-only body), fwd,
+//          group (passed through a Google Group: From rewritten, ARC sealed;
+//          { address, sealer, firstDkim, firstDmarc, noArc, footer, tamper })
 const fs = require("fs"), path = require("path"), crypto = require("crypto");
 
 function keyPair(outDir) {
@@ -16,7 +18,7 @@ function keyPair(outDir) {
     const p = publicKey.export({ type: "spki", format: "der" }).toString("base64");
     // Venmo's real selector names are unknown here; any works for the test.
     const rec = `v=DKIM1; k=rsa; p=${p}`;
-    fs.writeFileSync(path.join(outDir, "keys.json"), JSON.stringify({ "s1._domainkey.venmo.com": rec, "s1._domainkey.attacker.test": rec }));
+    fs.writeFileSync(path.join(outDir, "keys.json"), JSON.stringify({ "s1._domainkey.venmo.com": rec, "s1._domainkey.attacker.test": rec, "arc1._domainkey.google.com": rec, "arc1._domainkey.attacker.test": rec }));
   }
   return fs.readFileSync(pemFile, "utf8");
 }
@@ -32,7 +34,7 @@ async function build(outDir, appDir, id, o) {
   const html = `<html><body><table><tr><td><p>${payer} paid you</p></td></tr><tr><td>$${amount}</td></tr><tr><td><p>${note}</p></td></tr>${txn ? `<tr><td>Transaction ID</td><td>${txn}</td></tr>` : ""}</table></body></html>`;
   const headers = [
     `From: ${o.from || "Venmo <venmo@venmo.com>"}`,
-    `To: ${o.to || "nicole@example.com"}`,
+    `To: ${o.to || "owner@example.com"}`,
     `Subject: ${subject}`,
     `Date: Tue, 27 Oct 2026 18:04:00 +0000`,
     `Message-ID: <${id}@venmo.com>`,
@@ -55,14 +57,37 @@ async function build(outDir, appDir, id, o) {
     if (sig.errors?.length) throw new Error(JSON.stringify(sig.errors));
     msg = sig.signatures + msg;
   }
+  if (o.group) msg = await throughGroup(msg, o.group, keyPair(outDir), appDir);
   // What Gmail's auto-forward adds on top (not signed, not changed).
-  msg = `Delivered-To: venmo-inbox@example.resend.app\r\nX-Forwarded-To: venmo-inbox@example.resend.app\r\nX-Forwarded-For: nicole@example.com venmo-inbox@example.resend.app\r\n` + msg;
+  msg = `Delivered-To: venmo-inbox@example.resend.app\r\nX-Forwarded-To: venmo-inbox@example.resend.app\r\nX-Forwarded-For: owner@example.com venmo-inbox@example.resend.app\r\n` + msg;
   if (o.extraSubject) msg = `Subject: ${o.extraSubject}\r\n` + msg;
   if (o.tamper) msg = msg.split(o.tamper[0]).join(o.tamper[1]);
   keyPair(outDir);
   const file = path.join(outDir, `${id}.eml`);
   fs.writeFileSync(file, msg);
   return { file, txn };
+}
+
+// What a Google Group (e.g. support@) does: Google seals the email as it
+// arrives (ARC i=1, recording Venmo's DKIM/DMARC), the group rewrites From
+// ("'Venmo' via support"), then Google seals again as it delivers / forwards.
+async function throughGroup(msg, g, pem, appDir) {
+  const { sealMessage } = require(path.join(appDir, "node_modules/mailauth"));
+  const address = g.address || "owner@example.com";
+  const sealer = g.sealer || "google.com";
+  const seal = async (m, authResults, cv) =>
+    (await sealMessage(Buffer.from(m), { signingDomain: sealer, selector: "arc1", privateKey: pem, authResults, cv })).toString() + m;
+  if (!g.noArc) {
+    msg = await seal(msg, `mx.google.com; dkim=pass header.i=@${g.firstDkim || "venmo.com"} header.s=s1 header.b=abc; spf=pass smtp.mailfrom=${g.firstDkim || "venmo.com"}; dmarc=${g.firstDmarc || "pass"} (p=REJECT sp=REJECT dis=NONE) header.from=venmo.com`, "none");
+  }
+  msg = msg.replace(/^From: .*$/m, `From: 'Venmo' via support <${address}>\r\nReply-To: Venmo No-reply <no-reply@venmo.com>\r\nX-Original-From: Venmo <venmo@venmo.com>`);
+  if (g.footer) msg = msg.replace(/--b1--/, `--b1--\r\n-- \r\nYou received this message because you are subscribed to the group.`);
+  if (!g.noArc) {
+    msg = await seal(msg, "mx.google.com; dkim=pass header.i=@example-com.20260707.gappssmtp.com header.s=20230601 header.b=xyz; arc=pass (i=1)", "pass");
+    msg = await seal(msg, "mx.google.com; dkim=pass header.i=@example-com.20260707.gappssmtp.com header.s=20230601 header.b=xyz; arc=pass (i=2)", "pass");
+  }
+  if (g.tamper) msg = msg.split(g.tamper[0]).join(g.tamper[1]);
+  return msg;
 }
 
 module.exports = { build };

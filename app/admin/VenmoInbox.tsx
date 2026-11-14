@@ -8,12 +8,13 @@ import type { AdminRefreshKey } from "@/lib/assistant/shared";
 // unpaid orders (lib/venmoInbox.ts). Nothing is marked paid until staff tap
 // "Mark paid". Shown only while the "Venmo payment matching" switch is on.
 
-type Match = { strength: "strong" | "medium" | "weak" | "none"; orderId?: string; candidates: string[]; why: string; amountDiffers?: boolean };
+type Match = { strength: "strong" | "medium" | "weak" | "none"; orderId?: string; candidates: string[]; why: string; amountDiffers?: boolean; alreadyPaid?: boolean };
 type Payment = {
   id: string;
   receivedAt: number;
   subject: string;
   verified: boolean;
+  guessed?: boolean;
   reason?: string;
   payer?: string;
   amount?: number;
@@ -21,21 +22,22 @@ type Payment = {
   txnId?: string;
   state: "new" | "confirmed" | "rejected" | "dismissed";
   orderId?: string;
+  linked?: boolean;
   notOrders?: string[];
   decidedBy?: string;
   decidedAt?: number;
   match?: Match;
 };
-type OpenOrder = { id: string; ref: string; name: string; email: string; total: number; createdAt: number; expired: boolean };
+type OpenOrder = { id: string; ref: string; name: string; email: string; total: number; createdAt: number; expired: boolean; paid?: boolean };
 type SetupMsg = { id: string; receivedAt: number; from: string; subject: string; text: string };
 
 const money = (n?: number) => (typeof n === "number" ? `$${n.toFixed(2)}` : "—");
 const when = (t: number) => new Date(t).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
+export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => void; ordersKey?: string }) {
   const [on, setOn] = useState<boolean | null>(null);
   const [open, setOpen] = useState(false);
-  const [data, setData] = useState<{ payments: Payment[]; orders: OpenOrder[]; setup: SetupMsg[]; accountEmailSet: boolean } | null>(null);
+  const [data, setData] = useState<{ payments: Payment[]; orders: OpenOrder[]; paidOrders?: OpenOrder[]; setup: SetupMsg[]; accountEmailSet: boolean } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [pick, setPick] = useState<Record<string, string>>({});
@@ -51,16 +53,18 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
       })
       .catch(() => {});
   };
-  useEffect(load, []);
+  // Reload (and re-match) whenever the order list changes, e.g. an order
+  // marked paid or set back to pending by hand.
+  useEffect(load, [ordersKey]);
   useAdminRefresh(["orders"] as AdminRefreshKey[], load);
 
-  const orderById = useMemo(() => new Map((data?.orders || []).map((o) => [o.id, o])), [data]);
+  const orderById = useMemo(() => new Map([...(data?.orders || []), ...(data?.paidOrders || [])].map((o) => [o.id, o])), [data]);
   const fresh = (data?.payments || []).filter((p) => p.state === "new");
   const suggested = fresh.filter((p) => p.verified && p.match?.orderId && (p.match.strength === "strong" || p.match.strength === "medium") && orderById.has(p.match.orderId));
   const toSort = fresh.filter((p) => p.verified && !suggested.includes(p));
   const quarantined = fresh.filter((p) => !p.verified);
   const done = (data?.payments || []).filter((p) => p.state !== "new").slice(0, 15);
-  const sure = suggested.filter((p) => p.match!.strength === "strong" && !p.match!.amountDiffers);
+  const sure = suggested.filter((p) => p.match!.strength === "strong" && !p.match!.amountDiffers && !p.guessed && !p.match!.alreadyPaid);
 
   async function act(body: Record<string, unknown>, key: string, ok: string) {
     setBusy(key);
@@ -82,8 +86,8 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
     const o = orderById.get(orderId);
     if (!o) return;
     const differs = typeof p.amount === "number" && Math.abs(p.amount - o.total) >= 0.005;
-    if (differs && !window.confirm(`They paid ${money(p.amount)} but order #${o.ref} is ${money(o.total)}. Mark it paid anyway?`)) return;
-    act({ action: "confirm", paymentId: p.id, orderId }, p.id, `Order #${o.ref} marked paid.`);
+    if (differs && !window.confirm(`They paid ${money(p.amount)} but order #${o.ref} is ${money(o.total)}. ${o.paid ? "Link it" : "Mark it paid"} anyway?`)) return;
+    act({ action: "confirm", paymentId: p.id, orderId }, p.id, o.paid ? `Linked to order #${o.ref} (it was already paid).` : `Order #${o.ref} marked paid.`);
   }
 
   if (!on) return null;
@@ -97,7 +101,7 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
     <span className="vi-pay">
       <strong>{money(p.amount)}</strong> from <strong>{p.payer || "?"}</strong>
       {p.note && <span className="vi-note">“{p.note}”</span>}
-      <small>{when(p.receivedAt)}</small>
+      <small>{when(p.receivedAt)}{p.guessed ? <> · <span className="vi-guess">Best guess: unfamiliar email. Check the amount and name.</span> {p.subject && <>(&ldquo;{p.subject}&rdquo;)</>}</> : null}</small>
     </span>
   );
 
@@ -142,7 +146,7 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
                         </small>
                       </span>
                       <span className="vi-actions">
-                        <button type="button" className="submit" disabled={!!busy} onClick={() => confirm(p, o.id)}>{busy === p.id ? "Saving…" : "Mark paid"}</button>
+                        <button type="button" className="submit" disabled={!!busy} onClick={() => confirm(p, o.id)}>{busy === p.id ? "Saving…" : o.paid ? "Link" : "Mark paid"}</button>
                         <button type="button" disabled={!!busy} onClick={() => act({ action: "reject", paymentId: p.id, orderId: o.id }, p.id, "Noted. It's under “Sort by hand” now.")}>Not a match</button>
                       </span>
                     </li>
@@ -175,11 +179,16 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
                           <optgroup label="Other unpaid orders">
                             {rest.map((o) => <option key={o.id} value={o.id}>#{o.ref} · {o.name} · {money(o.total)}{o.expired ? " · expired" : ""}</option>)}
                           </optgroup>
+                          {(data.paidOrders || []).length > 0 && (
+                            <optgroup label="Already paid (link only)">
+                              {(data.paidOrders || []).filter((o) => !(p.notOrders || []).includes(o.id)).map((o) => <option key={o.id} value={o.id}>#{o.ref} · {o.name} · {money(o.total)} · paid</option>)}
+                            </optgroup>
+                          )}
                         </select>
                         <small>{p.match?.why}</small>
                       </span>
                       <span className="vi-actions">
-                        <button type="button" className="submit" disabled={!!busy || !chosen} onClick={() => confirm(p, chosen)}>{busy === p.id ? "Saving…" : "Mark paid"}</button>
+                        <button type="button" className="submit" disabled={!!busy || !chosen} onClick={() => confirm(p, chosen)}>{busy === p.id ? "Saving…" : orderById.get(chosen)?.paid ? "Link" : "Mark paid"}</button>
                         <button type="button" disabled={!!busy} onClick={() => act({ action: "dismiss", paymentId: p.id }, p.id, "Dismissed.")}>Dismiss</button>
                       </span>
                     </li>
@@ -192,12 +201,14 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
           {quarantined.length > 0 && (
             <>
               <h3>Quarantined</h3>
-              <p className="field-hint">These didn&rsquo;t pass the security check (they may not really be from Venmo), so they can&rsquo;t be matched. Check Venmo itself before marking any order paid.</p>
+              <p className="field-hint">These didn&rsquo;t pass the security check (they may not really be from Venmo), so they can&rsquo;t be marked paid from here. Check Venmo itself, then mark the order paid on the order.</p>
               <ul className="vi-list">
                 {quarantined.map((p) => (
                   <li key={p.id} className="vi-row is-quarantined">
                     <span className="vi-pay">
                       <strong>{p.subject || "(no subject)"}</strong>
+                      {typeof p.amount === "number" && <span>{money(p.amount)} from {p.payer || "?"}{p.note ? ` · “${p.note}”` : ""}</span>}
+                      {p.match?.orderId && orderById.has(p.match.orderId) && <span>Might be order #{orderById.get(p.match.orderId)!.ref} ({orderById.get(p.match.orderId)!.name}): {p.match.why}</span>}
                       <small>{when(p.receivedAt)} · {p.reason}</small>
                     </span>
                     <span className="vi-actions">
@@ -217,7 +228,7 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
               <ul>
                 {done.map((p) => (
                   <li key={p.id}>
-                    {money(p.amount)} from {p.payer || p.subject} — {p.state === "confirmed" ? `paid order #${(p.orderId || "").slice(-6).toUpperCase()}` : p.state}
+                    {money(p.amount)} from {p.payer || p.subject} — {p.state === "confirmed" ? `${p.linked ? "linked to already-paid order" : "paid order"} #${(p.orderId || "").slice(-6).toUpperCase()}` : p.state}
                     {p.decidedBy ? ` by ${p.decidedBy}` : ""}{p.decidedAt ? `, ${when(p.decidedAt)}` : ""}
                   </li>
                 ))}
@@ -230,9 +241,9 @@ export default function VenmoInbox({ onPaid }: { onPaid: () => void }) {
             <ol>
               <li>Resend → <strong>Receiving</strong>: copy your receiving address (it ends in <code>.resend.app</code>).</li>
               <li>Resend → <strong>Webhooks</strong>: on the existing <code>/api/webhooks/resend</code> endpoint, also tick <strong>email.received</strong>.</li>
-              <li>Vercel (Production): add <code>VENMO_ACCOUNT_EMAIL</code> = the email the business&rsquo;s Venmo notifications go to. {data.accountEmailSet ? "✓ Set." : "Not set yet."}</li>
+              <li>Vercel (Production): add <code>VENMO_ACCOUNT_EMAIL</code> = the email the business&rsquo;s Venmo notifications go to (if that&rsquo;s a group like support@, use the group&rsquo;s address). {data.accountEmailSet ? "✓ Set." : "Not set yet."}</li>
               <li>Gmail (whoever gets the Venmo emails): Settings → Forwarding → <strong>Add a forwarding address</strong> → the Resend address. Gmail emails a code: it appears just below.</li>
-              <li>Gmail: create a filter <strong>From: venmo@venmo.com</strong> → <strong>Forward it to</strong> the Resend address. (Use the filter: forwarding by hand breaks Venmo&rsquo;s signature.)</li>
+              <li>Gmail: create a filter <strong>From: venmo@venmo.com</strong> → <strong>Forward it to</strong> the Resend address. If Venmo emails arrive &ldquo;via support&rdquo; (a group), filter on <strong>Has the words: list:support@… &quot;paid you&quot;</strong> instead. (Use the filter: forwarding by hand breaks the signature check.)</li>
             </ol>
             {data.setup.length > 0 ? (
               <ul className="vi-codes">

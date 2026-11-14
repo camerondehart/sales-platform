@@ -3,8 +3,9 @@
  * Gmail). No imports, so the unit test can load it on its own.
  *
  * ASSUMPTIONS (until real redacted Venmo emails are added as fixtures):
- *  - The subject is "<Name> paid you $12.34" (Gmail's auto-forward keeps it;
- *    a "Fwd:" prefix is ignored). "You paid …" and requests are not payments.
+ *  - The subject is "<Name> paid you $12.34", or in Venmo's newer layout
+ *    "<Name> paid $12.34 to your …" (Gmail's auto-forward keeps it; a "Fwd:"
+ *    prefix is ignored). "You paid …" and requests are not payments.
  *  - The note is the first short line after the "paid you" line in the body.
  *  - A transaction ID appears as "Transaction ID" / "Payment ID" + digits.
  * Anything that doesn't fit comes back with ok: false and is quarantined.
@@ -141,7 +142,9 @@ export function addressOf(v: string): string {
   return (m ? m[1] : v).trim().toLowerCase();
 }
 
-const PAID = /^(?:(?:fwd?|fw):\s*)*(.{1,80}?) paid you \$([\d,]+(?:\.\d{1,2})?)\s*$/i;
+const PAID = /^(?:(?:fwd?|fw):\s*)*(.{1,80}?) paid (?:you )?\$([\d,]+(?:\.\d{1,2})?)(?:\s+to your\b.*)?\s*$/i;
+/** A "paid you $X" or "paid $X to your …" line. */
+export const PAID_LINE = / paid (?:you )?\$[\d,]/i;
 
 export function parseVenmo(raw: string): ParsedVenmo {
   const { headers } = splitMessage(raw);
@@ -150,7 +153,7 @@ export function parseVenmo(raw: string): ParsedVenmo {
   let m = subject.match(PAID);
   if (!m) {
     // Some formats put it only in the body.
-    const line = text.split("\n").find((l) => / paid you \$/i.test(l));
+    const line = text.split("\n").find((l) => PAID_LINE.test(l));
     m = line ? line.trim().match(PAID) : null;
   }
   if (!m) return { ok: false, error: /^you paid|request/i.test(subject) ? "Not an incoming payment." : "Doesn't look like a “paid you” email." };
@@ -160,16 +163,49 @@ export function parseVenmo(raw: string): ParsedVenmo {
 
   // Note: the first short line after the "paid you" line that isn't the amount or boilerplate.
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
-  const at = lines.findIndex((l) => / paid you/i.test(l));
+  const at = lines.findIndex((l) => / paid you/i.test(l) || PAID_LINE.test(l));
   let note = "";
-  for (const l of lines.slice(at === -1 ? 0 : at + 1, (at === -1 ? 0 : at + 1) + 6)) {
+  for (const l of lines.slice(at === -1 ? 0 : at + 1, (at === -1 ? 0 : at + 1) + 8)) {
     if (/^[-+]?\s*\$\s*[\d,]+(\.\d{1,2})?$/.test(l)) continue;
+    // Venmo's HTML repeats the headline and splits the amount ("$" / "150" / ". 00").
+    if (/ paid you\b/i.test(l) || PAID_LINE.test(l) || /^[-+$.,\d\s]+$/.test(l)) continue;
     if (/^(transaction|payment) id|^date|^see transaction|^view|^like|^comment|^venmo|^privacy|^this|^\w+ \d{1,2}, \d{4}/i.test(l)) break;
     if (l.length > 280) break;
-    note = l;
+    note = plusSpaces(l);
     break;
   }
-  const txn = text.match(/(?:transaction|payment)\s*id[:#\s]*([0-9]{8,30})/i);
+  const txn = text.match(/(?:transaction|payment)\s*id[:#\s]*(?=[A-Z]*\d)([0-9A-Z]{8,30})\b/i);
   const date = Date.parse(headers.get("date") || "");
   return { ok: true, payer, amount, note, txnId: txn?.[1], sentAt: Number.isFinite(date) ? date : undefined, text: text.slice(0, 6000) };
+}
+
+/**
+ * Best guess for an email in a layout we don't know (2026-11-11: try to
+ * match everything that lands in the inbox; staff review every match anyway).
+ * Amount = the first $ figure (subject first, then body); payer = the words
+ * before "paid"/"sent" in the subject or body; note = a line with a #ref.
+ */
+export function guessVenmo(raw: string): { payer: string; amount?: number; note: string; txnId?: string; sentAt?: number; text: string } {
+  const { headers } = splitMessage(raw);
+  const subject = decodeWords(headers.get("subject") || "").replace(/\s+/g, " ").trim().replace(/^(?:(?:fwd?|fw):\s*)+/i, "");
+  const text = messageText(raw);
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const money = (s: string) => {
+    const m = s.match(/\$\s?([\d,]+(?:\.\d{1,2})?)/);
+    const n = m ? Math.round(Number(m[1].replace(/,/g, "")) * 100) / 100 : NaN;
+    return n > 0 && n <= 100000 ? n : undefined;
+  };
+  const amount = money(subject) ?? lines.map(money).find((n) => n !== undefined);
+  // The words just before "paid"/"sent", after any "Label:" (at most 4 words).
+  const who = (s: string) => (s.match(/^(.{2,80}?)\s+(?:paid|sent|has sent)\b/i)?.[1] || "").split(/[:|–—-]\s/).pop()!.replace(/^["']|["']$/g, "").trim().split(/\s+/).slice(-4).join(" ");
+  const payer = (/^you\b/i.test(subject) ? "" : who(subject)) || lines.map((l) => (/^you\b/i.test(l) ? "" : who(l))).find(Boolean) || "";
+  const note = plusSpaces(lines.find((l) => l.length <= 280 && /#\s?[A-Za-z0-9]{6}(?![A-Za-z0-9])/.test(l) && !/https?:\/\//.test(l)) || "");
+  const txn = text.match(/(?:transaction|payment)\s*id[:#\s]*(?=[A-Z]*\d)([0-9A-Z]{8,30})\b/i);
+  const date = Date.parse(headers.get("date") || "");
+  return { payer, amount, note, txnId: txn?.[1], sentAt: Number.isFinite(date) ? date : undefined, text: text.slice(0, 6000) };
+}
+
+/** "Consultation+for+Marisa+strong+#5ZCNN6" (a pay link that encoded spaces as +) → spaces. */
+function plusSpaces(note: string): string {
+  return !/\s/.test(note) && /\w\+\w/.test(note) ? note.replace(/\+/g, " ") : note;
 }

@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { promises as fs } from "fs";
 import { VersionedStore } from "./versionedStore";
 import { getOrders, normalizeStatus, type Order } from "./orders";
-import { parseVenmo, splitMessage, addressOf, decodeWords, messageText } from "./venmoParse";
+import { parseVenmo, guessVenmo, splitMessage, addressOf, decodeWords, messageText } from "./venmoParse";
 import { verifyVenmo } from "./venmoVerify";
 import { matchPayment, type Match } from "./venmoMatch";
 
@@ -19,8 +19,10 @@ export type VenmoPayment = {
   id: string;
   receivedAt: number;
   subject: string;
-  /** Passed every check: the only ones that can be matched. */
+  /** Passed the security check: the only ones that can be marked paid from here. */
   verified: boolean;
+  /** Not in a layout we know: payer/amount/note are a best guess. */
+  guessed?: boolean;
   /** Why it's quarantined (when not verified). */
   reason?: string;
   payer?: string;
@@ -34,6 +36,8 @@ export type VenmoPayment = {
   state: "new" | "confirmed" | "rejected" | "dismissed";
   /** Order it was confirmed against, or the one staff said it isn't. */
   orderId?: string;
+  /** Confirmed against an order that was already paid: linked only, the order wasn't changed. */
+  linked?: boolean;
   /** Orders staff said "not a match" to. */
   notOrders?: string[];
   decidedAt?: number;
@@ -95,15 +99,17 @@ export async function ingest(raw: string): Promise<{ kind: "venmo" | "setup" | "
     return { kind: "setup", id: row.id };
   }
 
-  const parsed = parseVenmo(raw);
-  const looksVenmo = /venmo/i.test(from) || / paid you \$/i.test(subject);
-  if (!looksVenmo) return { kind: "ignored", reason: "Not a Venmo email." };
+  // Everything else that lands here is kept and matched as well as we can
+  // (2026-11-11): staff review every match anyway.
+  const strict = parseVenmo(raw);
+  const parsed = strict.ok ? strict : { ...guessVenmo(raw), ok: true as const };
+  const guessed = !strict.ok;
 
   const verdict = await verifyVenmo(raw);
-  const verified = verdict.ok && parsed.ok;
-  const reason = !verdict.ok ? verdict.reason : !parsed.ok ? parsed.error : undefined;
+  const verified = verdict.ok;
+  const reason = !verdict.ok ? verdict.reason : undefined;
   // Real Venmo transaction ID when we trust it; otherwise the message hash.
-  const id = verified && parsed.ok && parsed.txnId ? `vt_${parsed.txnId}` : `vm_${hash}`;
+  const id = verified && parsed.txnId ? `vt_${parsed.txnId}` : `vm_${hash}`;
 
   const existing = (await payments.read()).data.find((r) => r.id === id);
   if (existing) return { kind: "duplicate", id };
@@ -114,7 +120,13 @@ export async function ingest(raw: string): Promise<{ kind: "venmo" | "setup" | "
     subject,
     verified,
     reason,
-    ...(parsed.ok ? { payer: parsed.payer, amount: parsed.amount, note: parsed.note.slice(0, 300), txnId: parsed.txnId, sentAt: parsed.sentAt, text: parsed.text.slice(0, 4000) } : {}),
+    ...(guessed ? { guessed: true } : {}),
+    payer: parsed.payer,
+    amount: parsed.amount,
+    note: parsed.note.slice(0, 300),
+    txnId: parsed.txnId,
+    sentAt: parsed.sentAt,
+    text: parsed.text.slice(0, 4000),
     rawUrl,
     state: "new",
   };
@@ -127,23 +139,52 @@ export async function ingest(raw: string): Promise<{ kind: "venmo" | "setup" | "
 }
 
 export const awaitingPayment = (orders: Order[]) =>
-  orders.filter((o) => !o.isInquiry && normalizeStatus(o.status) === "pending" && !o.paidAt);
+  // Status is the truth: an order set back to Pending by hand keeps its old paidAt.
+  orders.filter((o) => !o.isInquiry && normalizeStatus(o.status) === "pending");
+
+/** Orders already paid (by hand, usually) in the last 30 days that no Venmo payment is linked to yet. */
+const LINK_DAYS = 30;
+export function recentlyPaid(orders: Order[], rows: VenmoPayment[], now = Date.now()): Order[] {
+  const taken = new Set(rows.filter((r) => r.state === "confirmed" && r.orderId).map((r) => r.orderId!));
+  return orders.filter((o) => {
+    const s = normalizeStatus(o.status);
+    return !o.isInquiry && (s === "paid" || s === "completed") && !taken.has(o.id) && now - (o.paidAt || o.createdAt) < LINK_DAYS * 86400000;
+  });
+}
 
 export type InboxRow = VenmoPayment & { match?: Match };
 
 /** Every payment, newest first, with a fresh match for the ones still to sort out. */
-export async function inbox(): Promise<{ rows: InboxRow[]; orders: Order[]; setup: SetupMessage[] }> {
+export async function inbox(): Promise<{ rows: InboxRow[]; orders: Order[]; paidOrders: Order[]; setup: SetupMessage[] }> {
   const [rows, orders, setupRows] = await Promise.all([payments.read().then((s) => s.data), getOrders(), setup.read().then((s) => s.data).catch(() => [])]);
   const open = awaitingPayment(orders);
+  const paid = recentlyPaid(orders, rows);
   const out = rows
     .slice()
     .sort((a, b) => b.receivedAt - a.receivedAt)
     .map((r): InboxRow => {
-      if (!r.verified || r.state !== "new" || r.amount === undefined) return r;
-      const pool = open.filter((o) => !(r.notOrders || []).includes(o.id));
-      return { ...r, match: matchPayment({ payer: r.payer || "", amount: r.amount, note: r.note || "", text: r.text }, pool) };
+      // Quarantined ones get a suggestion too, to help staff check by hand
+      // (they still can't be marked paid from the inbox).
+      if (r.state !== "new" || r.amount === undefined) return r;
+      const mp = { payer: r.payer || "", amount: r.amount, note: r.note || "", text: r.text };
+      const notThese = (o: Order) => !(r.notOrders || []).includes(o.id);
+      const m = matchPayment(mp, open.filter(notThese));
+      if (m.strength === "strong" || m.strength === "medium") return { ...r, match: m };
+      // Already marked paid by hand before the email came in? Offer to link it.
+      const late = matchPayment(mp, paid.filter(notThese));
+      if (late.strength === "strong" || late.strength === "medium") return { ...r, match: { ...late, alreadyPaid: true, why: `Already paid. ${late.why}` } };
+      return { ...r, match: m };
     });
-  return { rows: out, orders: open, setup: setupRows.slice().sort((a, b) => b.receivedAt - a.receivedAt) };
+  return { rows: out, orders: open, paidOrders: paid, setup: setupRows.slice().sort((a, b) => b.receivedAt - a.receivedAt) };
+}
+
+/** Orders a verified Venmo email was confirmed or linked to (for the ✓ next to their status). */
+export type VenmoLink = { payer?: string; amount?: number; at?: number };
+export async function venmoLinks(): Promise<Map<string, VenmoLink>> {
+  const rows = (await payments.read()).data;
+  const out = new Map<string, VenmoLink>();
+  for (const r of rows) if (r.state === "confirmed" && r.verified && r.orderId) out.set(r.orderId, { payer: r.payer, amount: r.amount, at: r.decidedAt });
+  return out;
 }
 
 /** Suggestions (strong or medium) for the Today list and the Concierge. */
@@ -151,7 +192,7 @@ export async function suggestions(): Promise<Array<{ payment: InboxRow; order: O
   const { rows, orders } = await inbox();
   const byId = new Map(orders.map((o) => [o.id, o]));
   return rows
-    .filter((r) => r.match && (r.match.strength === "strong" || r.match.strength === "medium") && r.match.orderId && byId.has(r.match.orderId))
+    .filter((r) => r.verified && r.match && !r.match.alreadyPaid && (r.match.strength === "strong" || r.match.strength === "medium") && r.match.orderId && byId.has(r.match.orderId))
     .map((r) => ({ payment: r, order: byId.get(r.match!.orderId!)! }));
 }
 
@@ -162,7 +203,7 @@ export async function getPayment(id: string): Promise<VenmoPayment | undefined> 
 /** Record a staff decision. Returns false if it was already decided (or quarantined, for confirm). */
 export async function decide(
   id: string,
-  change: { state: "confirmed"; orderId: string } | { state: "rejected"; orderId?: string } | { state: "dismissed" },
+  change: { state: "confirmed"; orderId: string; linked?: boolean } | { state: "rejected"; orderId?: string } | { state: "dismissed" },
   by: string
 ): Promise<{ ok: true; payment: VenmoPayment } | { ok: false; error: string }> {
   type R = { ok: true; payment: VenmoPayment } | { ok: false; error: string };
@@ -177,7 +218,7 @@ export async function decide(
       // "Not a match": stays in the inbox for a person to assign, minus that order.
       next = { ...r, notOrders: Array.from(new Set([...(r.notOrders || []), ...(change.orderId ? [change.orderId] : [])])), decidedAt: Date.now(), decidedBy: by };
     } else {
-      next = { ...r, state: change.state, ...(change.state === "confirmed" ? { orderId: change.orderId } : {}), decidedAt: Date.now(), decidedBy: by };
+      next = { ...r, state: change.state, ...(change.state === "confirmed" ? { orderId: change.orderId, ...(change.linked ? { linked: true } : {}) } : {}), decidedAt: Date.now(), decidedBy: by };
     }
     const out = rows.slice();
     out[i] = next;

@@ -2793,6 +2793,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                     <div className="user-main">
                       <div className="name" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
                         <span className={`status-pill status-${o.status}`}>{STATUS_LABELS[o.status]}</span>
+                        <VenmoCheck o={o} />
                         {o.userName}
                         {!o.isInquiry && <span style={{ color: "var(--ink-soft)", fontWeight: 400 }}>· ${o.total.toFixed(2)}</span>}
                       </div>
@@ -2993,7 +2994,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         />
       )}
 
-      {tab === "orders" && <VenmoInbox onPaid={() => loadOrders()} />}
+      {tab === "orders" && <VenmoInbox onPaid={() => loadOrders()} ordersKey={orders.map((o) => `${o.id}:${o.status}`).join("|")} />}
 
       {/* Orders queue */}
       {tab === "orders" && (
@@ -3080,6 +3081,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                   <div className="user-main">
                     <div className="name" style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
                       <span className={`status-pill status-${o.status}`}>{STATUS_LABELS[o.status]}</span>
+                      <VenmoCheck o={o} />
                       {isExpired(o) && <span className="rem-chip expired">Expired</span>}
                       {!isExpired(o) && o.status === "pending" && (o.reminders?.length || 0) > 0 && (
                         <span className="rem-chip" title={`Last reminder ${formatDateTime(o.reminders![o.reminders!.length - 1].at)}`}>
@@ -4181,6 +4183,7 @@ We just finished a new run and wanted you to hear it first.
                             <span style={{ display: "inline-block", padding: "0.12rem 0.55rem", borderRadius: "999px", fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--white)", background: STATUS_COLORS[o.status] }}>
                               {STATUS_LABELS[o.status]}
                             </span>
+                            <VenmoCheck o={o} />
                             {o.isInquiry ? "Inquiry" : `$${o.total.toFixed(2)}`} · #{o.id.slice(-6).toUpperCase()}
                           </div>
                           <div className="history-date">{formatDateTime(o.createdAt)}</div>
@@ -5133,6 +5136,7 @@ function OrderDetailModal({
                   <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                 ))}
               </select>
+              <VenmoCheck o={order} label />
               {order.status === "pending" && (
                 <button className="approve" onClick={() => onStatusChange(order.id, "paid")} style={{ padding: "0.55rem 1rem" }}>
                   ✓ Mark paid
@@ -5341,5 +5345,18 @@ function OrderReminders({ order, onRefreshed }: { order: Order; onRefreshed: (o:
       )}
       {msg && <div className="field-hint">{msg}</div>}
     </div>
+  );
+}
+
+/** A check next to a Paid/Completed order that a verified Venmo payment email is confirmed or linked to. */
+function VenmoCheck({ o, label }: { o: Order; label?: boolean }) {
+  const v = (o as Order & { venmo?: { payer?: string; amount?: number; at?: number } }).venmo;
+  if (!v || (o.status !== "paid" && o.status !== "completed" && o.status !== "shipped" && o.status !== "picked-up")) return null;
+  const amt = typeof v.amount === "number" ? ` $${v.amount.toFixed(2)}` : "";
+  const title = `Verified: Venmo${amt}${v.payer ? ` from ${v.payer}` : ""}${v.at ? `, ${formatDateTime(v.at)}` : ""}`;
+  return (
+    <span className="venmo-check" title={title} aria-label={title} role="img">
+      <span aria-hidden="true">✓</span>{label ? <span className="venmo-check-label">Venmo verified</span> : null}
+    </span>
   );
 }

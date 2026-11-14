@@ -510,12 +510,12 @@ vsign("v3", amount=1, note=f"#{_ref}", txn="4333333333333333333", tamper=["$1.00
 _s,_r3=vin("v3")
 check("venmo: an amount edited after Venmo signed it is quarantined", _s==200 and _r3.get("verified") is False, _r3)
 _q=vpay(_r["id"])
-check("venmo: quarantined emails are never matched", _q and _q["verified"] is False and not _q.get("match"), _q)
+check("venmo: quarantined emails stay quarantined (a match is only a hint for staff)", _q and _q["verified"] is False and _q["state"]=="new", _q)
 _s,_x=req("/api/admin/venmo", {"action":"confirm","paymentId":_r["id"],"orderId":_vo["id"]})
 check("venmo: confirming a quarantined email is refused", _s==400 and order_of(_vo["id"])["status"]=="pending", (_s,_x))
 # Gmail forwarding confirmation code shows in Setup
 os.makedirs(VDIR, exist_ok=True)
-open(VDIR+"/g1.eml","w").write("From: Gmail Team <forwarding-noreply@google.com>\r\nTo: x@example.resend.app\r\nSubject: (#123456789) Gmail Forwarding Confirmation - Receive Mail from nicole@example.com\r\nContent-Type: text/plain\r\n\r\nConfirmation code: 123456789\r\nTo allow nicole@example.com to automatically forward mail to your address, please click the link below.\r\n")
+open(VDIR+"/g1.eml","w").write("From: Gmail Team <forwarding-noreply@google.com>\r\nTo: x@example.resend.app\r\nSubject: (#123456789) Gmail Forwarding Confirmation - Receive Mail from owner@example.com\r\nContent-Type: text/plain\r\n\r\nConfirmation code: 123456789\r\nTo allow owner@example.com to automatically forward mail to your address, please click the link below.\r\n")
 _s,_r=vin("g1")
 check("venmo: Gmail's forwarding code shows in Setup", _s==200 and _r.get("kind")=="setup" and any("123456789" in m["text"] for m in vbox()["setup"]), _r)
 # medium: same amount + name, no ref (second order)
@@ -546,6 +546,36 @@ _s,_x=req("/api/admin/venmo", {"action":"confirm","paymentId":"vt_44444444444444
 check("venmo: staff can confirm a likely match by hand", _s==200 and order_of(_vo2["id"])["status"]=="paid", (_s,_x))
 _aud=[json.loads(l) for l in open(D+"audit.jsonl")] if os.path.exists(D+"audit.jsonl") else []
 check("venmo: confirms and 'not a match' are in the Activity log against the order", any(a.get("action")=="venmo.confirm" and a.get("targetId")==_vo2["id"] for a in _aud) and any(a.get("action")=="venmo.not_a_match" and a.get("targetId")==_vo2["id"] for a in _aud) and any(a.get("action")=="venmo.confirm_bulk" for a in _aud), [a.get("action") for a in _aud][-6:])
+
+# Already marked paid by hand before the Venmo email came in → link only
+_s,_r=buy(1,"10.92.0.3",email="lee.late@example.com")
+_vo3=order_of(_r["orderId"]); _ref3=_vo3["id"][-6:].upper()
+req("/api/admin/orders", {"id":_vo3["id"],"status":"paid"}, method="PATCH")
+_paid_at=order_of(_vo3["id"]).get("paidAt")
+vsign("v6", payer="Lee Late", amount=_vo3["total"], note=f"Consultation+for+Lee+Late+#{_ref3}", txn="4666666666666666666")
+vin("v6")
+_p6=vpay("vt_4666666666666666666"); _bx=vbox()
+check("venmo: an order already marked paid by hand still matches (sure, 'already paid')", _p6 and _p6["match"]["strength"]=="strong" and _p6["match"]["orderId"]==_vo3["id"] and _p6["match"].get("alreadyPaid") is True, _p6 and _p6.get("match"))
+check("venmo: recently paid orders are offered in the picker", any(o["id"]==_vo3["id"] for o in _bx.get("paidOrders",[])), [o["id"] for o in _bx.get("paidOrders",[])])
+_s,_b=req("/api/admin/venmo", {"action":"confirm_strong"})
+check("venmo: 'mark all sure' leaves already-paid links for a person", _s==200 and vpay("vt_4666666666666666666")["state"]=="new", (_s,_b))
+_s,_x=req("/api/admin/venmo", {"action":"confirm","paymentId":"vt_4666666666666666666","orderId":_vo3["id"]})
+_o3=order_of(_vo3["id"]); _p6=vpay("vt_4666666666666666666")
+check("venmo: linking to an already-paid order changes nothing on the order", _s==200 and _x.get("linked") is True and _o3["status"]=="paid" and _o3.get("paidAt")==_paid_at and _p6["state"]=="confirmed" and _p6.get("linked") is True, (_s,_x,_o3.get("status")))
+check("venmo: a linked order isn't offered again", not any(o["id"]==_vo3["id"] for o in vbox().get("paidOrders",[])), None)
+_ol={o["id"]:o for o in req("/api/admin/orders")[1]["orders"]}
+check("venmo: the orders list marks Venmo-verified orders (confirmed or linked)", (_ol[_vo3["id"]].get("venmo") or {}).get("payer")=="Lee Late" and abs((_ol[_vo["id"]].get("venmo") or {}).get("amount",0)-_vo["total"])<0.005 and not _ol[_vo2["id"]].get("venmo") is None, (_ol[_vo3["id"]].get("venmo"), _ol[_vo["id"]].get("venmo"), _vo["total"], _ol[_vo2["id"]].get("venmo"), _ol[_vo2["id"]]["status"]))
+# Paid by hand, then set back to Pending by hand (keeps its old paidAt) → matches as unpaid
+_s,_r=buy(1,"10.92.0.4",email="pat.back@example.com")
+_vo4=order_of(_r["orderId"]); _ref4=_vo4["id"][-6:].upper()
+req("/api/admin/orders", {"id":_vo4["id"],"status":"paid"}, method="PATCH")
+req("/api/admin/orders", {"id":_vo4["id"],"status":"pending"}, method="PATCH")
+vsign("v7", payer="Pat Back", amount=_vo4["total"], note=f"#{_ref4}", txn="4777777777777777777")
+vin("v7")
+_p7=vpay("vt_4777777777777777777")
+check("venmo: an order set back to Pending is matched as unpaid", _p7 and _p7["match"]["orderId"]==_vo4["id"] and not _p7["match"].get("alreadyPaid") and any(o["id"]==_vo4["id"] for o in vbox()["orders"]), _p7 and _p7.get("match"))
+_s,_x=req("/api/admin/venmo", {"action":"confirm","paymentId":"vt_4777777777777777777","orderId":_vo4["id"]})
+check("venmo: …and confirming it marks it paid", _s==200 and order_of(_vo4["id"])["status"]=="paid" and not _x.get("linked"), (_s,_x))
 
 # ---------------- Concierge voice (mic + read aloud through the Gateway)
 def speech():

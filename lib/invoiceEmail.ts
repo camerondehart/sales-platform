@@ -135,7 +135,7 @@ export function buildInvoiceEmail(order: Order, payLink: string, note?: string |
             <p style="margin: 0.5rem 0 0; line-height: 1.6; font-size: 0.92rem;">${paymentInstructionsHtml(order.userName, order.id.slice(-6).toUpperCase())}</p>
             ${VENMO_HANDLE ? `<div style="text-align: center; margin-top: 0.9rem;">
               <a href="${hrefSafe(venmoLink(order.total, order.userName, order.id.slice(-6).toUpperCase()))}" style="display: inline-block; background: #008CFF; color: white; padding: 0.75rem 1.5rem; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 0.85rem;">Pay $${order.total.toFixed(2)} with Venmo</a>
-              <p style="font-size: 0.72rem; color: #81858b; margin: 0.5rem 0 0;">Opens Venmo with the amount and memo filled in. This does <strong>not</strong> notify us on its own.</p>
+              <p style="font-size: 0.72rem; color: #81858b; margin: 0.5rem 0 0;">Opens Venmo with the amount and note filled in. <strong>Please don&rsquo;t change the Venmo note</strong>: we use it to match your payment to your order. This does <strong>not</strong> notify us on its own.</p>
             </div>` : ""}
           </div>
 

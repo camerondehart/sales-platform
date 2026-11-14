@@ -19,6 +19,8 @@ export type Match = {
   candidates: string[];
   why: string;
   amountDiffers?: boolean;
+  /** The order was already marked paid (by hand): linking it changes nothing on the order. */
+  alreadyPaid?: boolean;
 };
 
 export const refOf = (orderId: string) => orderId.slice(-6).toUpperCase();
@@ -44,6 +46,9 @@ export function namesMatch(venmoName: string, customerName: string): boolean {
   if (a.length > 1 && b.length > 1) {
     if (al === bl && (af === bf || af[0] === bf[0])) return true; // "Sam Lee" ~ "Samantha Lee"
     if (lev(a.join(""), b.join("")) <= 2 && a.join("").length >= 6) return true; // typo
+    // Double-barrelled surname: "Jess Miley-Rhoades" ~ "Jess Rhoades"
+    const surname = (x: string, y: string) => y.length >= 4 && x !== y && (x.endsWith(y) || x.startsWith(y));
+    if (af === bf && (surname(al, bl) || surname(bl, al))) return true;
   }
   return false;
 }

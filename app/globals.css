@@ -2367,6 +2367,10 @@ input[type="checkbox"], input[type="radio"] {
   white-space: nowrap;
 }
 .status-pill.status-pending { background: var(--yellow); }
+/* Verified Venmo payment linked to the order */
+.venmo-check { display: inline-flex; align-items: center; gap: 0.35rem; font-family: var(--font-sans); font-size: 0.72rem; font-weight: 700; color: var(--green-deep, #4f7d1f); white-space: nowrap; }
+.venmo-check > span[aria-hidden] { display: inline-flex; align-items: center; justify-content: center; width: 1.05rem; height: 1.05rem; border-radius: 50%; background: #3d95ce; color: #fff; font-size: 0.68rem; line-height: 1; }
+.venmo-check-label { letter-spacing: 0.04em; color: var(--ink-soft); font-weight: 600; }
 .status-pill.status-paid { background: var(--mint); }
 .status-pill.status-shipped { background: var(--green); }
 .status-pill.status-completed { background: var(--green); }
@@ -8169,6 +8173,7 @@ html[data-admin-theme="dark"] .store-pin span { border-color: var(--surface); }
 .vi-pay, .vi-order { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; font-size: 0.92rem; }
 .vi-pay small, .vi-order small { color: var(--ink-soft); font-size: 0.76rem; }
 .vi-note { font-style: italic; overflow-wrap: anywhere; }
+.vi-guess { color: var(--yellow-deep, #a2a434); font-weight: 600; }
 .vi-arrow { color: var(--ink-soft); }
 .vi-order select { max-width: 100%; font: inherit; padding: 0.45rem; border: 1px solid var(--rule); border-radius: 6px; background: var(--white, #fff); color: var(--ink); }
 .vi-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
@@ -8192,7 +8197,7 @@ html[data-admin-theme="dark"] .vi-row { background: var(--surface); }
 html[data-admin-theme="dark"] .vi-row.is-quarantined { background: rgba(200, 80, 60, 0.1); }
 html[data-admin-theme="dark"] .vi-warn { background: rgba(214, 216, 106, 0.08); }
 
-/* Pay page: "Put #REF in your Venmo note" */
+/* Pay page: "Please don't change the Venmo note" (#REF) */
 .pay-ref { margin: 0.7rem 0 0.2rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.9rem; }
 .pay-ref-copy { padding: 0.25rem 0.7rem; border: 1px solid var(--rule); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 0.78rem; cursor: pointer; }
 .store-carries { margin-top: 0.55rem; font-size: 0.88rem; }

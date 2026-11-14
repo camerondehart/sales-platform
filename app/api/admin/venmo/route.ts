@@ -14,11 +14,12 @@ const money = (n?: number) => (typeof n === "number" ? `$${n.toFixed(2)}` : "?")
 
 export async function GET() {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const { rows, orders, setup } = await inbox();
+  const { rows, orders, paidOrders, setup } = await inbox();
   return NextResponse.json(
     {
       payments: rows.map(({ text: _t, ...r }) => r),
       orders: orders.map((o) => ({ id: o.id, ref: refOf(o.id), name: o.userName, email: o.userEmail, total: o.total, createdAt: o.createdAt, expired: !!o.expiredAt })),
+      paidOrders: paidOrders.map((o) => ({ id: o.id, ref: refOf(o.id), name: o.userName, email: o.userEmail, total: o.total, createdAt: o.createdAt, expired: false, paid: true })),
       setup,
       accountEmailSet: !!process.env.VENMO_ACCOUNT_EMAIL?.trim(),
     },
@@ -33,13 +34,20 @@ async function confirmOne(paymentId: string, orderId: string, by: string) {
   if (!p.verified) return { ok: false as const, status: 400, error: "Quarantined payments can't be matched." };
   const o = await getOrderById(orderId);
   if (!o) return { ok: false as const, status: 404, error: "That order no longer exists." };
-  if (normalizeStatus(o.status) !== "pending" || o.paidAt) return { ok: false as const, status: 409, error: `Order ${refOf(o.id)} is already ${normalizeStatus(o.status)}.` };
+  const status = normalizeStatus(o.status);
+  if (status === "paid" || status === "completed") {
+    // Already marked paid by hand: link the payment to it, change nothing on the order.
+    const linked = await decide(paymentId, { state: "confirmed", orderId, linked: true }, by);
+    if (!linked.ok) return { ok: false as const, status: 409, error: linked.error };
+    return { ok: true as const, order: o, payment: linked.payment, before: { status: o.status, total: o.total }, linked: true };
+  }
+  if (status !== "pending") return { ok: false as const, status: 409, error: `Order ${refOf(o.id)} is already ${status}.` };
   const claimed = await decide(paymentId, { state: "confirmed", orderId }, by);
   if (!claimed.ok) return { ok: false as const, status: 409, error: claimed.error };
   const updated = await updateOrder(orderId, { status: "paid", paidAt: Date.now() });
   // Paid isn't completed: points come when the order is completed.
   if (updated) await syncOrderPoints(updated).catch((err) => console.error("[venmo] points", err));
-  return { ok: true as const, order: updated, payment: claimed.payment, before: { status: o.status, total: o.total } };
+  return { ok: true as const, order: updated, payment: claimed.payment, before: { status: o.status, total: o.total }, linked: false };
 }
 
 async function POST_handler(req: Request) {
@@ -54,20 +62,20 @@ async function POST_handler(req: Request) {
     const r = await confirmOne(paymentId, orderId, by);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
     auditDetail({
-      action: "venmo.confirm",
+      action: r.linked ? "venmo.link" : "venmo.confirm",
       targetId: orderId,
       before: r.before,
-      after: { status: "paid", venmo: { id: paymentId, payer: r.payment.payer, amount: r.payment.amount, note: r.payment.note } },
-      note: `Venmo ${money(r.payment.amount)} from ${r.payment.payer} → order ${refOf(orderId)}`,
+      after: { status: r.linked ? r.before.status : "paid", venmo: { id: paymentId, payer: r.payment.payer, amount: r.payment.amount, note: r.payment.note } },
+      note: `Venmo ${money(r.payment.amount)} from ${r.payment.payer} → order ${refOf(orderId)}${r.linked ? " (already paid: linked only)" : ""}`,
     });
-    return NextResponse.json({ ok: true, order: r.order });
+    return NextResponse.json({ ok: true, order: r.order, linked: r.linked });
   }
 
-  // Bulk: strong matches only (#ref in the note AND the amount matches).
+  // Bulk: strong matches only (#ref in the note AND the amount matches), never best guesses.
   if (body.action === "confirm_strong") {
     const want = Array.isArray(body.paymentIds) ? new Set(body.paymentIds.map(String)) : null;
     const { rows } = await inbox();
-    const strong = rows.filter((r) => r.match?.strength === "strong" && !r.match.amountDiffers && r.match.orderId && (!want || want.has(r.id)));
+    const strong = rows.filter((r) => r.verified && !r.guessed && !r.match?.alreadyPaid && r.match?.strength === "strong" && !r.match.amountDiffers && r.match.orderId && (!want || want.has(r.id)));
     const done: Array<{ paymentId: string; orderId: string; ref: string; amount?: number; payer?: string }> = [];
     const skipped: Array<{ paymentId: string; error: string }> = [];
     for (const r of strong) {

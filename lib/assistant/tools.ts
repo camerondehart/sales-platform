@@ -1490,6 +1490,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           amount: r.amount,
           note: r.note,
           status: !r.verified ? `quarantined: ${r.reason}` : r.state,
+          ...(r.guessed ? { best_guess: "Unfamiliar email layout: payer/amount/note are a best guess. Say so, and ask staff to check before confirming." } : {}),
           match: r.match ? { strength: r.match.strength, order_id: r.match.orderId, why: r.match.why, candidates: r.match.candidates.slice(0, 5) } : undefined,
           confirmed_order: r.orderId,
         })),
@@ -1506,7 +1507,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       if (p.state !== "new") return { note: `That payment is already ${p.state}.` };
       const o = (await cachedOrders(true)).find((x) => x.id === oid);
       if (!o) return { error: "No order with that id. Use find_orders first." };
-      if (normalizeStatus(o.status) !== "pending" || o.paidAt) return { note: `Order ${orderRef(o)} is already ${normalizeStatus(o.status)}.` };
+      if (normalizeStatus(o.status) !== "pending") return { note: `Order ${orderRef(o)} is already ${normalizeStatus(o.status)}.` };
       const strength = p.match?.orderId === o.id ? p.match.strength : "picked by hand";
       const differs = typeof p.amount === "number" && Math.abs(p.amount - o.total) >= 0.005;
       ctx.actions.push({
