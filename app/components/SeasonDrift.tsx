@@ -10,8 +10,10 @@ import type { CSSProperties } from "react";
  * (CSS). Seasonal site backgrounds: lib/seasonLooks.ts.
  */
 const GLYPH: Record<string, string> = { heart: "♥", shamrock: "☘", star: "★" };
+/** Mixed leaves (fall, Thanksgiving): maple, oak and the plain leaf in turn. */
+const LEAF_SHAPES = [" s-maple", "", " s-oak"];
 
-export default function SeasonDrift({ kind, colors, count }: { kind: string; colors: string[]; count: number }) {
+export default function SeasonDrift({ kind, colors, count, mixed }: { kind: string; colors: string[]; count: number; mixed?: boolean }) {
   const path = usePathname() || "";
   if (path.startsWith("/admin") || path.startsWith("/help")) return null;
   return (
@@ -19,7 +21,7 @@ export default function SeasonDrift({ kind, colors, count }: { kind: string; col
       {Array.from({ length: count }).map((_, i) => (
         <span
           key={i}
-          className="season-drop"
+          className={`season-drop${mixed && kind === "leaf" ? LEAF_SHAPES[i % 3] : ""}`}
           style={
             {
               left: `${(i * 37 + 5) % 100}%`,

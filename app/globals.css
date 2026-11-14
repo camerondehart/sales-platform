@@ -4930,6 +4930,40 @@ img, svg, video, table { max-width: 100%; }
   .admin-shell { margin-left: 196px; padding: 1.8rem 1.5rem 5rem; }
 }
 
+/* ---------- Unfolded iPhone Duo (and tablets in portrait): 600–1099px ----------
+   The single scrolling tab row hid Marketing → Settings off the right edge.
+   Here every tab shows at once, five to a row. */
+@media (min-width: 600px) and (max-width: 1099px) {
+  .admin-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.2rem 0.3rem;
+    overflow: visible;
+    padding-bottom: 0.2rem;
+  }
+  .admin-tab {
+    justify-content: center;
+    min-width: 0;
+    padding: 0.55rem 0.4rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    border-radius: 8px;
+  }
+  .admin-tab.active::after { bottom: 0; }
+}
+/* Unfolded and held sideways the screen is short: let the tabs scroll away
+   with the page so the sticky header + two tab rows don't eat the view. */
+@media (min-width: 600px) and (max-width: 1099px) and (max-height: 700px) {
+  .admin-tabs { position: static; scroll-margin-top: 6rem; }
+}
+/* Phones, and the Duo folded or unfolded upright: the header already sticks to
+   the top and covers the tab bar, whose labels showed through it as a faint
+   ghost while scrolling. The tabs scroll away with the page instead, and
+   "jump to a tab" stops just under the header. */
+@media (max-width: 700px) {
+  .admin-tabs { position: static; scroll-margin-top: 9.5rem; }
+}
+
 /* ---------- Any touch device: finger-sized controls ---------- */
 @media (pointer: coarse) {
   /* iOS zooms the whole page when focusing a field under 16px. */
@@ -8966,6 +9000,10 @@ body[data-season] .scene-sky, body[data-season] .scene-ridge, body[data-season] 
 .season-drift { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 .season-drop { position: absolute; top: -6vh; width: var(--sz); height: calc(var(--sz) * 0.65); opacity: var(--op); will-change: transform; animation: season-fall 18s linear infinite; }
 .season-drift.k-leaf .season-drop { border-radius: 0 100% 0 100%; }
+/* Fall + Thanksgiving mix in maple and oak leaves (SeasonDrift mixed); a square box so the shape reads. */
+.season-drift.k-leaf .season-drop.s-maple, .season-drift.k-leaf .season-drop.s-oak { width: calc(var(--sz) * 1.3); height: calc(var(--sz) * 1.3); border-radius: 0; -webkit-mask: var(--leaf) center / contain no-repeat; mask: var(--leaf) center / contain no-repeat; }
+.season-drop.s-maple { --leaf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1l1.3 3.5 1.9-.9-.6 5 2.6-2.2.8 1.5 3.6-.7-1.1 3.2 2.1 1.2-4.6 3.6.7 1.8-5.3-.7-.8.3V23h-1.2v-6.4l-.8-.3-5.3.7.7-1.8-4.6-3.6 2.1-1.2-1.1-3.2 3.6.7.8-1.5 2.6 2.2-.6-5 1.9.9z'/%3E%3C/svg%3E"); }
+.season-drop.s-oak { --leaf: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1C13.6 1 14.6 2.6 14 4.2C15.8 3.6 17.4 5 16.6 6.8L14 8.2C16.4 7.6 18.6 9 17.8 11C17.2 12.4 15.6 12.4 14.4 12C16.6 12.4 18 14.4 16.8 16C15.8 17.2 14 16.8 13 16L12.6 18V23H11.4V18L11 16C10 16.8 8.2 17.2 7.2 16C6 14.4 7.4 12.4 9.6 12C8.4 12.4 6.8 12.4 6.2 11C5.4 9 7.6 7.6 10 8.2L7.4 6.8C6.6 5 8.2 3.6 10 4.2C9.4 2.6 10.4 1 12 1z'/%3E%3C/svg%3E"); }
 .season-drift.k-petal .season-drop { border-radius: 100% 0 100% 0; height: calc(var(--sz) * 0.8); }
 .season-drift.k-snow .season-drop { height: var(--sz); border-radius: 50%; opacity: calc(var(--op) + 0.35); box-shadow: 0 0 0 1px rgba(150, 178, 204, 0.35), 0 0 5px rgba(120, 150, 180, 0.55); }
 .season-drift.k-confetti .season-drop { width: calc(var(--sz) * 0.5); height: var(--sz); border-radius: 2px; }
@@ -9091,6 +9129,10 @@ body:has(.admin-shell) .site-foot-made { margin-top: 0.1rem; opacity: 0.8; }
 @media (min-width: 1100px) { body:has(.admin-shell) .site-foot { margin-left: 232px; } }
 @media (min-width: 1100px) and (max-width: 1280px) { body:has(.admin-shell) .site-foot { margin-left: 196px; } }
 @media (max-width: 640px) { body:has(.admin-shell) .site-foot { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); } }
+/* iPhone Safari's text autosizing blew the "Site made with ♥ in …" line up on wide screens (the
+   unfolded Duo). It skips flex boxes, which is why the links next to it were fine, so lay this
+   line out the same way. The gap stands in for the spaces either side of the heart. */
+.site-foot-made { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 0 0.28em; }
 /* Footer text a touch heavier so it reads more easily. The site fonts have no
    in-between weight, so a hairline stroke in the text colour gives the slight lift; size, colours
    and spacing are unchanged. */

@@ -38,7 +38,7 @@ export const SITE_LOOKS: Partial<Record<EntranceKey, SiteLook>> = {
     tree: "70, 110, 70", tree2: "214, 118, 48",
     sky: ["#fbf8f3", "#f8f0e3", "#f3e6d1", "#eddcc0"], sun: "250, 210, 150", ridge: "196, 118, 60", meadow: "168, 140, 72",
     caps: ["#c2452f", "#d98a3a", "#e0b04a"], glow: ["224, 122, 46", "194, 69, 47"],
-    drift: { kind: "leaf", colors: ["#e07a2e", "#c2452f", "#e6a53a", "#a8552a"], count: 18 },
+    drift: { kind: "leaf", colors: ["#e07a2e", "#c2452f", "#e6a53a", "#a8552a"], count: 18, mixed: true },
   },
   winter: {
     tree: "58, 118, 132", tree2: "150, 196, 230",
@@ -86,7 +86,7 @@ export const SITE_LOOKS: Partial<Record<EntranceKey, SiteLook>> = {
     tree: "76, 104, 64", tree2: "200, 112, 46",
     sky: ["#fbf8f2", "#f8efe0", "#f3e5cc", "#ecdabb"], sun: "250, 214, 150", ridge: "184, 112, 46", meadow: "176, 150, 76",
     caps: ["#b8702e", "#e07a2e", "#f2c14e"], glow: ["217, 138, 58", "184, 112, 46"],
-    drift: { kind: "leaf", colors: ["#d98a3a", "#b8702e", "#f2c14e", "#8f3f26"], count: 16 },
+    drift: { kind: "leaf", colors: ["#d98a3a", "#b8702e", "#f2c14e", "#8f3f26"], count: 16, mixed: true },
   },
   holiday: {
     tree: "40, 100, 70", tree2: "40, 100, 70",

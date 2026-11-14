@@ -13,7 +13,7 @@ export const ENTRANCE_KEYS = ["classic", "spring", "summer", "fall", "winter", "
 export type EntranceKey = (typeof ENTRANCE_KEYS)[number];
 export type EntranceChoice = EntranceKey | "auto";
 
-export type Falling = { kind: "leaf" | "snow" | "petal" | "heart" | "confetti" | "shamrock" | "star"; colors: string[]; count: number };
+export type Falling = { kind: "leaf" | "snow" | "petal" | "heart" | "confetti" | "shamrock" | "star"; colors: string[]; count: number; /** Leaves only: a mix of maple, oak and plain leaves (site background). */ mixed?: boolean };
 export type Ground = "shrooms" | "pumpkins" | "jacks" | "flowers" | "sunflowers" | "gifts" | "candies";
 
 export type EntranceTheme = {
