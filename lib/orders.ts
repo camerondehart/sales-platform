@@ -9,6 +9,7 @@
 // A legacy orders.json (if present) is still read and merged for backward
 // compatibility; any update to a legacy order migrates it to its own file.
 
+import { fetchAllJson } from "./fetchAll";
 import { promises as fs } from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -174,17 +175,9 @@ async function blobReadAll(): Promise<Order[]> {
     cursor = page.hasMore ? page.cursor : undefined;
   } while (cursor);
 
-  const results = await Promise.all(
-    files.map(async (f) => {
-      try {
-        const res = await fetch(bust(f.url), { cache: "no-store" });
-        if (!res.ok) return null;
-        return (await res.json()) as Order;
-      } catch {
-        return null;
-      }
-    })
-  );
+  // A few at a time, with retries, and an error instead of a partial list:
+  // skipping files that failed once gave the nightly report $0 for 30 days.
+  const results = await fetchAllJson<Order>(files, { url: bust, what: "order" });
   const orders = results.filter((o): o is Order => !!o && !!o.id).map(newest);
 
   // Merge legacy single-file orders that haven't been migrated yet.

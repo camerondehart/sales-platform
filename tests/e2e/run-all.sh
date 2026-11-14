@@ -49,6 +49,8 @@ echo "Suspicious activity signals (unit): $(node "$REPO/tests/unit/suspicion.cjs
 node "$REPO/tests/unit/suspicion.cjs" >/dev/null 2>&1 || { echo "Suspicious activity unit check failed"; exit 1; }
 echo "Safe storage on Blob (unit): $(node "$REPO/tests/unit/versioned-blob.cjs" 2>/dev/null | tail -1)"
 node "$REPO/tests/unit/versioned-blob.cjs" >/dev/null 2>&1 || { echo "Safe storage unit check failed"; exit 1; }
+echo "Order files never skipped (unit): $(node "$REPO/tests/unit/fetch-all.cjs" | tail -1)"
+node "$REPO/tests/unit/fetch-all.cjs" >/dev/null 2>&1 || { echo "Order file loading unit check failed"; exit 1; }
 echo "Building…"
 (cd /tmp/final && npx next build >/tmp/harness/build.log 2>&1) || { echo "Build failed — see /tmp/harness/build.log"; exit 1; }
 set +e
