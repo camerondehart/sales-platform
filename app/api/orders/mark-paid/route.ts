@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { tooMany } from "@/lib/publicLimits";
 import { Resend } from "resend";
 import { getOrderByToken, updateOrder, isCompleted } from "@/lib/orders";
-import { awardLoyaltyPoints } from "@/lib/loyalty";
+import { syncOrderPoints } from "@/lib/loyalty";
 import { escapeHtml } from "@/lib/invoiceEmail";
 
 export async function GET(req: Request) {
@@ -62,13 +62,15 @@ export async function POST(req: Request) {
 
   const now = Date.now();
   const nextStatus = isCashPickup ? "completed" : "paid";
-  await updateOrder(
+  const updated = await updateOrder(
     order.id,
     isCashPickup
       ? { status: "completed", pickedUpAt: now, paidAt: now }
       : { status: "paid", paidAt: now }
   );
-  await awardLoyaltyPoints(order);
+  // The customer saying "I've paid" earns nothing: points come once the order
+  // is completed (a cash pickup they confirm lands on completed).
+  if (updated) await syncOrderPoints(updated).catch((err) => console.error("[mark-paid] points", err));
 
   // Notify the admin — best-effort.
   const apiKey = process.env.RESEND_API_KEY;

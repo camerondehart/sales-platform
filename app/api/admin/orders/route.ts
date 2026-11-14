@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { getOrders, getOrderById, updateOrder, type OrderStatus } from "@/lib/orders";
 
-import { awardLoyaltyPoints } from "@/lib/loyalty";
+import { syncOrderPoints } from "@/lib/loyalty";
 import { audited, auditDetail } from "@/lib/audit";
 import { returnStock, takeStock } from "@/lib/stock";
 
@@ -78,9 +78,16 @@ async function PATCH_handler(req: Request) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
-  // Award loyalty points the first time an order is settled
-  if (nextStatus === "paid" || nextStatus === "completed") {
-    await awardLoyaltyPoints(order);
+  // Loyalty points follow the order (lib/loyalty.ts): completed = its product
+  // dollars in points, anything else = none; cancelling also returns points
+  // spent on it, and setting it back from cancelled spends them again.
+  try {
+    const moved = await syncOrderPoints(order);
+    if (moved.earned || moved.takenBack || moved.returned || moved.respent) {
+      auditDetail({ after: { status: nextStatus, ...(stockMoved ? { stock: stockMoved, units: existing!.stockTaken } : {}), points: moved } });
+    }
+  } catch (err) {
+    console.error("[orders] couldn't update loyalty points", err);
   }
 
   return NextResponse.json({ ok: true, order });

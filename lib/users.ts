@@ -23,7 +23,7 @@ export type User = {
   // -----------------------------------
   // ---------- loyalty ----------
   loyaltyPoints?: number;
-  pointsHistory?: Array<{ amount: number; reason: string; date: number; orderId?: string }>;
+  pointsHistory?: Array<{ amount: number; reason: string; date: number; orderId?: string; kind?: "earn" | "earn_back" | "redeem" | "redeem_back" }>;
   // -----------------------------------
   createdAt: number;
   approvedAt?: number;

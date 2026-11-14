@@ -65,6 +65,8 @@ export type Order = {
   // Loyalty
   loyaltyPointsRedeemed?: number;
   loyaltyPointsEarned?: number;
+  /** Points taken back when the order was cancelled (cleared if it's set back to paid). */
+  loyaltyPointsTakenBack?: number;
   paymentToken: string; // random token for the public mark-paid link
   paidAt?: number;
   shippedAt?: number;

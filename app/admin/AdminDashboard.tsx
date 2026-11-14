@@ -39,6 +39,7 @@ import StockCounts from "./StockCounts";
 import VenmoInbox from "./VenmoInbox";
 import VoiceSettings from "./VoiceSettings";
 import AmbassadorsPanel from "./AmbassadorsPanel";
+import PointsCheckPanel from "./PointsCheckPanel";
 import { backorders } from "@/lib/stockMath";
 import EventOfferPicker from "./EventOfferPicker";
 import StaffPhraseCard from "./StaffPhraseCard";
@@ -4099,6 +4100,7 @@ We just finished a new run and wanted you to hear it first.
             {stMsg && <span style={{ marginLeft: "1rem", fontStyle: "italic", color: "var(--ink-soft)" }}>{stMsg}</span>}
           </div>
         </form>
+        <div className="admin-form"><PointsCheckPanel /></div>
       </section>
             ) },
             { key: "flags", icon: "🎛️", title: "Feature switches", summary: "Turn features on or off without a redeploy.", render: () => <FlagsPanel fold={false} /> },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin, adminActor } from "@/lib/auth";
 import { getOrderById, updateOrder, normalizeStatus } from "@/lib/orders";
-import { awardLoyaltyPoints } from "@/lib/loyalty";
+import { syncOrderPoints } from "@/lib/loyalty";
 import { audited, auditDetail } from "@/lib/audit";
 import { decide, getPayment, inbox } from "@/lib/venmoInbox";
 import { refOf } from "@/lib/venmoMatch";
@@ -37,7 +37,8 @@ async function confirmOne(paymentId: string, orderId: string, by: string) {
   const claimed = await decide(paymentId, { state: "confirmed", orderId }, by);
   if (!claimed.ok) return { ok: false as const, status: 409, error: claimed.error };
   const updated = await updateOrder(orderId, { status: "paid", paidAt: Date.now() });
-  if (updated) await awardLoyaltyPoints(updated);
+  // Paid isn't completed: points come when the order is completed.
+  if (updated) await syncOrderPoints(updated).catch((err) => console.error("[venmo] points", err));
   return { ok: true as const, order: updated, payment: claimed.payment, before: { status: o.status, total: o.total } };
 }
 

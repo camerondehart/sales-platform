@@ -226,7 +226,7 @@ export async function POST(req: Request) {
   // Deduct redeemed points now that the order exists
   if (pointsRedeemed > 0) {
     try {
-      await adjustPoints(user.id, -pointsRedeemed, `Redeemed on order ${order.id.slice(-6).toUpperCase()}`, order.id);
+      await adjustPoints(user.id, -pointsRedeemed, `Redeemed on order ${order.id.slice(-6).toUpperCase()}`, order.id, "redeem");
     } catch (err) {
       console.error("Failed to deduct loyalty points", err);
     }
