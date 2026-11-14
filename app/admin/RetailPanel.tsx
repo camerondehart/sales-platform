@@ -288,7 +288,7 @@ function Accounts({ data, reload, say }: { data: Data; reload: () => Promise<voi
                 ))}
               </select>
             </div>
-            <div className="field"><label htmlFor="rt-contact">Main contact</label><input id="rt-contact" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} maxLength={120} /></div>
+            <div className="field"><label htmlFor="rt-contact">Main contact person</label><input id="rt-contact" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} maxLength={120} /></div>
             <div className="field"><label htmlFor="rt-phone">Phone</label><input id="rt-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={30} /></div>
             <div className="field full"><label htmlFor="rt-notes">Staff notes (the store never sees these)</label><textarea id="rt-notes" rows={2} value={form.staffNotes} onChange={(e) => setForm({ ...form, staffNotes: e.target.value })} /></div>
           </div>

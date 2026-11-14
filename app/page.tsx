@@ -19,6 +19,7 @@ export default async function Home() {
   // visitor who isn't a member has something to do rather than a dead end.
   const shopProducts = await applyStockFlag(await applyVideoFlag((await getProducts()).filter(isExternal)));
   const stores = await isEnabled("store_locator").catch(() => false);
+  const retailPortal = await isEnabled("retail_portal").catch(() => false);
 
   return (
     <>
@@ -35,6 +36,17 @@ export default async function Home() {
             <circle cx="12" cy="15.3" r="1.2" />
           </svg>
         </a>
+        {/* Store portal sign-in for shops that carry our products, in the other corner. */}
+        {retailPortal && (
+          <a href="/store-portal" className="home-store-link" aria-label="Store portal sign-in" title="Store portal sign-in">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 9.5 5.5 4.5h13L20 9.5" />
+              <path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0" />
+              <path d="M5.5 12v8h13v-8" />
+              <path d="M10 20v-4.5h4V20" />
+            </svg>
+          </a>
+        )}
         <div className="gate-kicker">Member Access</div>
         <h1 className="gate-title">{brand.members}</h1>
         <div className="gate-ornament" aria-hidden="true">

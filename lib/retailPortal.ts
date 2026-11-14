@@ -3,7 +3,7 @@ import { getProducts, isExternal } from "./storage";
 import { getStores, addressLine, type StoreLocation } from "./stores";
 import { pacificDay, pacificDateTime } from "./periods";
 import { createRequest, requestsFor, shippedTracking, storeView, STATUS_LABEL, type RequestItem, type RetailAccount, type RetailLogin, type StockRequest } from "./retail";
-import { isEnabled } from "./flags";
+import { isEnabled, applyVideoFlag } from "./flags";
 
 /**
  * What the store portal shows and does, shared by its own pages/routes and
@@ -11,14 +11,19 @@ import { isEnabled } from "./flags";
  * both always agree. No prices anywhere (2026-11-10).
  */
 
-export type PortalProduct = { id: string; name: string; image: string; category?: string };
+export type PortalProduct = { id: string; name: string; image: string; category?: string; description?: string; video?: string };
 
 /** Products a store can ask for: the public shop's single products (no bundles). */
 export async function portalProducts(): Promise<PortalProduct[]> {
-  return (await getProducts())
-    .filter(isExternal)
-    .filter((p) => !p.isBundle)
-    .map((p) => ({ id: p.id, name: p.name, image: p.image, ...(p.category ? { category: p.category } : {}) }));
+  // Description and video (when Product videos is on) for the product window; still no prices.
+  return (await applyVideoFlag((await getProducts()).filter(isExternal).filter((p) => !p.isBundle))).map((p) => ({
+    id: p.id,
+    name: p.name,
+    image: p.image,
+    ...(p.category ? { category: p.category } : {}),
+    ...(p.description ? { description: p.description } : {}),
+    ...(p.video ? { video: p.video } : {}),
+  }));
 }
 
 export const monthOf = (t: number) => pacificDay(t).slice(0, 7);

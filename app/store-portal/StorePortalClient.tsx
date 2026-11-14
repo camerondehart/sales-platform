@@ -5,6 +5,10 @@ import { browserSupportsWebAuthn, startAuthentication, startRegistration } from 
 import AssistantWidget from "@/app/components/assistant/AssistantWidget";
 import { EVT_ADMIN_REFRESH, EVT_OPEN } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
+import FormattedDescription from "@/app/components/FormattedDescription";
+import ProductVideo from "@/app/components/ProductVideo";
+import { unlockName } from "@/lib/unlockName";
+import { FaceIdIcon } from "@/app/components/MemberFaceId";
 
 /**
  * Store portal screens (app/store-portal/page.tsx). Server routes:
@@ -38,6 +42,9 @@ export function StoreSignIn({ codesOn, faceOn, startOn }: { codesOn: boolean; fa
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [canFace, setCanFace] = useState(false);
+  // Face ID on iPhone/iPad, Touch ID on a Mac, and so on (same as the member and staff sign-in).
+  const [unlock, setUnlock] = useState("Face ID");
+  useEffect(() => setUnlock(unlockName()), []);
   useEffect(() => {
     setCanFace(faceOn && browserSupportsWebAuthn());
   }, [faceOn]);
@@ -109,6 +116,16 @@ export function StoreSignIn({ codesOn, faceOn, startOn }: { codesOn: boolean; fa
           </button>
         </div>
       )}
+      {/* Same look as the member and staff sign-in: the green Face ID / Touch ID button first. */}
+      {canFace && view !== "link" && (
+        <>
+          <button type="button" className="gate-button auth-faceid" onClick={faceId} disabled={busy}>
+            <FaceIdIcon unlock={unlock} />
+            {busy ? "Checking…" : `Sign in with ${unlock}`}
+          </button>
+          <div className="auth-or"><span>or with your email</span></div>
+        </>
+      )}
       <form onSubmit={submit} className="wel-form auth-form">
         <input type="email" className="gate-input" placeholder="Store login email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
         {view === "password" && (
@@ -120,20 +137,12 @@ export function StoreSignIn({ codesOn, faceOn, startOn }: { codesOn: boolean; fa
         {view === "code" && codeSent && (
           <input inputMode="numeric" className="gate-input" placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} autoComplete="one-time-code" required style={{ marginTop: "0.55rem" }} />
         )}
-        <button type="submit" className="gate-button" disabled={busy}>
+        <button type="submit" className={`gate-button${canFace && view !== "link" ? " auth-secondary" : ""}`} disabled={busy}>
           {busy ? "One moment…" : view === "password" ? "Sign in" : view === "code" ? (codeSent ? "Sign in" : "Email me a code") : "Email me a link"}
         </button>
         {error && <div className="gate-error">{error}</div>}
         {msg && <div className="gate-success" style={{ marginTop: "0.8rem", fontSize: "0.9rem" }}>{msg}</div>}
       </form>
-      {canFace && view !== "link" && (
-        <>
-          <div className="auth-or">or</div>
-          <button type="button" className="gate-button auth-secondary auth-faceid" onClick={faceId} disabled={busy}>
-            Sign in with Face ID / Touch ID
-          </button>
-        </>
-      )}
       <div className="auth-links" style={{ justifyContent: "center" }}>
         {view === "link" ? (
           <button type="button" className="auth-link" onClick={() => reset("password")}>Back to sign in</button>
@@ -184,7 +193,7 @@ type Data = {
   me: { name: string; email: string };
   account: { id: string; name: string; contactName?: string; phone?: string; logins: Array<{ id: string; name: string; email: string; active: boolean }> };
   location: { name: string; address: string; phone?: string; website?: string; hours?: string; onMap: boolean } | null;
-  products: Array<{ id: string; name: string; image: string; category?: string }>;
+  products: Array<{ id: string; name: string; image: string; category?: string; description?: string; video?: string }>;
   requests: Req[];
   tracking: { totalUnits: number; shipments: number; lastShippedAt?: number; products: Array<{ productId: string; name: string; units: number; shipments: number; lastAt: number }>; months: Array<{ month: string; units: number }> };
 };
@@ -248,6 +257,14 @@ function RequestForm({ products, onSent }: { products: Data["products"]; onSent:
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  // The product window: tap a product's picture or name to look at it (no prices).
+  const [viewing, setViewing] = useState<Data["products"][number] | null>(null);
+  useEffect(() => {
+    if (!viewing) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setViewing(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewing]);
   const shown = useMemo(() => {
     const f = filter.trim().toLowerCase();
     return f ? products.filter((p) => p.name.toLowerCase().includes(f) || (p.category || "").toLowerCase().includes(f)) : products;
@@ -280,8 +297,10 @@ function RequestForm({ products, onSent }: { products: Data["products"]; onSent:
       <ul className="sp-products">
         {shown.map((p) => (
           <li key={p.id} className={(qty[p.id] || 0) > 0 ? "is-on" : ""}>
-            {p.image ? <img src={p.image} alt="" loading="lazy" /> : <span className="sp-noimg" aria-hidden="true" />}
-            <span className="sp-pname">{p.name}</span>
+            <button type="button" className="sp-pview" onClick={() => setViewing(p)} aria-label={`Look at ${p.name}`}>
+              {p.image ? <img src={p.image} alt="" loading="lazy" /> : <span className="sp-noimg" aria-hidden="true" />}
+              <span className="sp-pname">{p.name}</span>
+            </button>
             <span className="sp-qty">
               <button type="button" aria-label={`One less ${p.name}`} onClick={() => set(p.id, (qty[p.id] || 0) - 1)} disabled={!(qty[p.id] > 0)}>−</button>
               <input inputMode="numeric" aria-label={`Units of ${p.name}`} value={qty[p.id] ? String(qty[p.id]) : ""} placeholder="0" onChange={(e) => set(p.id, Number(e.target.value.replace(/\D/g, "")))} />
@@ -298,6 +317,34 @@ function RequestForm({ products, onSent }: { products: Data["products"]; onSent:
       </div>
       {error && <div className="gate-error">{error}</div>}
       {msg && <div className="gate-success sp-ok">{msg}</div>}
+      {viewing && (
+        <div className="modal-backdrop" onClick={() => setViewing(null)}>
+          <div className="modal sp-modal" role="dialog" aria-modal="true" aria-label={viewing.name} onClick={(e) => e.stopPropagation()} style={{ overflowX: "hidden" }}>
+            <button type="button" className="modal-close" onClick={() => setViewing(null)} aria-label="Close">×</button>
+            {viewing.image && (
+              <div className="modal-image">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={viewing.image} alt={viewing.name} />
+              </div>
+            )}
+            <div className="modal-body">
+              <ProductVideo url={viewing.video} title={viewing.name} />
+              <h2 className="modal-name">{viewing.name}</h2>
+              {viewing.category && <div className="card-category" style={{ marginTop: "0.5rem" }}>{viewing.category}</div>}
+              {viewing.description && <FormattedDescription text={viewing.description} />}
+              <div className="sp-modal-qty">
+                <span className="sp-muted">Units to request</span>
+                <span className="sp-qty">
+                  <button type="button" aria-label={`One less ${viewing.name} (product window)`} onClick={() => set(viewing.id, (qty[viewing.id] || 0) - 1)} disabled={!(qty[viewing.id] > 0)}>−</button>
+                  <input inputMode="numeric" aria-label={`Units of ${viewing.name} (product window)`} value={qty[viewing.id] ? String(qty[viewing.id]) : ""} placeholder="0" onChange={(e) => set(viewing.id, Number(e.target.value.replace(/\D/g, "")))} />
+                  <button type="button" aria-label={`One more ${viewing.name} (product window)`} onClick={() => set(viewing.id, (qty[viewing.id] || 0) + 1)}>+</button>
+                </span>
+              </div>
+              <button type="button" className="submit" onClick={() => setViewing(null)}>Done</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -451,6 +498,7 @@ function StoreDetails({ data }: { data: Data }) {
 function FaceIdDevices() {
   const [list, setList] = useState<Array<{ id: string; device: string; createdAt: number; lastUsedAt?: number }> | null>(null);
   const [supported, setSupported] = useState(false);
+  const [unlock, setUnlock] = useState("Face ID");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const load = useCallback(async () => {
@@ -460,6 +508,7 @@ function FaceIdDevices() {
   }, []);
   useEffect(() => {
     setSupported(browserSupportsWebAuthn());
+    setUnlock(unlockName());
     void load();
   }, [load]);
   if (!list) return null;
@@ -486,7 +535,7 @@ function FaceIdDevices() {
   }
   return (
     <section className="sp-card" aria-labelledby="sp-face">
-      <h2 id="sp-face" className="sp-h2">Face ID</h2>
+      <h2 id="sp-face" className="sp-h2">Face ID / Touch ID</h2>
       <p className="sp-muted">Sign in with one tap on your phone or computer. Your password and emailed codes keep working.</p>
       {list.length > 0 && (
         <ul className="sp-devices">
@@ -499,9 +548,9 @@ function FaceIdDevices() {
         </ul>
       )}
       {supported ? (
-        <button type="button" className="sp-btn sp-btn-ghost" onClick={add} disabled={busy}>{busy ? "One moment…" : "Add Face ID for this device"}</button>
+        <button type="button" className="sp-btn sp-btn-ghost" onClick={add} disabled={busy}>{busy ? "One moment…" : `Add ${unlock} for this device`}</button>
       ) : (
-        <p className="sp-muted">This browser can&apos;t use Face ID.</p>
+        <p className="sp-muted">This browser can&apos;t use Face ID or Touch ID.</p>
       )}
       {msg && <div className="sp-muted" style={{ marginTop: "0.6rem" }}>{msg}</div>}
     </section>

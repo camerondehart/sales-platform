@@ -15,7 +15,7 @@ import { getSubscribers } from "./subscribers";
 import { listCampaigns } from "./campaignSchedule";
 import { listBundles } from "./bundleStore";
 import { getSettings } from "./settings";
-import { managerSuggestions, type Suggestion } from "./siteManager";
+import { managerSuggestions, todayAsk, type Suggestion } from "./siteManager";
 import { marketingIdeas } from "./marketingIdeas";
 import { suggestions as venmoSuggestions } from "./venmoInbox";
 import { refOf } from "./venmoMatch";
@@ -172,7 +172,7 @@ export async function todaySuggestions(monthCap: number): Promise<{ manager: Sug
         task: `Review ${waiting.length} stock request${waiting.length === 1 ? "" : "s"} from stores (${units} units)`,
         why: "Sent from the store portal. Approve, ship or decline each one in the Retail tab; the store sees the status and your note.",
         items: waiting.slice(0, 8).map((r) => `${r.storeName} ${r.ref}: ${r.items.map((i) => `${i.name} × ${i.qty}`).join(", ").slice(0, 160)}`),
-        ask: "Which stores are waiting on stock requests and what did they ask for? Help me approve them.",
+        ask: todayAsk("retail-requests", "Which stores are waiting on stock requests and what did they ask for? Help me approve them."),
         targets: waiting.slice(0, 10).map((r) => ({ kind: "retail_request" as const, id: r.id, name: `${r.storeName} ${r.ref}`, detail: `${r.items.map((i) => `${i.name} × ${i.qty}`).join(", ")}${r.note ? `; store's note: ${r.note.slice(0, 120)}` : ""}` })),
         guide: "Summarise each target (store, products, units, note). Change nothing until staff decide. To approve or decline, call propose_retail_request_status with ref = the target id (one card each). For shipping, tell staff to use Mark shipped in the Retail tab, which asks whether to take the units off stock counts.",
         tab: "retail",

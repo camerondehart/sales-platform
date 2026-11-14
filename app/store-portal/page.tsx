@@ -24,7 +24,7 @@ export default async function StorePortalPage({ searchParams }: { searchParams: 
   ]);
   if (!on) {
     return (
-      <div className="pay-shell">
+      <div className="pay-shell sp-gate">
         <div className="pay-card fade-rise wel-card">
           <div className="pay-kicker">{brand.name} · Store portal</div>
           <h1 className="pay-title">The store portal is closed right now</h1>
@@ -40,7 +40,7 @@ export default async function StorePortalPage({ searchParams }: { searchParams: 
   if (t) {
     const check = await checkStoreSetupToken(t);
     return (
-      <div className="pay-shell">
+      <div className="pay-shell sp-gate">
         <div className="pay-card fade-rise wel-card">
           <div className="pay-kicker">{brand.name} · Store portal</div>
           {check.ok ? (
@@ -64,7 +64,7 @@ export default async function StorePortalPage({ searchParams }: { searchParams: 
   const session = await getStoreSession();
   if (!session) {
     return (
-      <div className="pay-shell">
+      <div className="pay-shell sp-gate">
         <div className="pay-card fade-rise wel-card">
           <div className="logo-mark" aria-hidden="true" style={{ margin: "0 auto 1rem" }}>
             <span></span><span></span><span></span><span></span>

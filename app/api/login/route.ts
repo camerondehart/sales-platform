@@ -12,6 +12,8 @@ import { checkRateLimit, checkSharedLimit, recordFailedAttempt, recordSharedFail
 import { auditSystem } from "@/lib/audit";
 import { isEnabled } from "@/lib/flags";
 import { matchesPhrase, oldPasswordStatus } from "@/lib/staffPhrase";
+import { canSignIn, verifyRetailPassword } from "@/lib/retail";
+import { startStoreSession } from "@/lib/retailAuth";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -78,7 +80,22 @@ export async function POST(req: Request) {
   // visitor login — verify user email + password + status
   if (!body.email) return fail("missing_email");
   const user = await verifyPassword(body.email, body.password);
-  if (!user) return fail("invalid");
+  if (!user) {
+    // A store login typed into the member sign-in (switch retail_portal): sign them
+    // into the store portal instead, with the store portal's own lockout counted too.
+    if (await isEnabled("retail_portal").catch(() => false)) {
+      const storeKey = `store:${emailForRateLimit}`;
+      if (!checkRateLimit(storeKey, ip).blocked) {
+        const hit = await verifyRetailPassword(emailForRateLimit.trim(), String(body.password || ""));
+        if (hit && canSignIn(hit)) {
+          await startStoreSession(hit.login, hit.account);
+          return NextResponse.json({ ok: true, name: hit.login.name, to: "/store-portal" });
+        }
+        recordFailedAttempt(storeKey, ip);
+      }
+    }
+    return fail("invalid");
+  }
 
   if (user.status === "pending") {
     return NextResponse.json({ error: "pending" }, { status: 403 });

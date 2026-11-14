@@ -245,6 +245,12 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId =
     });
 
     if (res.ok) {
+      const ok = await res.json().catch(() => ({}));
+      // A store login: straight to the store portal.
+      if (ok.to === "/store-portal") {
+        window.location.href = "/store-portal";
+        return;
+      }
       markSignedIn("password");
       router.push("/gallery");
       router.refresh();

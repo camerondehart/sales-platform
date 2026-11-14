@@ -66,6 +66,15 @@ s,r,h=req("/api/store-portal/auth", {"action":"password","email":"RAE@shop.examp
 check("password sign-in works (email any case)", s==200 and cookie_from(h), (s,r))
 s,r,_=req("/api/store-portal/auth", {"action":"password","email":"rae@shop.example","password":"wrong-pass-1"}, cookie=None, headers={"x-forwarded-for":"10.9.0.3"})
 check("wrong password refused", s==401, (s,r))
+# Store logins typed into the member sign-in go to the store portal (2026-11-11).
+s,r,h=req("/api/login", {"role":"visitor","email":"Rae@shop.example","password":"rae-strong-pass"}, cookie=None, headers={"x-forwarded-for":"10.9.0.4"})
+check("member sign-in with a store login: signs into the store portal", s==200 and r.get("to")=="/store-portal" and cookie_from(h) and not cookie_from(h, "gallery_visitor"), (s,r))
+s,r,h=req("/api/login", {"role":"visitor","email":"rae@shop.example","password":"wrong-pass-2"}, cookie=None, headers={"x-forwarded-for":"10.9.0.5"})
+check("member sign-in with a wrong store password: refused as usual", s==401 and not cookie_from(h), (s,r))
+s,html,_=req("/", cookie=None, raw=True)
+check("homepage: store portal sign-in icon in the other corner", 'class="home-store-link"' in html and 'href="/store-portal"' in html and 'class="home-staff-link"' in html, s)
+s,html,_=req("/store-portal", cookie=None, raw=True)
+check("store sign-in card sits above the falling leaves", "pay-shell sp-gate" in html, s)
 
 # ---- a store session is not a member or staff session (and vice versa)
 s,_,_=req("/api/admin/retail", cookie=RAE)
@@ -95,6 +104,7 @@ check("a store code never signs in to the members' site", s in (401,404), (s,r))
 # ---- portal data + requests
 s,d,_=req("/api/store-portal", cookie=RAE)
 check("portal data: store, products without prices, no staff notes", s==200 and d["account"]["name"]=="Maple Street Market" and any(p["id"]=="p_pub" for p in d["products"]) and not any(p["id"]=="p_mem" for p in d["products"]) and "price" not in json.dumps(d["products"]).lower() and "Pays net 30" not in json.dumps(d), d)
+check("portal products carry a description for the product window", any(p.get("description") for p in d["products"]) and not any("price" in p for p in d["products"]), d["products"][:2])
 before=len(mail())
 s,r,_=req("/api/store-portal", {"items":[{"productId":"p_pub","qty":12},{"productId":"p_pub2","qty":3}],"note":"Before Friday please"}, cookie=RAE)
 REQ=r.get("request",{})
@@ -200,6 +210,9 @@ s,r,_=req("/api/admin/flags", {"key":"retail_portal","on":False})
 s,html,_=req("/store-portal", cookie=RAE, raw=True)
 s2,_,_=req("/api/store-portal", cookie=RAE)
 check("portal switch off: the portal is closed (data kept)", "closed right now" in html and s2==404 and os.path.exists(D+"retail-accounts.json"), (s2, html[:200]))
+s,html,_=req("/", cookie=None, raw=True)
+s3,r3,h3=req("/api/login", {"role":"visitor","email":"rae@shop.example","password":"rae-strong-pass"}, cookie=None, headers={"x-forwarded-for":"10.9.0.6"})
+check("portal switch off: no store icon, member sign-in ignores store logins", 'home-store-link' not in html and s3==401 and not cookie_from(h3), (s3,r3))
 req("/api/admin/flags", {"key":"retail_portal","on":True})
 
 # ---- activity log + privacy
