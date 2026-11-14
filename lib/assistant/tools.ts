@@ -51,7 +51,7 @@ import { isEnabled } from "../flags";
 import { liveBundles } from "../bundleStore";
 import { applyStockFlag, getStock } from "@/lib/stock";
 import { backorders } from "@/lib/stockMath";
-import { inbox as venmoInbox } from "@/lib/venmoInbox";
+import { inbox as venmoInbox, offsiteSales } from "@/lib/venmoInbox";
 import { cachedPublicStores } from "../storesCache";
 import { cleanStore, getStores } from "@/lib/stores";
 import { geocodeCached, milesBetween } from "../geocode";
@@ -1243,8 +1243,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           label = `Last ${days} days`;
         }
       }
-      const [orders, users, products] = await Promise.all([cachedOrders(), cachedUsers(), cachedProducts()]);
-      return computeInsights(orders, users, products, {
+      const [orders, users, products, offsite] = await Promise.all([cachedOrders(), cachedUsers(), cachedProducts(), offsiteSales().catch(() => [])]);
+      // Venmo payments marked "Handled off-site" count as sales too (no order, no items).
+      return computeInsights([...orders, ...offsite.map((o) => ({ ...o, userName: `${o.userName} (off-site Venmo, no order)` }))], users, products, {
         from,
         to,
         label,

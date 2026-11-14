@@ -173,6 +173,8 @@ export default function AdminDashboard({
 
   // Orders queue
   const [orders, setOrders] = useState<Order[]>([]);
+  // Venmo payments marked "Handled off-site": revenue with no order (Overview's 7-day figure).
+  const [offsiteSales, setOffsiteSales] = useState<Array<{ amount: number; at: number }>>([]);
   const [orderFilter, setOrderFilter] = useState<OrderStatus | "all" | "expired">("all");
   // For the Expired tab's explainer: the reminder time limit and whether reminders are on.
   const [reminderExpireHours, setReminderExpireHours] = useState<number | null>(null);
@@ -1205,6 +1207,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         // during the storage lag window doesn't appear to undo them.
         const fresh = applyRecentChanges<Order>("order", data.orders);
         setOrders(fresh);
+        setOffsiteSales(Array.isArray(data.offsite) ? data.offsite : []);
 
         // Deep link: /admin?order=<id> (from notification emails)
         // opens that order's detail modal on load.
@@ -2770,10 +2773,11 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               <button className="kpi kpi-action" onClick={() => glanceGo("analytics")} title="Open Analytics">
                 <span className="kpi-go" aria-hidden="true">→</span>
                 <div className="kpi-value">
-                  ${orders
+                  ${(orders
                     .filter((o) => (o.status === "paid" || isCompleted(o.status)) &&
                       (o.paidAt || o.createdAt) >= lastNDaysStart(7))
-                    .reduce((n, o) => n + o.total, 0)
+                    .reduce((n, o) => n + o.total, 0) +
+                    offsiteSales.filter((s) => s.at >= lastNDaysStart(7)).reduce((n, s) => n + s.amount, 0))
                     .toFixed(2)}
                 </div>
                 <div className="kpi-label">Revenue, 7 days</div>

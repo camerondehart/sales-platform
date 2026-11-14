@@ -20,7 +20,7 @@ type Payment = {
   amount?: number;
   note?: string;
   txnId?: string;
-  state: "new" | "confirmed" | "rejected" | "dismissed";
+  state: "new" | "confirmed" | "rejected" | "dismissed" | "offsite";
   orderId?: string;
   linked?: boolean;
   notOrders?: string[];
@@ -74,7 +74,7 @@ export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => v
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "That didn't work.");
       setMsg({ ok: true, text: body.action === "confirm_strong" ? `${d.confirmed} marked paid.${d.skipped?.length ? ` ${d.skipped.length} skipped.` : ""}` : ok });
-      if (String(body.action).startsWith("confirm")) onPaid();
+      if (String(body.action).startsWith("confirm") || String(body.action).startsWith("offsite")) onPaid();
       load();
     } catch (err) {
       setMsg({ ok: false, text: err instanceof Error ? err.message : "That didn't work." });
@@ -88,6 +88,12 @@ export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => v
     const differs = typeof p.amount === "number" && Math.abs(p.amount - o.total) >= 0.005;
     if (differs && !window.confirm(`They paid ${money(p.amount)} but order #${o.ref} is ${money(o.total)}. ${o.paid ? "Link it" : "Mark it paid"} anyway?`)) return;
     act({ action: "confirm", paymentId: p.id, orderId }, p.id, o.paid ? `Linked to order #${o.ref} (it was already paid).` : `Order #${o.ref} marked paid.`);
+  }
+
+  // A real sale that happened away from the site: counts as revenue, no order.
+  function offsite(p: Payment) {
+    if (!window.confirm(`Count ${money(p.amount)} from ${p.payer || "?"} as a sale handled off-site? It adds to revenue and isn't tied to any order.`)) return;
+    act({ action: "offsite", paymentId: p.id }, p.id, `${money(p.amount)} counted as an off-site sale.`);
   }
 
   if (!on) return null;
@@ -159,7 +165,7 @@ export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => v
           {toSort.length > 0 && (
             <>
               <h3>Sort by hand</h3>
-              <p className="field-hint">No sure match. Pick the order it pays for, or dismiss it if it isn&rsquo;t for an order.</p>
+              <p className="field-hint">No sure match. Pick the order it pays for. If it was a real sale that happened away from the site, tap <strong>Handled off-site</strong> to count it as revenue without an order. Dismiss it if it isn&rsquo;t a sale at all.</p>
               <ul className="vi-list">
                 {toSort.map((p) => {
                   const cands = (p.match?.candidates || []).filter((id) => orderById.has(id));
@@ -189,6 +195,7 @@ export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => v
                       </span>
                       <span className="vi-actions">
                         <button type="button" className="submit" disabled={!!busy || !chosen} onClick={() => confirm(p, chosen)}>{busy === p.id ? "Saving…" : orderById.get(chosen)?.paid ? "Link" : "Mark paid"}</button>
+                        {typeof p.amount === "number" && p.amount > 0 && <button type="button" disabled={!!busy} onClick={() => offsite(p)}>Handled off-site</button>}
                         <button type="button" disabled={!!busy} onClick={() => act({ action: "dismiss", paymentId: p.id }, p.id, "Dismissed.")}>Dismiss</button>
                       </span>
                     </li>
@@ -228,8 +235,11 @@ export default function VenmoInbox({ onPaid, ordersKey = "" }: { onPaid: () => v
               <ul>
                 {done.map((p) => (
                   <li key={p.id}>
-                    {money(p.amount)} from {p.payer || p.subject} — {p.state === "confirmed" ? `${p.linked ? "linked to already-paid order" : "paid order"} #${(p.orderId || "").slice(-6).toUpperCase()}` : p.state}
+                    {money(p.amount)} from {p.payer || p.subject} — {p.state === "confirmed" ? `${p.linked ? "linked to already-paid order" : "paid order"} #${(p.orderId || "").slice(-6).toUpperCase()}` : p.state === "offsite" ? "handled off-site (counted as revenue)" : p.state}
                     {p.decidedBy ? ` by ${p.decidedBy}` : ""}{p.decidedAt ? `, ${when(p.decidedAt)}` : ""}
+                    {p.state === "offsite" && (
+                      <button type="button" className="vi-undo" disabled={!!busy} onClick={() => act({ action: "offsite_undo", paymentId: p.id }, p.id, "Undone. It's back under “Sort by hand” and no longer counts as revenue.")}>Undo</button>
+                    )}
                   </li>
                 ))}
               </ul>

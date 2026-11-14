@@ -8184,6 +8184,7 @@ html[data-admin-theme="dark"] .store-pin span { border-color: var(--surface); }
 .vi-chip.is-medium { background: var(--yellow-deep); }
 .vi-done, .vi-setup { margin-top: 1rem; font-size: 0.88rem; }
 .vi-done summary, .vi-setup summary { cursor: pointer; font-weight: 600; }
+.vi-undo { margin-left: 0.5rem; padding: 0.15rem 0.6rem; border: 1px solid var(--rule); border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 0.8rem; cursor: pointer; }
 .vi-setup ol { padding-left: 1.2rem; line-height: 1.55; }
 .vi-codes { list-style: none; padding: 0; }
 .vi-codes pre { white-space: pre-wrap; background: var(--paper); border: 1px solid var(--rule-soft); border-radius: 6px; padding: 0.6rem; font-size: 0.78rem; max-height: 220px; overflow: auto; }

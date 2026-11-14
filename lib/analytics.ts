@@ -6,6 +6,7 @@ import { getOrders, parsePrice, type Order } from "./orders";
 import { getUsers } from "./users";
 import { getProducts } from "./storage";
 import { addDays, lastNDaysStart, pacificDay, pacificMidnight } from "./periods";
+import { offsiteSales } from "./venmoInbox";
 
 // Money actually collected. "completed" covers both shipped and collected
 // orders; the legacy values are kept so historic orders still count.
@@ -90,7 +91,7 @@ export type Insights = {
 };
 
 export async function getInsights(): Promise<Insights> {
-  const [orders, users, products] = await Promise.all([getOrders(), getUsers(), getProducts()]);
+  const [orders, users, products, offsite] = await Promise.all([getOrders(), getUsers(), getProducts(), offsiteSales().catch(() => [])]);
   const now = Date.now();
   // local calendar days, same as the Analytics tab (lib/periods.ts):
   // "last 7 days" = today plus the 6 full days before it.
@@ -100,7 +101,8 @@ export async function getInsights(): Promise<Insights> {
   const d14 = lastNDaysStart(14, now);
   const d30 = lastNDaysStart(30, now);
 
-  const revenueOrders = orders.filter(isRevenue);
+  // Plus Venmo payments marked "Handled off-site": revenue with no order behind it.
+  const revenueOrders = [...orders.filter(isRevenue), ...offsite];
   const inWindow = (from: number, to = Infinity) =>
     revenueOrders.filter((o) => revenueAt(o) >= from && revenueAt(o) < to);
 
@@ -220,7 +222,7 @@ export async function getInsights(): Promise<Insights> {
     topCustomers,
     pendingApprovals: users.filter((u) => u.status === "pending").length,
     shipCount7: last7Orders.filter((o) => o.shippingMethod === "ship").length,
-    pickupCount7: last7Orders.filter((o) => o.shippingMethod === "pickup").length,
+    pickupCount7: last7Orders.filter((o) => o.shippingMethod === "pickup" && !o.offSite).length,
   };
 }
 

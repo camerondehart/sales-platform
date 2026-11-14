@@ -36,7 +36,7 @@ async function build(outDir, appDir, id, o) {
     `From: ${o.from || "Venmo <venmo@venmo.com>"}`,
     `To: ${o.to || "owner@example.com"}`,
     `Subject: ${subject}`,
-    `Date: Tue, 27 Oct 2026 18:04:00 +0000`,
+    `Date: ${o.date || "Tue, 27 Oct 2026 18:04:00 +0000"}`,
     `Message-ID: <${id}@venmo.com>`,
     `MIME-Version: 1.0`,
   ];

@@ -337,6 +337,7 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
             parts={[
               { label: "Members' shop", value: Math.round(data.shopSplit.member), color: "#6fa336" },
               { label: "Public shop", value: Math.round(data.shopSplit.public), color: "#d8b36a" },
+              ...(data.shopSplit.offsite > 0 ? [{ label: "Off-site (Venmo)", value: Math.round(data.shopSplit.offsite), color: "#8fb7c9" }] : []),
             ]}
           />
         </div>

@@ -8,6 +8,7 @@ import { getProducts } from "./storage";
 import { isRevenue } from "./analytics";
 import { pacificDay } from "./periods";
 import { brand } from "@/lib/brand";
+import { offsiteSales } from "./venmoInbox";
 
 function cell(v: string | number | undefined | null): string {
   if (v === undefined || v === null) return "";
@@ -23,8 +24,9 @@ function revenueAt(o: Order): number {
 }
 
 export async function generateRevenueCSV(): Promise<string> {
-  const [allOrders, products] = await Promise.all([getOrders(), getProducts()]);
-  const orders = allOrders.filter(isRevenue).sort((a, b) => revenueAt(a) - revenueAt(b));
+  const [allOrders, products, offsite] = await Promise.all([getOrders(), getProducts(), offsiteSales().catch(() => [])]);
+  // Venmo payments marked "Handled off-site" count as sales with no order behind them.
+  const orders = [...allOrders.filter(isRevenue), ...offsite].sort((a, b) => revenueAt(a) - revenueAt(b));
   const productMeta = new Map(products.map((p) => [p.id, p]));
   const lines: string[] = [];
 
@@ -37,8 +39,9 @@ export async function generateRevenueCSV(): Promise<string> {
   lines.push(cell("REVENUE SUMMARY"));
   lines.push(row(["Generated", `${new Date().toLocaleString("en-US", { timeZone: brand.timezone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ${brand.timezoneLabel}`]));
   lines.push(row(["Dates", `${brand.timezoneLabel} time; an order counts on the day it was marked paid`]));
-  lines.push(row(["Basis", "Orders marked paid or shipped"]));
+  lines.push(row(["Basis", offsite.length ? "Orders marked paid or shipped, plus Venmo payments handled off-site" : "Orders marked paid or shipped"]));
   lines.push(row(["Paid orders", orders.length]));
+  if (offsite.length) lines.push(row(["Of which off-site Venmo sales", `${offsite.length} (${offsite.reduce((n, o) => n + o.total, 0).toFixed(2)})`]));
   lines.push(row(["Product revenue", grossProduct.toFixed(2)]));
   lines.push(row(["Shipping collected", shipping.toFixed(2)]));
   lines.push(row(["Promo discounts given", discounts.toFixed(2)]));
@@ -138,7 +141,7 @@ export async function generateRevenueCSV(): Promise<string> {
       const spend = list.reduce((n, o) => n + o.total, 0);
       const times = list.map(revenueAt);
       return {
-        name: list[0].userName,
+        name: list[0].offSite ? `${list[0].userName} (off-site Venmo)` : list[0].userName,
         email: list[0].userEmail,
         orders: list.length,
         spend,

@@ -94,6 +94,8 @@ export type Order = {
   stockTaken?: Array<{ productId: string; qty: number }>;
   /** When a cancel put stockTaken back (cleared if the order is un-cancelled and takes it again). */
   stockReturnedAt?: number;
+  /** Never saved: a Venmo payment staff marked "Handled off-site", shaped like an order for the revenue figures only (lib/venmoInbox.ts offsiteSales). */
+  offSite?: boolean;
 };
 
 const DATA_FILE = path.join(process.cwd(), "data", "orders.json");

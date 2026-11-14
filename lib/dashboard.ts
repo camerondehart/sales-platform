@@ -8,6 +8,7 @@ import { allUsage, recentEscalations } from "./assistant/usage";
 import { readTraffic, flushTraffic, type DayRow } from "./traffic";
 import { addDays, pacificDay, pacificMidnight } from "./periods";
 import { brand } from "@/lib/brand";
+import { offsiteSales } from "./venmoInbox";
 
 /**
  * Everything the Analytics tab shows, computed in one pass.
@@ -67,12 +68,14 @@ export async function computeDashboard(daysRequested: number) {
     readTraffic(dayKeys[0], dayKeys[dayKeys.length - 1]),
     readTraffic(prevKeys[0], prevKeys[prevKeys.length - 1]),
   ]);
+  const offsite = await offsiteSales().catch(() => []);
   const productById = new Map(products.map((p) => [p.id, p]));
   const tByDay = new Map(traffic.map((r) => [r.id, r.c]));
   const ptByDay = new Map(prevTraffic.map((r) => [r.id, r.c]));
 
   // ---------------------------------------------------------------- sales
-  const paid = orders.filter(isRevenue);
+  // Plus Venmo payments marked "Handled off-site": revenue with no order behind it.
+  const paid = [...orders.filter(isRevenue), ...offsite];
   const inRange = (o: Order, a: number, b: number) => soldAt(o) >= a && soldAt(o) < b;
   const cur = paid.filter((o) => inRange(o, from, now + 1));
   const prev = paid.filter((o) => inRange(o, prevFrom, from));
@@ -324,7 +327,8 @@ export async function computeDashboard(daysRequested: number) {
     },
     events: { registrations: regsInRange, upcoming },
     shopSplit: {
-      member: cur.filter((o) => o.source !== "retail").reduce((n, o) => n + o.total, 0),
+      member: cur.filter((o) => o.source !== "retail" && !o.offSite).reduce((n, o) => n + o.total, 0),
+      offsite: cur.filter((o) => o.offSite).reduce((n, o) => n + o.total, 0),
       public: cur.filter((o) => o.source === "retail").reduce((n, o) => n + o.total, 0),
     },
     highlights: highlights.slice(0, 6),

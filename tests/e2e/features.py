@@ -576,6 +576,34 @@ _p7=vpay("vt_4777777777777777777")
 check("venmo: an order set back to Pending is matched as unpaid", _p7 and _p7["match"]["orderId"]==_vo4["id"] and not _p7["match"].get("alreadyPaid") and any(o["id"]==_vo4["id"] for o in vbox()["orders"]), _p7 and _p7.get("match"))
 _s,_x=req("/api/admin/venmo", {"action":"confirm","paymentId":"vt_4777777777777777777","orderId":_vo4["id"]})
 check("venmo: …and confirming it marks it paid", _s==200 and order_of(_vo4["id"])["status"]=="paid" and not _x.get("linked"), (_s,_x))
+# Handled off-site: a real sale with no order → counts as revenue, tied to nothing
+_rev0=req("/api/admin/analytics?days=7")[1]["kpis"]["revenue"]["value"]
+_n_orders=len(req("/api/admin/orders")[1]["orders"])
+import time as _time
+vsign("v8", payer="Olive Offsite", amount=45, note="popcorn", txn="4888888888888888888", date=_time.strftime("%a, %d %b %Y %H:%M:%S +0000", _time.gmtime()))
+vin("v8")
+_s,_x=req("/api/admin/venmo", {"action":"offsite","paymentId":"vt_4888888888888888888"})
+_p8=vpay("vt_4888888888888888888")
+check("venmo: 'Handled off-site' clears the payment without tying it to an order", _s==200 and _p8["state"]=="offsite" and not _p8.get("orderId"), (_s,_x,_p8))
+_dash=req("/api/admin/analytics?days=7")[1]
+check("venmo: an off-site payment adds to Analytics revenue", abs(_dash["kpis"]["revenue"]["value"]-_rev0-45)<0.005 and abs(_dash["shopSplit"]["offsite"]-45)<0.005, (_rev0,_dash["kpis"]["revenue"]["value"],_dash["shopSplit"]))
+_ol2=req("/api/admin/orders")[1]
+check("venmo: …and to the Overview figure, without creating an order", len(_ol2["orders"])==_n_orders and any(abs(x["amount"]-45)<0.005 for x in _ol2.get("offsite",[])), (_n_orders,len(_ol2["orders"]),_ol2.get("offsite")))
+_cr=urllib.request.Request(BASE+"/api/admin/revenue/export"); _cr.add_header("cookie", ADMIN)
+_csv=urllib.request.urlopen(_cr, timeout=120).read().decode("utf8","replace")
+check("venmo: the revenue report lists the off-site sale", "Olive Offsite (off-site Venmo)" in _csv and "Of which off-site Venmo sales" in _csv, _csv[:300])
+_s,_x=req("/api/admin/venmo", {"action":"offsite","paymentId":"vt_4888888888888888888"})
+check("venmo: an off-site payment can't be counted twice", _s==409, (_s,_x))
+_s,_x=req("/api/admin/venmo", {"action":"offsite","paymentId":_r3["id"]})
+check("venmo: a quarantined email can't be counted as an off-site sale", _s==400 and vpay(_r3["id"])["state"]!="offsite", (_s,_x))
+_aud=[json.loads(l) for l in open(D+"audit.jsonl")] if os.path.exists(D+"audit.jsonl") else []
+_s,_x=req("/api/admin/venmo", {"action":"offsite_undo","paymentId":"vt_4888888888888888888"})
+check("venmo: undoing off-site puts it back to sort by hand and takes it out of revenue", _s==200 and vpay("vt_4888888888888888888")["state"]=="new" and abs(req("/api/admin/analytics?days=7")[1]["kpis"]["revenue"]["value"]-_rev0)<0.005, (_s,_x))
+_s,_x=req("/api/admin/venmo", {"action":"offsite_undo","paymentId":"vt_4888888888888888888"})
+check("venmo: only an off-site payment can be undone", _s==409, (_s,_x))
+_s,_x=req("/api/admin/venmo", {"action":"offsite","paymentId":"vt_4888888888888888888"})
+check("venmo: after an undo it can be counted again", _s==200 and vpay("vt_4888888888888888888")["state"]=="offsite", (_s,_x))
+check("venmo: off-site is in the Activity log", any(a.get("action")=="venmo.offsite" and a.get("targetId")=="vt_4888888888888888888" for a in _aud), [a.get("action") for a in _aud][-5:])
 
 # ---------------- Concierge voice (mic + read aloud through the Gateway)
 def speech():

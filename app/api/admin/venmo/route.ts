@@ -3,7 +3,7 @@ import { isAdmin, adminActor } from "@/lib/auth";
 import { getOrderById, updateOrder, normalizeStatus } from "@/lib/orders";
 import { syncOrderPoints } from "@/lib/loyalty";
 import { audited, auditDetail } from "@/lib/audit";
-import { decide, getPayment, inbox } from "@/lib/venmoInbox";
+import { decide, getPayment, inbox, undoOffsite } from "@/lib/venmoInbox";
 import { refOf } from "@/lib/venmoMatch";
 
 // Orders → Venmo payments. GET the inbox (with fresh match suggestions);
@@ -96,6 +96,33 @@ async function POST_handler(req: Request) {
       targetId: orderId || paymentId,
       after: { venmo: { id: paymentId, payer: r.payment.payer, amount: r.payment.amount }, orderId: orderId || undefined },
       note: body.action === "reject" ? `Venmo ${money(r.payment.amount)} from ${r.payment.payer} is not order ${orderId ? refOf(orderId) : "?"}` : `Venmo email dismissed`,
+    });
+    return NextResponse.json({ ok: true });
+  }
+  // A real sale that happened off the site: counts as revenue, tied to no order.
+  if (body.action === "offsite") {
+    if (!paymentId) return NextResponse.json({ error: "Need the payment." }, { status: 400 });
+    const r = await decide(paymentId, { state: "offsite" }, by);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: /quarantined|no amount/i.test(r.error) ? 400 : 409 });
+    auditDetail({
+      action: "venmo.offsite",
+      targetId: paymentId,
+      after: { venmo: { id: paymentId, payer: r.payment.payer, amount: r.payment.amount, note: r.payment.note } },
+      note: `Venmo ${money(r.payment.amount)} from ${r.payment.payer} handled off-site (counted as revenue, no order)`,
+    });
+    return NextResponse.json({ ok: true });
+  }
+  // Undo a mis-tap: back to Sort by hand, no longer counted as revenue.
+  if (body.action === "offsite_undo") {
+    if (!paymentId) return NextResponse.json({ error: "Need the payment." }, { status: 400 });
+    const r = await undoOffsite(paymentId);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 409 });
+    auditDetail({
+      action: "venmo.offsite_undo",
+      targetId: paymentId,
+      before: { state: "offsite" },
+      after: { state: "new", venmo: { id: paymentId, payer: r.payment.payer, amount: r.payment.amount } },
+      note: `Venmo ${money(r.payment.amount)} from ${r.payment.payer}: off-site undone (back to Sort by hand, no longer revenue)`,
     });
     return NextResponse.json({ ok: true });
   }

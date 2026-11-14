@@ -33,7 +33,8 @@ export type VenmoPayment = {
   /** The visible text, for #ref search and staff to read (trimmed). */
   text?: string;
   rawUrl?: string;
-  state: "new" | "confirmed" | "rejected" | "dismissed";
+  /** "offsite": a real sale that happened off the site. Counts as revenue, tied to no order. */
+  state: "new" | "confirmed" | "rejected" | "dismissed" | "offsite";
   /** Order it was confirmed against, or the one staff said it isn't. */
   orderId?: string;
   /** Confirmed against an order that was already paid: linked only, the order wasn't changed. */
@@ -196,6 +197,40 @@ export async function suggestions(): Promise<Array<{ payment: InboxRow; order: O
     .map((r) => ({ payment: r, order: byId.get(r.match!.orderId!)! }));
 }
 
+/** When the money came in: Venmo's own time when the email had one, else when the email arrived. */
+const paidTime = (r: VenmoPayment) => r.sentAt || r.receivedAt;
+
+/**
+ * Venmo payments staff marked "Handled off-site" (2026-11-12): real
+ * sales that happened away from the site. Each one is shaped like a completed
+ * order with no items so the revenue figures can add it in. They are never
+ * saved as orders and never show in the Orders list, earn points or get emails.
+ */
+export function offsiteAsOrders(rows: VenmoPayment[]): Order[] {
+  return rows
+    .filter((r) => r.state === "offsite" && r.verified && typeof r.amount === "number" && r.amount > 0)
+    .map((r): Order => ({
+      id: `offsite_${r.id}`,
+      userId: `offsite:${(r.payer || "unknown").trim().toLowerCase()}`,
+      userName: r.payer || "Off-site Venmo",
+      userEmail: "",
+      items: [],
+      shippingMethod: "pickup",
+      shippingCost: 0,
+      subtotal: r.amount!,
+      total: r.amount!,
+      isInquiry: false,
+      status: "completed",
+      paymentToken: "",
+      paidAt: paidTime(r),
+      createdAt: paidTime(r),
+      offSite: true,
+    }));
+}
+export async function offsiteSales(): Promise<Order[]> {
+  return offsiteAsOrders((await payments.read()).data);
+}
+
 export async function getPayment(id: string): Promise<VenmoPayment | undefined> {
   return (await payments.read()).data.find((r) => r.id === id);
 }
@@ -203,7 +238,7 @@ export async function getPayment(id: string): Promise<VenmoPayment | undefined> 
 /** Record a staff decision. Returns false if it was already decided (or quarantined, for confirm). */
 export async function decide(
   id: string,
-  change: { state: "confirmed"; orderId: string; linked?: boolean } | { state: "rejected"; orderId?: string } | { state: "dismissed" },
+  change: { state: "confirmed"; orderId: string; linked?: boolean } | { state: "rejected"; orderId?: string } | { state: "dismissed" } | { state: "offsite" },
   by: string
 ): Promise<{ ok: true; payment: VenmoPayment } | { ok: false; error: string }> {
   type R = { ok: true; payment: VenmoPayment } | { ok: false; error: string };
@@ -212,7 +247,9 @@ export async function decide(
     if (i === -1) return { data: null, result: { ok: false as const, error: "That payment isn't in the inbox." } };
     const r = rows[i];
     if (change.state === "confirmed" && !r.verified) return { data: null, result: { ok: false as const, error: "Quarantined payments can't be matched." } };
-    if (r.state !== "new") return { data: null, result: { ok: false as const, error: `Already ${r.state}.` } };
+    if (change.state === "offsite" && !r.verified) return { data: null, result: { ok: false as const, error: "Quarantined payments can't be counted as sales." } };
+    if (change.state === "offsite" && !(typeof r.amount === "number" && r.amount > 0)) return { data: null, result: { ok: false as const, error: "This email has no amount to count." } };
+    if (r.state !== "new") return { data: null, result: { ok: false as const, error: `Already ${r.state === "offsite" ? "handled off-site" : r.state}.` } };
     let next: VenmoPayment;
     if (change.state === "rejected") {
       // "Not a match": stays in the inbox for a person to assign, minus that order.
@@ -220,6 +257,21 @@ export async function decide(
     } else {
       next = { ...r, state: change.state, ...(change.state === "confirmed" ? { orderId: change.orderId, ...(change.linked ? { linked: true } : {}) } : {}), decidedAt: Date.now(), decidedBy: by };
     }
+    const out = rows.slice();
+    out[i] = next;
+    return { data: out, result: { ok: true as const, payment: next } };
+  });
+}
+
+/** Undo "Handled off-site": the payment goes back to Sort by hand and stops counting as revenue. */
+export async function undoOffsite(id: string): Promise<{ ok: true; payment: VenmoPayment } | { ok: false; error: string }> {
+  type R = { ok: true; payment: VenmoPayment } | { ok: false; error: string };
+  return payments.mutate<R>((rows) => {
+    const i = rows.findIndex((r) => r.id === id);
+    if (i === -1) return { data: null, result: { ok: false as const, error: "That payment isn't in the inbox." } };
+    if (rows[i].state !== "offsite") return { data: null, result: { ok: false as const, error: "That payment isn't marked handled off-site." } };
+    const { decidedAt: _a, decidedBy: _b, ...rest } = rows[i];
+    const next: VenmoPayment = { ...rest, state: "new" };
     const out = rows.slice();
     out[i] = next;
     return { data: out, result: { ok: true as const, payment: next } };

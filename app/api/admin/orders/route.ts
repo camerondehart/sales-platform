@@ -6,7 +6,7 @@ import { syncOrderPoints } from "@/lib/loyalty";
 import { normalizeStatus } from "@/lib/orderStatus";
 import { audited, auditDetail } from "@/lib/audit";
 import { returnStock, takeStock } from "@/lib/stock";
-import { venmoLinks } from "@/lib/venmoInbox";
+import { venmoLinks, offsiteSales } from "@/lib/venmoInbox";
 
 const VALID_STATUSES: OrderStatus[] = [
   "inquiry", "pending", "paid", "completed", "cancelled",
@@ -24,7 +24,9 @@ export async function GET(req: Request) {
   orders.sort((a, b) => b.createdAt - a.createdAt);
   // Response only (never saved): which orders a verified Venmo email backs up.
   const links = await venmoLinks().catch(() => new Map());
-  return NextResponse.json({ orders: links.size ? orders.map((o) => (links.has(o.id) ? { ...o, venmo: links.get(o.id) } : o)) : orders });
+  // Venmo payments marked "Handled off-site": revenue with no order (for the Overview's 7-day figure).
+  const offsite = userId ? [] : (await offsiteSales().catch(() => [])).map((o) => ({ amount: o.total, at: o.paidAt || o.createdAt }));
+  return NextResponse.json({ orders: links.size ? orders.map((o) => (links.has(o.id) ? { ...o, venmo: links.get(o.id) } : o)) : orders, offsite });
 }
 
 async function PATCH_handler(req: Request) {
