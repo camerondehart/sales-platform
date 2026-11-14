@@ -18,6 +18,7 @@ import { brand } from "@/lib/brand";
 import { reserveForOrder, returnStock } from "@/lib/stock";
 import { creditFor } from "@/lib/ambassadors";
 import { isEnabled } from "@/lib/flags";
+import { recordRisk } from "@/lib/riskLog";
 
 const SHIPPING_FLAT = 10;
 
@@ -218,6 +219,9 @@ export async function POST(req: Request) {
     if (stock.stockTaken) await returnStock(stock.stockTaken).catch(() => {});
     throw err;
   });
+
+  // Members → Suspicious activity: note where this order came from. Flags only, never blocks.
+  if (!isInquiry && !order.placedBy) await recordRisk(req, "order", order.id, order.userEmail);
 
   // Deduct redeemed points now that the order exists
   if (pointsRedeemed > 0) {

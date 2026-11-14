@@ -45,6 +45,7 @@ export const FLAG_KEYS = [
   "seasonal_site",
   "site_requests",
   "ambassador_welcome",
+  "suspicious_activity",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -213,6 +214,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   ambassador_welcome: {
     label: "Ambassador welcome animations",
     description: "Each ambassador's page opens with a short welcome (about 3 seconds, once per visit, tap to skip): their photo in a glowing ring, their headline and a drift of their emoji, in their page's look (Cosmic, Botanical, Blossom or Golden hour; Auto picks from the emoji in their headline). Pick the look in the Ambassadors tab. Off = the page opens straight away (the look still styles the page).",
+    defaults: on,
+    built: true,
+  },
+  suspicious_activity: {
+    label: "Suspicious activity flags",
+    description: "Members → Suspicious activity lists accounts and orders that look fake, each with the reasons (several requests from one internet address, look-alike emails, a shared shipping address, orders never paid…). It only flags for you to check and never blocks anyone. While on, each membership request and checkout notes the internet address, browser and country it came from (kept 180 days). Off = nothing is noted and the list is hidden.",
     defaults: on,
     built: true,
   },

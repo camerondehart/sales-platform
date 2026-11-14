@@ -14,6 +14,7 @@ import { reserveForOrder, returnStock } from "@/lib/stock";
 import { ambassadorCodes, creditFor } from "@/lib/ambassadors";
 import { findDiscountByCode, recordDiscountUse, validateDiscount, worksInPublicShop } from "@/lib/discounts";
 import { isEnabled } from "@/lib/flags";
+import { recordRisk } from "@/lib/riskLog";
 
 const SHIPPING_FLAT = 10;
 
@@ -151,6 +152,9 @@ export async function POST(req: Request) {
     if (stock.stockTaken) await returnStock(stock.stockTaken).catch(() => {});
     throw err;
   });
+
+  // Members → Suspicious activity: note where this order came from. Flags only, never blocks.
+  await recordRisk(req, "order", order.id, order.userEmail);
 
   if (appliedDiscount && codeAmount > 0) {
     await recordDiscountUse(appliedDiscount.id, customerId, order.id, codeAmount).catch((err) => console.error("Failed to record discount use", err));

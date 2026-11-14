@@ -87,7 +87,8 @@ const check = (name, ok, d = "") => { if (!ok) fails++; console.log(`${ok ? "PAS
     await qp.goto(BASE + "/admin");
     await qp.locator(".admin-tab", { hasText: "Overview" }).first().click();
     await qp.locator(".qa-tile", { hasText: "staff password" }).click();
-    await qp.locator(".settings-open").waitFor({ timeout: 10000 }).catch(() => {});
+    // The card's wording arrives after its own fetch, so wait for the text, not just the panel.
+    await qp.locator(".settings-open", { hasText: /staff password/i }).waitFor({ timeout: 10000 }).catch(() => {});
     check("quick actions: Today's staff password opens Settings → Steward password", /staff password/i.test(await qp.locator(".settings-open").innerText().catch(() => "")));
     await qp.locator(".admin-tab", { hasText: "Overview" }).first().click();
     await qp.locator(".qa-tile", { hasText: "Update stock counts" }).click();

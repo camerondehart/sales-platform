@@ -4,6 +4,7 @@ import { createUser } from "@/lib/users";
 import { addSubscriber } from "@/lib/subscribers";
 import { Resend } from "resend";
 import { brand } from "@/lib/brand";
+import { recordRisk } from "@/lib/riskLog";
 
 export async function POST(req: Request) {
   // Stop scripts flooding this form (lib/publicLimits.ts).
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
+
+  // Members → Suspicious activity: note where this request came from. Flags only, never blocks.
+  await recordRisk(req, "signup", result.user.id, result.user.email);
 
   // Every new member joins the mailing list (Cam, 2026-10-31; agreement §4.3 lets
   // the business choose automatic opt-in). They can unsubscribe from any email.

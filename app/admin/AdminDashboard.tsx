@@ -33,6 +33,7 @@ import QaIcon, { type QaIconName } from "./QaIcon";
 import FaqPanel from "./FaqPanel";
 import EntrancePanel from "./EntrancePanel";
 import SiteRequestsPanel from "./SiteRequestsPanel";
+import SuspiciousPanel from "./SuspiciousPanel";
 import ShippingWeights from "./ShippingWeights";
 import StockCounts from "./StockCounts";
 import VenmoInbox from "./VenmoInbox";
@@ -2958,6 +2959,17 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           </div>
         )}
       </section>
+      )}
+
+      {/* Suspicious activity (below the requests queue, collapsible): flags only, shown when the switch is on (the panel hides itself otherwise) */}
+      {tab === "members" && (
+        <SuspiciousPanel
+          onFind={(email) => {
+            setMemberQuery(email);
+            setMemberPage(0);
+            setShowMembers(true);
+          }}
+        />
       )}
 
       {tab === "orders" && <VenmoInbox onPaid={() => loadOrders()} />}

@@ -43,6 +43,8 @@ echo "Cash pickup deals (unit): $(node "$REPO/tests/unit/cash-pricing.cjs" | tai
 node "$REPO/tests/unit/cash-pricing.cjs" >/dev/null 2>&1 || { echo "Cash pickup pricing unit check failed"; exit 1; }
 echo "Backorders & restock needs (unit): $(node "$REPO/tests/unit/stock-math.cjs" | tail -1)"
 node "$REPO/tests/unit/stock-math.cjs" >/dev/null 2>&1 || { echo "Stock maths unit check failed"; exit 1; }
+echo "Suspicious activity signals (unit): $(node "$REPO/tests/unit/suspicion.cjs" | tail -1)"
+node "$REPO/tests/unit/suspicion.cjs" >/dev/null 2>&1 || { echo "Suspicious activity unit check failed"; exit 1; }
 echo "Safe storage on Blob (unit): $(node "$REPO/tests/unit/versioned-blob.cjs" 2>/dev/null | tail -1)"
 node "$REPO/tests/unit/versioned-blob.cjs" >/dev/null 2>&1 || { echo "Safe storage unit check failed"; exit 1; }
 echo "Building…"

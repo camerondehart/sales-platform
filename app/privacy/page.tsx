@@ -17,7 +17,7 @@ export const metadata = {
  * §14; bump EFFECTIVE when it changes. The 12-month / 7-year retention
  * periods come from the lawyer's draft; the business confirms them.
  */
-const EFFECTIVE = "November 1, 2026";
+const EFFECTIVE = "November 9, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const HOST = brand.siteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -37,7 +37,8 @@ const COLLECT: Array<[string, string, string]> = [
   ["Events and consultations", "Event registrations and notes. Consultation requests: your interest, preferred time, comments and the name you typed to sign the acknowledgement", "When you register or ask for a consultation"],
   ["Concierge conversations", "What you type, or the text of what you say by voice", "When you use the Concierge. Photos you share with it are used to answer and not saved"],
   ["Email activity", "Whether our emails are opened and which links are clicked", "When you open our emails"],
-  ["Site information", "Pages viewed, products looked at, which link or code brought you here and country, counted as daily totals. Your browser remembers a creator's page you came through", "Automatically, as you use the site. We don't keep a record of individual visits or IP addresses"],
+  ["Site information", "Pages viewed, products looked at, which link or code brought you here and country, counted as daily totals. Your browser remembers a creator's page you came through", "Automatically, as you use the site. We don't keep a record of individual visits"],
+  ["Fraud checks", "The internet (IP) address, browser type and country a membership request or an order came from", "When you request membership or place an order. We use it only to spot fake accounts and fake orders, and a person on our team reviews anything it flags"],
   ["Location you choose to share", "Your browser's location", "Only when you tap \"use my location\" on the store map. It's used once to sort stores and not stored"],
 ];
 
@@ -49,6 +50,7 @@ const KEEP: Array<[string, string]> = [
   ["Event registrations and consultation requests", "As long as needed to run the event or arrange your call, then as part of our ordinary records"],
   ["Mailing list", "Until you unsubscribe. We keep your email on a do-not-send list so we don't email you again"],
   ["Site information", "Daily totals, kept to see trends. They don't identify you"],
+  ["Fraud checks", "180 days, then deleted automatically"],
 ];
 
 export default async function PrivacyPage() {

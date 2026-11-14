@@ -9334,3 +9334,46 @@ html[data-amb-welcome="play"] .amb-rv { animation-delay: calc(var(--d, 0s) + 3.6
   .amb-more { display: block; }
 }
 .dc-editing-title { font-weight: 700; }
+
+/* Members → Suspicious activity (flags for staff to review; nothing is blocked) */
+.sus-fold { display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0; cursor: pointer; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--green); }
+.sus-fold .badge { display: inline-flex; align-items: center; justify-content: center; margin-left: 0.35rem; min-width: 1.5rem; height: 1.5rem; padding: 0 0.4rem; border-radius: 999px; background: var(--danger-strong); color: #fff; font-size: 0.72rem; letter-spacing: 0; }
+.sus-intro { max-width: 62rem; margin-top: 0.8rem; }
+.sus-empty { padding: 1.25rem 0; }
+.sus-list { list-style: none; margin: 0.6rem 0 1rem; padding: 0; display: grid; gap: 0.7rem; }
+.sus-case { padding: 0.85rem 1rem; border: 1px solid var(--rule-soft); border-left: 4px solid #e0b64a; border-radius: 12px; background: var(--surface, #fff); min-width: 0; }
+.sus-case.is-strong { border-left-color: var(--danger-strong); }
+.sus-case.is-reviewed { opacity: 0.8; border-left-color: var(--rule); }
+.sus-head { display: flex; align-items: baseline; gap: 0.4rem 0.7rem; flex-wrap: wrap; }
+.sus-level { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.14rem 0.55rem; border-radius: 999px; background: #fdf0d8; color: #9a6410; white-space: nowrap; }
+.sus-level.is-strong { background: #fbe4e4; color: var(--danger-strong); }
+.sus-title { font-size: 1rem; overflow-wrap: anywhere; }
+.sus-when { margin-left: auto; font-size: 0.8rem; color: var(--ink-soft); white-space: nowrap; }
+.sus-reasons { margin: 0.5rem 0 0.6rem; padding-left: 1.15rem; display: grid; gap: 0.2rem; font-size: 0.9rem; line-height: 1.45; overflow-wrap: anywhere; }
+.sus-people { display: grid; gap: 0.3rem; padding: 0.55rem 0; border-top: 1px solid var(--rule-soft); }
+.sus-person { display: grid; grid-template-columns: minmax(0, 1.5fr) auto minmax(0, 1.4fr) auto; align-items: baseline; gap: 0.2rem 0.75rem; font-size: 0.88rem; }
+.sus-who { min-width: 0; overflow-wrap: anywhere; }
+.sus-email { color: var(--ink-soft); }
+.sus-chip { justify-self: start; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.12rem 0.5rem; border-radius: 999px; background: rgba(127, 127, 127, 0.14); color: var(--ink-soft); white-space: nowrap; }
+.sus-chip.is-approved { background: #eef4e6; color: #4f7f22; }
+.sus-chip.is-pending { background: #fdf0d8; color: #9a6410; }
+.sus-chip.is-rejected { background: #fbe4e4; color: var(--danger-strong); }
+.sus-meta { font-size: 0.82rem; color: var(--ink-soft); }
+.sus-go { justify-self: end; min-width: 5.5rem; text-align: right; }
+.sus-go .link-btn { font-size: 0.8rem; }
+.sus-orders { margin: 0; padding: 0.5rem 0 0; border-top: 1px solid var(--rule-soft); font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; overflow-wrap: anywhere; }
+.sus-orders strong { color: var(--ink); }
+.sus-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.6rem; }
+.sus-actions .esc-btn { padding: 0.35rem 0.9rem; font-size: 0.8rem; }
+.sus-toggle { background: none; border: none; padding: 0; cursor: pointer; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-soft); }
+.sus-note { margin-top: 0.6rem; }
+@media (max-width: 720px) {
+  .sus-person { grid-template-columns: minmax(0, 1fr) auto; padding: 0.3rem 0; }
+  .sus-who, .sus-person .sus-meta { grid-column: 1 / -1; }
+  .sus-person .sus-meta { order: 3; }
+  .sus-go { min-width: 0; }
+  .sus-when { margin-left: 0; flex-basis: 100%; }
+}
+html[data-admin-theme="dark"] .sus-level, html[data-admin-theme="dark"] .sus-chip.is-pending { background: rgba(236, 213, 142, 0.16); color: #ecd58e; }
+html[data-admin-theme="dark"] .sus-level.is-strong, html[data-admin-theme="dark"] .sus-chip.is-rejected { background: rgba(214, 110, 113, 0.18); color: #f0a3a5; }
+html[data-admin-theme="dark"] .sus-chip.is-approved { background: rgba(133, 186, 69, 0.18); color: var(--accent-strong); }
