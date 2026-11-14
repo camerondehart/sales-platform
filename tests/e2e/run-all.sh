@@ -51,7 +51,7 @@ echo "Building…"
 (cd /tmp/final && npx next build >/tmp/harness/build.log 2>&1) || { echo "Build failed — see /tmp/harness/build.log"; exit 1; }
 set +e
 FAILED=0
-for suite in run.sh:core run2.sh:reliability run3.sh:admin-actions run4.sh:insights run5.sh:messages run6.sh:models run7.sh:foundations run8.sh:analytics run9.sh:features run10.sh:sign-in run11.sh:bundles run12.sh:uploads run13.sh:product-cards run14.sh:concierge-actions run15.sh:launch-hardening run16.sh:member-import; do
+for suite in run.sh:core run2.sh:reliability run3.sh:admin-actions run4.sh:insights run5.sh:messages run6.sh:models run7.sh:foundations run8.sh:analytics run9.sh:features run10.sh:sign-in run11.sh:bundles run12.sh:uploads run13.sh:product-cards run14.sh:concierge-actions run15.sh:launch-hardening run16.sh:member-import run17.sh:retail-stores; do
   script="${suite%%:*}"; name="${suite##*:}"
   sleep 3
   out="$(bash /tmp/harness/$script 2>&1)"

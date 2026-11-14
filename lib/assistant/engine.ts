@@ -12,6 +12,8 @@ import { SUPPORT_EMAIL } from "./shared";
 import { getFlags, isEnabled } from "../flags";
 import { productCardsFor } from "./productCards";
 import { brand } from "../brand";
+import { getStoreSession } from "../retailAuth";
+import type { RetailAccount, RetailLogin } from "../retail";
 
 const MAX_STEPS = 6;
 const MAX_HISTORY = 16;
@@ -19,8 +21,14 @@ const MAX_USER_CHARS = 2000;
 const MAX_ANY_CHARS = 4000;
 
 /** Who is asking, decided from cookies only — never from the request body. */
-export async function resolveAudience(mode: WidgetMode): Promise<{ audience: Audience; user: User | null } | null> {
+export async function resolveAudience(mode: WidgetMode): Promise<{ audience: Audience; user: User | null; store?: { account: RetailAccount; login: RetailLogin } } | null> {
   if (mode === "admin") return (await isAdmin()) ? { audience: "admin", user: null } : null;
+  // The store portal: its own sign-in only (never a member or staff session).
+  if (mode === "store") {
+    if (!(await isEnabled("retail_portal").catch(() => false))) return null;
+    const store = await getStoreSession();
+    return store ? { audience: "store", user: null, store } : null;
+  }
   const v = await getVisitor(); // JWT check only, no storage read
   if (v) {
     // Cached member list: avoids a Blob read on every message.
@@ -31,7 +39,8 @@ export async function resolveAudience(mode: WidgetMode): Promise<{ audience: Aud
 }
 
 export function enabledFor(config: AssistantConfig, audience: Audience): boolean {
-  return audience === "admin" ? config.enabledStaff : audience === "member" ? config.enabledMembers : config.enabledPublic;
+  // Stores follow the members' setting (signed-in people the business knows).
+  return audience === "admin" ? config.enabledStaff : audience === "member" || audience === "store" ? config.enabledMembers : config.enabledPublic;
 }
 
 /** Clean untrusted history from the browser. */
@@ -64,6 +73,8 @@ export function guardReply(text: string, audience: Audience): string {
   // The "[Shown with this reply — recorded by the site: …]" notes are written by
   // the staff widget, never by the model; drop any the model imitates.
   if (audience === "admin") return text.replace(/\n*\[Shown with this reply — recorded by the site:[\s\S]*?\]\s*$/g, "").trim() || text;
+  // Store portal chats get the same card notes (the widget writes them for stores too).
+  if (audience === "store") text = text.replace(/\n*\[Shown with this reply — recorded by the site:[\s\S]*?\]\s*$/g, "").trim() || text;
   if (!OFF_LIMITS.test(text)) return text;
   console.warn(`[assistant] off-limits term in a ${audience} reply; replaced with redirect`);
   return REDIRECT_REPLY;
@@ -102,7 +113,7 @@ async function alertCapOnce(config: AssistantConfig): Promise<void> {
 }
 
 export async function assistantStatus(req: Request) {
-  const [config, master, voiceOn, photosOn] = await Promise.all([getAssistantConfig(), isEnabled("ai_assistant"), isEnabled("voice_concierge").catch(() => false), isEnabled("concierge_photos").catch(() => false)]);
+  const [config, master, voiceOn, photosOn, portalOn] = await Promise.all([getAssistantConfig(), isEnabled("ai_assistant"), isEnabled("voice_concierge").catch(() => false), isEnabled("concierge_photos").catch(() => false), isEnabled("retail_portal").catch(() => false)]);
   const hasKey = !!gatewayCredential(req);
   const capped = hasKey ? await capReached(config) : false;
   const ok = master && hasKey && !capped;
@@ -116,6 +127,7 @@ export async function assistantStatus(req: Request) {
       public: ok && config.enabledPublic,
       member: ok && config.enabledMembers,
       admin: ok && config.enabledStaff,
+      store: ok && config.enabledMembers && portalOn,
     },
     name: config.assistantName,
     voice: ok && voiceOn,
@@ -181,10 +193,10 @@ const CONVERSATION_GUIDE =
   `When they're clearly finished (they say thanks and that they're good, goodbye, that's all, or similar), reply with one short, warm goodbye and put ${END_MARK} at the very end — that switches their mic off. Never add ${END_MARK} otherwise, and never when they asked another question.`;
 
 export async function handleChat(req: Request, body: { mode?: unknown; messages?: unknown; photo?: unknown; conversation?: unknown }): Promise<{ status: number; reply: ChatReply; model?: string }> {
-  const mode: WidgetMode = body.mode === "admin" ? "admin" : "site";
+  const mode: WidgetMode = body.mode === "admin" ? "admin" : body.mode === "store" ? "store" : "site";
   const who = await resolveAudience(mode);
-  if (!who) return { status: 401, reply: { reply: "Please sign in to the dashboard again.", offline: true } };
-  const { audience, user } = who;
+  if (!who) return { status: 401, reply: { reply: mode === "store" ? "Please sign in to the store portal again." : "Please sign in to the dashboard again.", offline: true } };
+  const { audience, user, store } = who;
 
   const history = sanitizeHistory(body.messages);
   if (!history) return { status: 400, reply: { reply: "I didn't catch a question there.", degraded: true } };
@@ -193,7 +205,7 @@ export async function handleChat(req: Request, body: { mode?: unknown; messages?
 
   const ip = clientIp(req);
   const [perBurst, perDay] = MESSAGE_LIMITS[audience];
-  const rateKey = audience === "member" && user ? `u:${user.id}` : `ip:${ip}`;
+  const rateKey = audience === "member" && user ? `u:${user.id}` : audience === "store" && store ? `s:${store.login.id}` : `ip:${ip}`;
   if (overLimit(`msg5:${audience}:${rateKey}`, perBurst, 5 * 60_000) || overLimit(`msgD:${audience}:${rateKey}`, perDay, 86_400_000)) {
     return { status: 429, reply: { reply: "That's a lot of questions in a short time — give me a few minutes and try again.", degraded: true } };
   }
@@ -214,15 +226,15 @@ export async function handleChat(req: Request, body: { mode?: unknown; messages?
 
   if (photo) {
     if (!flags.concierge_photos) return { status: 400, reply: { reply: "Photos aren't switched on right now — please describe it in words.", degraded: true } };
-    const photoKey = audience === "member" && user ? `u:${user.id}` : `ip:${ip}`;
+    const photoKey = audience === "member" && user ? `u:${user.id}` : audience === "store" && store ? `s:${store.login.id}` : `ip:${ip}`;
     if (overLimit(`photo:${audience}:${photoKey}`, audience === "admin" ? 60 : 12, 60 * 60_000)) {
       return { status: 429, reply: { reply: "That's a lot of photos in a short time — give me a little while and try again, or describe it in words.", degraded: true } };
     }
   }
   const allowActions = audience !== "admin" || flags.ai_admin_actions;
-  const ctx: ToolContext = { audience, user, ip, config, transcript: history, actions: [], draft: null, allowActions };
+  const ctx: ToolContext = { audience, user, ip, config, transcript: history, actions: [], draft: null, allowActions, ...(store ? { store } : {}) };
   const tools = toolsFor(audience, { actions: allowActions });
-  const system = await buildSystemPrompt({ audience, config, user });
+  const system = await buildSystemPrompt({ audience, config, user, store });
   const messages: GatewayMessage[] = [
     { role: "system", content: [system, photo ? PHOTO_GUIDE(audience) : "", body.conversation === true ? CONVERSATION_GUIDE : ""].filter(Boolean).join("\n\n") },
     ...history.map((m, i) =>

@@ -50,13 +50,13 @@ async function keepTranscript(req: Request, body: { mode?: unknown; messages?: u
     const msgs = Array.isArray(body.messages) ? (body.messages as Array<{ role?: string; content?: string }>) : [];
     const last = [...msgs].reverse().find((m) => m?.role === "user");
     if (!last?.content) return;
-    const mode: WidgetMode = body.mode === "admin" ? "admin" : "site";
+    const mode: WidgetMode = body.mode === "admin" ? "admin" : body.mode === "store" ? "store" : "site";
     const who = await resolveAudience(mode);
     if (!who) return;
-    const label = who.audience === "admin" ? "Staff" : who.user ? `${who.user.name} <${who.user.email}>` : "Visitor";
+    const label = who.audience === "admin" ? "Staff" : who.store ? `${who.store.login.name} <${who.store.login.email}> · ${who.store.account.name} (store)` : who.user ? `${who.user.name} <${who.user.email}>` : "Visitor";
     const saved = await saveTurn({
       convId,
-      owner: who.user ? `u:${who.user.id}` : who.audience === "admin" ? "admin" : `ip:${clientIp(req)}`,
+      owner: who.user ? `u:${who.user.id}` : who.store ? `s:${who.store.login.id}` : who.audience === "admin" ? "admin" : `ip:${clientIp(req)}`,
       audience: who.audience,
       who: label,
       userMessage: String(last.content),

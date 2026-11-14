@@ -38,6 +38,8 @@ import { PHOTO_SLOT, SUPPORT_EMAIL } from "./shared";
 import { getFaq } from "../faq";
 import { ADMIN_EXTRA_DEFS, runAdminExtra } from "./adminActions";
 import { AMBASSADOR_DEFS, runAmbassadorTool } from "./ambassadorTools";
+import { STORE_DEFS, runStoreTool } from "./storeTools";
+import type { RetailAccount, RetailLogin } from "../retail";
 import { resolveSegment, SEGMENT_KEYS } from "../segments";
 import { recipientsFor } from "../campaignSchedule";
 import { THEME_KEYS, cleanThemeChoice, themeForCategory } from "../campaignThemes";
@@ -80,6 +82,8 @@ export type ToolContext = {
   allowActions?: boolean;
   /** Customers: products to show as cards under the reply (show_products). */
   productIds?: string[];
+  /** Store portal: the signed-in store login (audience "store"). */
+  store?: { account: RetailAccount; login: RetailLogin };
 };
 
 type ToolDef = GatewayTool & { audiences: Audience[] };
@@ -713,7 +717,7 @@ const DEFS: ToolDef[] = [
 const isActionTool = (name: string) => name.startsWith("propose_");
 
 export function toolsFor(audience: Audience, opts: { actions?: boolean } = {}): GatewayTool[] {
-  return [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS].filter((d) => d.audiences.includes(audience))
+  return [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS, ...STORE_DEFS].filter((d) => d.audiences.includes(audience))
     .filter((d) => opts.actions !== false || !isActionTool(d.function.name))
     .map(({ type, function: fn }) => ({ type, function: fn }));
 }
@@ -873,7 +877,7 @@ type Result = Record<string, unknown> | string;
 
 export async function runTool(name: string, rawArgs: string, ctx: ToolContext): Promise<Result> {
   // Refuse anything not offered to this audience, whatever the model asks for.
-  const def = [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS].find((d) => d.function.name === name);
+  const def = [...DEFS, ...ADMIN_EXTRA_DEFS, ...AMBASSADOR_DEFS, ...STORE_DEFS].find((d) => d.function.name === name);
   if (!def || !def.audiences.includes(ctx.audience)) return { error: `Tool ${name} is not available.` };
   if (ctx.allowActions === false && isActionTool(name)) {
     return { error: "Preparing changes is switched off right now (Settings → Feature switches). Explain how to do it in the dashboard instead." };
@@ -893,6 +897,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
   // Ambassadors: numbers, terms, payouts, progress reports (ambassadorTools.ts).
   const amb = await runAmbassadorTool(name, args, ctx);
   if (amb) return amb;
+  // Retail stores: the store portal's own tools, and staff's view of requests (storeTools.ts).
+  const retail = await runStoreTool(name, args, ctx);
+  if (retail) return retail;
 
   switch (name) {
     // ------------------------------------------------ everyone

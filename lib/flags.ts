@@ -46,6 +46,7 @@ export const FLAG_KEYS = [
   "site_requests",
   "ambassador_welcome",
   "suspicious_activity",
+  "retail_portal",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -221,6 +222,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     label: "Suspicious activity flags",
     description: "Members → Suspicious activity lists accounts and orders that look fake, each with the reasons (several requests from one internet address, look-alike emails, a shared shipping address, orders never paid…). It only flags for you to check and never blocks anyone. While on, each membership request and checkout notes the internet address, browser and country it came from (kept 180 days). Off = nothing is noted and the list is hidden.",
     defaults: on,
+    built: true,
+  },
+  retail_portal: {
+    label: "Retail store portal",
+    description: "Shops that carry our products sign in at /store-portal (password, emailed code or Face ID) to request more stock, see each request's progress and everything we've shipped them, with the Concierge to do any of it for them. No prices or money in the portal. Staff create store accounts, review requests and manage the store map in the Retail tab; new requests email the team and show on the Today list. Off = the portal is closed (accounts and requests stay saved; the Retail tab still works).",
+    defaults: { production: false, preview: true, development: true },
     built: true,
   },
   member_passkeys: {

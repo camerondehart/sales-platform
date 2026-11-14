@@ -39,7 +39,7 @@ export type Suggestion = {
    * The exact records this item is about, so the Concierge can act on them
    * without searching (it reads them with the today_item tool).
    */
-  targets?: Array<{ kind: "order" | "member" | "product" | "code" | "event" | "ambassador"; id: string; name: string; detail?: string }>;
+  targets?: Array<{ kind: "order" | "member" | "product" | "code" | "event" | "ambassador" | "retail_request"; id: string; name: string; detail?: string }>;
   /** Step-by-step for the Concierge: which tools to call with which settings. */
   guide?: string;
 };

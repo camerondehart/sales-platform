@@ -17,7 +17,7 @@ export const metadata = {
  * §14; bump EFFECTIVE when it changes. The 12-month / 7-year retention
  * periods come from the lawyer's draft; the business confirms them.
  */
-const EFFECTIVE = "November 9, 2026";
+const EFFECTIVE = "November 10, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const HOST = brand.siteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -39,6 +39,7 @@ const COLLECT: Array<[string, string, string]> = [
   ["Email activity", "Whether our emails are opened and which links are clicked", "When you open our emails"],
   ["Site information", "Pages viewed, products looked at, which link or code brought you here and country, counted as daily totals. Your browser remembers a creator's page you came through", "Automatically, as you use the site. We don't keep a record of individual visits"],
   ["Fraud checks", "The internet (IP) address, browser type and country a membership request or an order came from", "When you request membership or place an order. We use it only to spot fake accounts and fake orders, and a person on our team reviews anything it flags"],
+  ["Retail store accounts", "For shops that stock our products: the store's name, a contact name and phone, each login's name and email, the stock requests the store sends (products, quantities and notes) and what we've shipped to it. Store logins sign in the same ways as members", "When we set up a store's portal account, and when the store uses it"],
   ["Location you choose to share", "Your browser's location", "Only when you tap \"use my location\" on the store map. It's used once to sort stores and not stored"],
 ];
 
@@ -51,6 +52,7 @@ const KEEP: Array<[string, string]> = [
   ["Mailing list", "Until you unsubscribe. We keep your email on a do-not-send list so we don't email you again"],
   ["Site information", "Daily totals, kept to see trends. They don't identify you"],
   ["Fraud checks", "180 days, then deleted automatically"],
+  ["Retail store accounts and stock requests", "While the store's account is open, then as part of our ordinary business records"],
 ];
 
 export default async function PrivacyPage() {

@@ -48,4 +48,5 @@ export const MESSAGE_LIMITS = {
   public: [15, 80],
   member: [30, 200],
   admin: [120, 2000],
+  store: [30, 200],
 } as const;

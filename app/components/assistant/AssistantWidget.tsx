@@ -33,7 +33,7 @@ import {
 type ActionState = "idle" | "running" | "done" | "failed" | "dismissed";
 
 /** Cards whose confirmation sends an email (for the wording of the ✓ line). */
-const SENT_KINDS = new Set<string>(["order_message", "member_message", "resend_invoice", "member_password", "manual_invoice", "campaign_send", "campaign_test", "handoff", "report"]);
+const SENT_KINDS = new Set<string>(["order_message", "member_message", "resend_invoice", "member_password", "manual_invoice", "campaign_send", "campaign_test", "handoff", "report", "store_request", "store_message"]);
 
 /**
  * Staff chat: what each earlier reply actually showed (cards + their status,
@@ -86,7 +86,13 @@ const REQUEST_TIMEOUT = 65_000;
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-const SUGGESTIONS: Record<"public" | "member" | "admin", string[]> = {
+const SUGGESTIONS: Record<"public" | "member" | "admin" | "store", string[]> = {
+  store: [
+    "I'd like to order more stock",
+    "Where's my latest request?",
+    "What have you shipped us this year?",
+    "Please update our store hours",
+  ],
   public: [
     "What would you recommend for focus?",
     "How do I become a member?",
@@ -214,7 +220,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   // Voice: mic + read aloud (useVoice.ts). Words heard go into the box, not straight to send.
   const voice = useVoice({
     enabled: !!status?.voice,
-    mode: mode === "admin" ? "admin" : "site",
+    mode,
     onText: (t) => {
       setInput((prev) => `${prev.trim() ? `${prev.trim()} ` : ""}${t}`.slice(0, 2000));
       setTimeout(() => inputRef.current?.focus(), 30);
@@ -253,8 +259,8 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
     if (!open) voiceRef.current.stopAll();
   }, [open]);
 
-  const audience: "public" | "member" | "admin" =
-    mode === "admin" ? "admin" : path.startsWith("/gallery") ? "member" : "public";
+  const audience: "public" | "member" | "admin" | "store" =
+    mode === "admin" ? "admin" : mode === "store" ? "store" : path.startsWith("/gallery") ? "member" : "public";
 
   // Staff starter buttons come from today's bulletin (same list as the Overview card):
   // the top open items that the Concierge can prepare cards for. Falls back to the fixed ones.
@@ -298,7 +304,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
     };
   }, [mode]);
 
-  const visible = !!status && (mode === "admin" ? true : status.available[audience]);
+  const visible = !!status && (mode === "admin" ? true : !!status.available[audience]);
 
   // Keep the cart button clear of the launcher.
   useEffect(() => {
@@ -381,7 +387,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
       const history: ChatMessage[] = thread
         .filter((m) => !m.local && m.content)
         .map((m) => {
-          const ledger = mode === "admin" && m.role === "assistant" ? cardLedger(m) : "";
+          const ledger = (mode === "admin" || mode === "store") && m.role === "assistant" ? cardLedger(m) : "";
           // Server keeps 4000 characters per message; the ledger always fits.
           return { role: m.role, content: ledger ? `${m.content.slice(0, 3900 - ledger.length)}\n\n${ledger}` : m.content };
         })
@@ -458,7 +464,6 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
   sendRef.current = send;
   // Staff: the Overview "Today" bulletin uses the same event to ask for cards.
   useEffect(() => {
-    if (mode !== "site" && mode !== "admin") return;
     const onOpen = () => setOpen(true);
     const onAsk = (e: Event) => {
       const q = (e as CustomEvent<{ question?: string }>).detail?.question;
@@ -702,12 +707,14 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                   <PeaksMark />
                 </div>
                 <div className="as-empty-title">
-                  {isAdmin ? "What can I take off your plate?" : audience === "member" ? "Welcome back" : "Hi, how can I help?"}
+                  {isAdmin ? "What can I take off your plate?" : audience === "member" ? "Welcome back" : audience === "store" ? "Hi! How can I help your store?" : "Hi, how can I help?"}
                 </div>
                 <p>
                   {isAdmin
                     ? "Ask about orders, members or sales, get help with the dashboard, or have me draft a campaign. I'll never change anything without your OK."
-                    : "Ask about our products, your order, membership or your account. If I can't sort it, I'll pass you to the team."}
+                    : audience === "store"
+                      ? "I can request more stock for you, check on a request, show what we've shipped you, or pass a message to the team. Nothing is sent until you press the button."
+                      : "Ask about our products, your order, membership or your account. If I can't sort it, I'll pass you to the team."}
                 </p>
                 <div className="as-chips">
                   {audience === "admin" && todayChips && todayChips.length > 0 ? (

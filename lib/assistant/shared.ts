@@ -4,10 +4,11 @@ import { brand } from "@/lib/brand";
  * No server-only imports here — this file ships to the browser.
  */
 
-export type Audience = "public" | "member" | "admin";
+/** "store" = a retail store signed in to the store portal (lib/assistant/storeTools.ts). */
+export type Audience = "public" | "member" | "admin" | "store";
 
 /** Where the widget is mounted. The server decides the real audience. */
-export type WidgetMode = "site" | "admin";
+export type WidgetMode = "site" | "admin" | "store";
 
 export type ChatRole = "user" | "assistant";
 
@@ -47,6 +48,12 @@ export type ActionProposal = {
     | "resend_invoice"
     | "member_email"
     | "points_credit"
+    // Retail: staff move a store's stock request; stores request / cancel / confirm / message
+    | "retail_request_status"
+    | "store_request"
+    | "store_request_cancel"
+    | "store_request_received"
+    | "store_message"
     // The rest of the dashboard (lib/assistant/adminActions.ts)
     | "member_create"
     | "member_delete"
@@ -96,7 +103,7 @@ export type ActionProposal = {
 export type AdminRefreshKey =
   | "users" | "orders" | "products" | "discounts" | "settings" | "banner"
   | "events" | "subscribers" | "bundles" | "campaigns" | "templates" | "flags"
-  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance" | "site_requests";
+  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance" | "site_requests" | "retail";
 
 export type CampaignDraft = {
   subject: string;
@@ -157,7 +164,7 @@ export type ChatReply = {
 };
 
 export type AssistantStatus = {
-  available: { public: boolean; member: boolean; admin: boolean };
+  available: { public: boolean; member: boolean; admin: boolean; store?: boolean };
   name: string;
   /** Voice on (mic + read aloud): the switch is on and a Gateway key is set. */
   voice?: boolean;

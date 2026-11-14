@@ -25,6 +25,7 @@ import { normalizeStatus } from "./orderStatus";
 import { getAmbassadors, termsOf } from "./ambassadors";
 import { ambassadorStatsFor } from "./ambassadorData";
 import { pacificDay } from "./periods";
+import { getRequests } from "./retail";
 
 export async function todaySuggestions(monthCap: number): Promise<{ manager: Suggestion[]; marketing: Suggestion[] }> {
   let manager: Suggestion[] = [];
@@ -158,6 +159,28 @@ export async function todaySuggestions(monthCap: number): Promise<{ manager: Sug
     }
   } catch (err) {
     console.error("[today] ambassadors skipped", err);
+  }
+  // Retail stores' stock requests waiting for review (Retail tab; shows whether or not the portal switch is on).
+  try {
+    const waiting = (await getRequests()).filter((r) => r.status === "pending");
+    if (waiting.length) {
+      const units = waiting.reduce((n, r) => n + r.items.reduce((m, i) => m + i.qty, 0), 0);
+      const oldest = Math.min(...waiting.map((r) => r.createdAt));
+      manager.unshift({
+        key: "retail-requests",
+        priority: Date.now() - oldest > 2 * 86_400_000 ? "now" : "today",
+        task: `Review ${waiting.length} stock request${waiting.length === 1 ? "" : "s"} from stores (${units} units)`,
+        why: "Sent from the store portal. Approve, ship or decline each one in the Retail tab; the store sees the status and your note.",
+        items: waiting.slice(0, 8).map((r) => `${r.storeName} ${r.ref}: ${r.items.map((i) => `${i.name} × ${i.qty}`).join(", ").slice(0, 160)}`),
+        ask: "Which stores are waiting on stock requests and what did they ask for? Help me approve them.",
+        targets: waiting.slice(0, 10).map((r) => ({ kind: "retail_request" as const, id: r.id, name: `${r.storeName} ${r.ref}`, detail: `${r.items.map((i) => `${i.name} × ${i.qty}`).join(", ")}${r.note ? `; store's note: ${r.note.slice(0, 120)}` : ""}` })),
+        guide: "Summarise each target (store, products, units, note). Change nothing until staff decide. To approve or decline, call propose_retail_request_status with ref = the target id (one card each). For shipping, tell staff to use Mark shipped in the Retail tab, which asks whether to take the units off stock counts.",
+        tab: "retail",
+        button: "Review requests",
+      });
+    }
+  } catch (err) {
+    console.error("[today] retail requests skipped", err);
   }
   try {
     const [orders, users, products, subscribers, campaigns, bundles, settings] = await Promise.all([

@@ -19,6 +19,7 @@ const AUD: Array<[string, string, string]> = [
   ["admin", "Staff", "#2f5d3a"],
   ["member", "Members", "#85ba45"],
   ["public", "Visitors", "#d8b36a"],
+  ["store", "Stores", "#7a8fa6"],
 ];
 const PROVIDER_COLOR: Record<string, string> = {
   anthropic: "#d97757",

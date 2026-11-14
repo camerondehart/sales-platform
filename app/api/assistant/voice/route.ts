@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bad request." }, { status: 400 });
   }
   if (!(await isEnabled("voice_concierge").catch(() => false))) return NextResponse.json({ error: "Voice is off." }, { status: 404 });
-  const mode: WidgetMode = body.mode === "admin" ? "admin" : "site";
+  const mode: WidgetMode = body.mode === "admin" ? "admin" : body.mode === "store" ? "store" : "site";
   const who = await resolveAudience(mode);
   if (!who) return NextResponse.json({ error: "Please sign in again." }, { status: 401 });
   // Voice counts toward the Assistant's monthly limit, like chat.

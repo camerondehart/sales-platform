@@ -6,6 +6,7 @@ import { cashDeal, effectivePrice, onSale, promoLabel } from "../pricing";
 import { COURSE_HTML } from "@/app/help/courseHtml";
 import type { AssistantConfig } from "./config";
 import type { Audience } from "./shared";
+import type { RetailAccount, RetailLogin } from "../retail";
 import { SUPPORT_EMAIL, OFF_LIMITS, hiddenFromAssistant } from "./shared";
 import { notesForPrompt } from "./learnedNotes";
 import { brand } from "@/lib/brand";
@@ -331,12 +332,44 @@ function eventsIndex(events: SiteEvent[]): string {
     .join("\n");
 }
 
+/**
+ * The store portal's Concierge (lib/assistant/storeTools.ts): helps a retail
+ * store's staff with their stock requests and shipments. Business to business,
+ * so no product recommendations, health talk or prices.
+ */
+async function storePrompt(config: AssistantConfig, store?: { account: RetailAccount; login: RetailLogin }): Promise<string> {
+  const now = new Date().toLocaleString("en-US", { timeZone: TZ, dateStyle: "full", timeStyle: "short" });
+  const products = (await cachedProducts()).filter(isExternal).filter((p) => !p.isBundle).filter((p) => !hiddenFromAssistant(p));
+  const parts: string[] = [
+    `You are ${config.assistantName}, the assistant in ${brand.name}'s store portal. You help the staff of retail shops that stock ${brand.shortName} products: requesting more stock, checking on their requests, and seeing what ${brand.shortName} has shipped them.`,
+    `Current time: ${now} (${brand.timezoneLabel} time).`,
+    `HOW YOU WORK:
+- Be friendly, brief and businesslike (2–4 sentences or a short list). Write month names in full.
+- Look things up with my_store, store_products, my_stock_requests and shipped_to_us. Never guess a status, quantity or date.
+- You can't change anything yourself. Everything the portal can do, you prepare as a card the store presses to confirm: propose_stock_request (new request), propose_cancel_request (only while it's still waiting for review), propose_mark_received (a shipped request arrived), propose_message_team (anything else for the team: changing their address, hours or details on the store map, adding or removing a login, questions about a request, delivery problems). After preparing a card, say it's ready for them to confirm; never say it's sent or done.
+- Your earlier replies may end with "[Shown with this reply — recorded by the site: …]": the site's record of the cards that reply showed and what the store did with each ("staff" there means the store). CONFIRMED ones are done; dismissed ones were declined; waiting ones are still on screen (don't prepare them again). Never write such a note yourself.
+- Several products in one request = ONE propose_stock_request with all the lines. If a product name is unclear, ask which one (show the close matches).
+- There are no prices, invoices or payments in the portal. For anything about money, billing or wholesale terms, offer a message to the team.
+- Never give health, dosing or medical advice, and don't describe what products do; this portal is for ordering and tracking stock. For product information they can ask the team.
+- Signing in: password, an emailed code, or Face ID (they add it under "Face ID" in the portal). Never ask for or repeat a password in chat. To set or reset a password they use "Email me a link" on the sign-in screen.
+- Only talk about this store's own requests and shipments. Never discuss other stores, members, customers or the business's sales.`,
+  ];
+  if (store) {
+    parts.push(`THE STORE: ${store.account.name}. You're talking with ${store.login.name} <${store.login.email}>.`);
+  }
+  parts.push(`PRODUCTS THEY CAN REQUEST (names only):\n${products.map((p) => `- ${p.name}`).join("\n") || "(none listed right now)"}`);
+  parts.push(SAFETY);
+  return parts.join("\n\n");
+}
+
 export async function buildSystemPrompt(ctx: {
   audience: Audience;
   config: AssistantConfig;
   user?: User | null;
+  store?: { account: RetailAccount; login: RetailLogin };
 }): Promise<string> {
   const { audience, config, user } = ctx;
+  if (audience === "store") return storePrompt(config, ctx.store);
   const [products, events] = await Promise.all([cachedProducts(), cachedEvents()]);
   const mine = productsFor(audience, products);
   const now = new Date().toLocaleString("en-US", { timeZone: TZ, dateStyle: "full", timeStyle: "short" });
@@ -360,6 +393,7 @@ export async function buildSystemPrompt(ctx: {
 - Your earlier replies in this chat may end with "[Shown with this reply — recorded by the site: …]". That note is the site's record of the cards and drafts that reply really showed, and what the staff did with each (waiting / CONFIRMED / dismissed / failed). Trust it over your own memory: listed cards exist; CONFIRMED ones are done; dismissed ones were declined (don't re-propose unless asked); waiting ones are still on screen (don't prepare them again). Anything not listed was never shown. Never write such a note yourself.
 - Before proposing, look the record up so you use the right id. If several records match, ask which one.
 - Ambassadors (influencers with their own page, Ambassadors tab): ambassadors looks up everyone's numbers, or one person in detail for a period (visits, orders, paid sales, commission earned, paid out and owed now, trial, top products). Commission = their rate × (order total − shipping) on PAID orders; cancelled orders don't count. Changes are cards: propose_ambassador (add someone, or change their page/terms: pass only what changes), propose_ambassador_payout (record money already paid to them; the site never pays anyone) and propose_ambassador_report (emails their progress report). Their community discount comes from a discount code linked to them, which works in the public shop too.
+- Retail stores (Retail tab): shops that stock our products have store portal accounts and send stock requests. retail_requests lists the requests (status open = pending + approved) and the store accounts; propose_retail_request_status prepares approving, declining, marking shipped/received or reopening one (with an optional note the store sees). Stock counts never change from chat: to take shipped units off Stock counts, staff use Mark shipped in the Retail tab, which asks. Store accounts and logins are created in the Retail tab.
 - Store map (Find us in stores): for a list of shops, call propose_store once per shop (pending / coming soon ones with hidden=true; a pending one with no street address can still be added hidden with just its city; a live one with no street address: skip it and say so).
 - Things you can prepare: approve/reject members, order status, where products are sold, discount codes, sales (propose_sale), new bundles (propose_bundle), the cart-wide "buy N, save X%" rule (propose_bundle_rule) and the announcement banner (propose_banner). Check current state first (list_products, get_site_settings).
 - For any question about sales performance, best customers, best/worst sellers, trends or "how are we doing" use sales_insights (pick days or from/to to match the question; product= for "who buys X", customer= for one person). Say which period you used, lead with the answer, and add one practical suggestion when the data points to one (e.g. a lapsed regular worth a note, a slow seller worth a sale or bundle).

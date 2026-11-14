@@ -23,6 +23,7 @@ import StaffPanel from "./StaffPanel";
 import SettingsTiles from "./SettingsTiles";
 import RowMenu from "./RowMenu";
 import StoreLocationsPanel from "./StoreLocationsPanel";
+import RetailPanel from "./RetailPanel";
 import DiscountCodeList, { codeState } from "./DiscountCodeList";
 import { useAdminTheme } from "./useAdminTheme";
 import MediaUpload from "./MediaUpload";
@@ -64,7 +65,7 @@ const SUBS_PER_PAGE = 25;
 // Deprecated screen; flip to true to bring it back temporarily.
 const SHOW_LEGACY_INQUIRY_ARCHIVE = false;
 
-type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "ambassadors" | "assistant" | "settings";
+type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "ambassadors" | "retail" | "assistant" | "settings";
 
 const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "overview", label: "Overview", icon: "◧" },
@@ -75,6 +76,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "events", label: "Events", icon: "🎟" },
   { key: "marketing", label: "Marketing", icon: "✦" },
   { key: "ambassadors", label: "Ambassadors", icon: "★" },
+  { key: "retail", label: "Retail", icon: "🏪" },
   { key: "assistant", label: "Assistant", icon: "✧" },
   { key: "settings", label: "Settings", icon: "⚙" },
 ];
@@ -128,8 +130,11 @@ export default function AdminDashboard({
   // the server and first client render agree (no hydration mismatch).
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("fp_admin_tab") as TabKey | null;
+      // A link from an email (/admin?tab=retail) wins over the remembered tab.
+      const linked = new URLSearchParams(window.location.search).get("tab") as TabKey | null;
+      const saved = linked && TABS.some((t) => t.key === linked) ? linked : (localStorage.getItem("fp_admin_tab") as TabKey | null);
       if (saved && TABS.some((t) => t.key === saved)) setTab(saved);
+      if (linked) window.history.replaceState({}, "", "/admin");
     } catch {}
   }, []);
   useEffect(() => {
@@ -2572,6 +2577,19 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     };
   }, []);
 
+  // Stores' stock requests waiting for review (Retail tab badge).
+  const [retailPending, setRetailPending] = useState(0);
+  useEffect(() => {
+    const load = () =>
+      fetch("/api/admin/retail", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d && Array.isArray(d.requests) && setRetailPending(d.requests.filter((x: { status?: string }) => x.status === "pending").length))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 5 * 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Customer requests the assistant handed to the team and nobody has closed.
   const [openEscalations, setOpenEscalations] = useState(0);
   useEffect(() => {
@@ -2686,11 +2704,13 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           const badge =
             t.key === "orders" ? openOrderCount :
             t.key === "members" ? pending.length :
+            t.key === "retail" ? retailPending :
             t.key === "assistant" ? openEscalations : 0;
           // Spell out what the number means, on hover and for screen readers.
           const badgeTitle =
             t.key === "orders" ? openOrderSummary :
             t.key === "members" ? `${pending.length} waiting for approval` :
+            t.key === "retail" ? `${retailPending} stock ${retailPending === 1 ? "request" : "requests"} waiting for review` :
             t.key === "assistant" ? `${openEscalations} customer ${openEscalations === 1 ? "request" : "requests"} waiting for a reply` : "";
           return (
             <button
@@ -3912,6 +3932,7 @@ We just finished a new run and wanted you to hear it first.
       {/* Discount codes */}
       {tab === "marketing" && <BundlesPanel products={products} />}
       {tab === "ambassadors" && <AmbassadorsPanel products={products} />}
+      {tab === "retail" && <RetailPanel onPending={setRetailPending} />}
       {tab === "marketing" && (
       <section className="admin-section">
         <h2>

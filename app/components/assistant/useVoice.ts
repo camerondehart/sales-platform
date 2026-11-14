@@ -62,7 +62,7 @@ const toB64 = (blob: Blob) =>
 
 export function useVoice(opts: {
   enabled: boolean;
-  mode: "site" | "admin";
+  mode: "site" | "admin" | "store";
   /** Tap-to-talk: put the words in the box. */
   onText: (text: string) => void;
   /** Hands-free: send the words straight away. */

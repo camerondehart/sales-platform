@@ -9,13 +9,14 @@ import { VersionedStore } from "./versionedStore";
  *   - staff codes: a 6-digit code typed on the member sign-in by someone on
  *     the staff list — signs in to the dashboard, so tighter limits
  *     (3 tries per code, at most 6 codes a day per address)
+ *   - store portal codes: same rules as members' codes (lib/retailAuth.ts)
  *
  * Only an HMAC of each secret is stored (keyed with AUTH_SECRET), so even
  * someone who read the stored file couldn't work out a code or a link.
  * Using a code is a race-safe write: two tabs can't both use the same one.
  */
 
-export type Purpose = "member" | "admin" | "staff";
+export type Purpose = "member" | "admin" | "staff" | "store";
 
 type Row = {
   id: string;
@@ -41,7 +42,7 @@ const WINDOW = 15 * 60_000;
 /** Staff codes: fewer guesses, and a daily cap, since they open the dashboard. */
 const STAFF_TRIES = 3;
 const STAFF_PER_DAY = 6;
-const isCode = (p: Purpose) => p === "member" || p === "staff";
+const isCode = (p: Purpose) => p === "member" || p === "staff" || p === "store";
 
 const store = new VersionedStore<Row>({
   name: "login-codes",
@@ -105,7 +106,12 @@ export async function useStaffCode(emailRaw: string, codeRaw: string): Promise<s
   return useCode("staff", emailRaw, codeRaw);
 }
 
-async function useCode(purpose: "member" | "staff", emailRaw: string, codeRaw: string): Promise<string | null> {
+/** Check a store portal login's 6-digit code. Returns the email on success. */
+export async function useStoreCode(emailRaw: string, codeRaw: string): Promise<string | null> {
+  return useCode("store", emailRaw, codeRaw);
+}
+
+async function useCode(purpose: "member" | "staff" | "store", emailRaw: string, codeRaw: string): Promise<string | null> {
   const email = norm(emailRaw);
   const code = String(codeRaw || "").replace(/\D/g, "");
   if (!email || code.length !== 6) return null;

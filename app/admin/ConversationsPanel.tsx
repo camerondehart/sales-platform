@@ -10,7 +10,7 @@ import { brand } from "@/lib/brand";
 type Flag = { kind: string; severity: "high" | "medium" | "low"; excerpt: string; at: number };
 type Transcript = {
   id: string;
-  audience: "public" | "member" | "admin";
+  audience: "public" | "member" | "admin" | "store";
   who: string;
   startedAt: number;
   lastAt: number;
@@ -61,7 +61,7 @@ const TOPIC_LABELS: Record<string, string> = {
   complaint: "Complaints",
   other: "Other",
 };
-const AUD: Record<string, string> = { public: "Visitor", member: "Member", admin: "Staff" };
+const AUD: Record<string, string> = { public: "Visitor", member: "Member", admin: "Staff", store: "Store" };
 
 const when = (t: number) =>
   new Date(t).toLocaleString("en-US", { timeZone: brand.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -157,7 +157,7 @@ export default function ConversationsPanel() {
 
       <div className="al-filters" style={{ marginTop: "1rem" }}>
         <div className="seg">
-          {[["", "All"], ["public", "Visitors"], ["member", "Members"], ["admin", "Staff"]].map(([v, l]) => (
+          {[["", "All"], ["public", "Visitors"], ["member", "Members"], ["store", "Stores"], ["admin", "Staff"]].map(([v, l]) => (
             <button key={v} type="button" className={audience === v ? "on" : ""} onClick={() => setAudience(v)}>{l}</button>
           ))}
         </div>

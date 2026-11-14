@@ -29,7 +29,7 @@ export type AuditEntry = {
   at: number;
   action: string;
   actor: string;
-  actorType: "admin" | "system" | "member" | "visitor";
+  actorType: "admin" | "system" | "member" | "visitor" | "store";
   source: "human" | "ai" | "system";
   targetType?: string;
   targetId?: string;
