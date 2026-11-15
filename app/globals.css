@@ -9563,3 +9563,40 @@ html[data-admin-theme="dark"] .rt-form { background: var(--surface-alt); border-
 .evn-found strong { color: var(--ink); font-weight: 600; }
 .evn-save { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.5rem; }
 @media (max-width: 720px) { .evn-list li { grid-template-columns: minmax(0, 1fr); } }
+
+/* ─────────────── Ambassador pages: members-only picks (2026-11-15) ───────────────
+   Locked for visitors who aren't signed-in members: a frosted placeholder (no
+   product details are sent). Frost is faked with gradients, no live blur
+   (repeated element over the animated background). */
+.card-members a, a.card-meta, a.card-image { color: inherit; text-decoration: none; }
+a.card-add-link { display: block; text-align: center; text-decoration: none; color: var(--white); line-height: normal; }
+.card-members-tag { position: absolute; right: 10px; top: 10px; z-index: 2; padding: 0.24rem 0.6rem; border-radius: 999px; pointer-events: none;
+  background: rgba(255, 255, 255, 0.86); color: var(--accent-strong); font-family: var(--font-sans); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; box-shadow: 0 3px 10px -4px rgba(0, 0, 0, 0.3); }
+.card-locked { cursor: default; }
+.card-locked:hover { transform: none; }
+.card-locked-art {
+  background:
+    radial-gradient(120% 90% at 20% 15%, rgba(255, 255, 255, 0.75), transparent 60%),
+    linear-gradient(160deg, #e9efe0 0%, #dfe8d4 45%, #e8e3ea 100%);
+  display: grid; place-items: center;
+}
+.card-locked-blob { position: absolute; border-radius: 50%; opacity: 0.55; }
+.card-locked-blob-1 { width: 62%; height: 46%; left: 8%; top: 22%; background: radial-gradient(closest-side, rgba(133, 186, 69, 0.55), rgba(133, 186, 69, 0)); }
+.card-locked-blob-2 { width: 54%; height: 42%; right: 4%; top: 40%; background: radial-gradient(closest-side, rgba(15, 199, 163, 0.38), rgba(15, 199, 163, 0)); }
+.card-locked-blob-3 { width: 48%; height: 34%; left: 26%; bottom: 6%; background: radial-gradient(closest-side, rgba(186, 160, 200, 0.45), rgba(186, 160, 200, 0)); }
+.card-locked-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.12)); }
+.card-locked-lock { position: relative; z-index: 1; display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.82); color: var(--accent-strong); box-shadow: 0 8px 22px -10px rgba(40, 60, 20, 0.45); }
+.card-locked-meta .card-name { font-style: italic; }
+.card-locked .card-add-link { margin-top: auto; }
+.card-locked-join { display: block; padding: 0.55rem 0.75rem 0.7rem; text-align: center; font-size: 0.74rem; color: var(--accent-strong); text-decoration: none; }
+.card-locked-join:hover { text-decoration: underline; }
+.card-locked .card-add-link + .card-locked-join { margin-top: 0; }
+@media (max-width: 640px) {
+  .grid:not(.grid-one-up) .card-members-tag { font-size: 0.52rem; padding: 0.2rem 0.45rem; right: 6px; top: 6px; }
+  .grid:not(.grid-one-up) .card-locked-lock { width: 46px; height: 46px; }
+  .grid:not(.grid-one-up) .card-locked-join { font-size: 0.66rem; padding: 0.45rem 0.4rem 0.55rem; }
+}
+.dc-chip.members { margin-left: 0.4rem; white-space: nowrap; background: rgba(133, 186, 69, 0.16); color: var(--accent-strong); }
+html[data-admin-theme="dark"] .dc-chip.members { background: rgba(166, 213, 95, 0.18); color: #c6e79a; }

@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { isEnabled, applyVideoFlag } from "@/lib/flags";
-import { isAdmin } from "@/lib/auth";
-import { getProducts, isExternal } from "@/lib/storage";
+import { isAdmin, getApprovedVisitor } from "@/lib/auth";
+import { getProducts, isExternal, isInternal, type Product } from "@/lib/storage";
 import { applyStockFlag } from "@/lib/stock";
 import { getAmbassadorBySlug, SLUG_RE, socialKind, SOCIAL_NAMES, type Ambassador } from "@/lib/ambassadors";
 import RetailClient from "@/app/retail/RetailClient";
@@ -73,16 +73,31 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
   const { a, preview } = hit;
   // Count the visit (and QR scan) for their numbers; never staff previews or bots.
   if (!preview && !isBot(headers().get("user-agent") || "")) countAmbassadorVisit(a.id, searchParams?.qr === "1");
-  const [products, stores, welcomeOn, pickup, code] = await Promise.all([
-    getProducts().then((all) => applyVideoFlag(all.filter(isExternal))).then(applyStockFlag),
+  const [all, stores, welcomeOn, pickup, code, member] = await Promise.all([
+    getProducts().then(applyVideoFlag).then(applyStockFlag),
     isEnabled("store_locator").catch(() => false),
     isEnabled("ambassador_welcome").catch(() => false),
     isEnabled("cash_pickup").catch(() => false),
     liveCode(a.discountCode),
+    getApprovedVisitor().catch(() => null),
   ]);
-  // Only public-shop products can be featured; members-only ones never show here.
+  const products = all.filter(isExternal);
+  // Featured picks keep their order. Public-shop ones are normal cards. Members-only ones
+  // are real cards (linking to the members' shop) for a signed-in member, and a locked
+  // placeholder for everyone else: their name, photo and price never leave the server.
   const publicIds = new Set(products.map((p) => p.id));
-  const featured = a.productIds.filter((id) => publicIds.has(id));
+  const memberOnly = new Map(all.filter((p) => isInternal(p) && !isExternal(p)).map((p) => [p.id, p]));
+  const memberPicks: Record<string, Product | null> = {};
+  const featured: string[] = [];
+  let locked = 0;
+  for (const id of a.productIds) {
+    if (publicIds.has(id)) featured.push(id);
+    else if (memberOnly.has(id)) {
+      const key = member ? id : `members-only-${++locked}`;
+      memberPicks[key] = member ? memberOnly.get(id)! : null;
+      featured.push(key);
+    }
+  }
   const first = a.name.split(" ")[0];
   // Their look (lib/ambassadorLooks.ts) and emoji: the emoji leaves the headline and becomes a badge on their photo.
   const look = lookFor(a);
@@ -186,6 +201,8 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
         stores={stores}
         featuredIds={featured.length ? featured : undefined}
         pickedBy={featured.length ? first : undefined}
+        memberPicks={Object.keys(memberPicks).length ? memberPicks : undefined}
+        signInNext={`/${a.slug}`}
         intro={intro}
         outro={
           <>

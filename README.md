@@ -144,7 +144,7 @@ All behind switches in Settings → Feature switches (live-site defaults in brac
 | Stock counts [off] | Products → Stock counts; at 0 a product shows "Currently restocking" and can still be ordered (backorders) |
 | Venmo payment matching [off] | Forward Venmo's "paid you" emails to Resend inbound; they're verified (DKIM) and matched to orders by the `#REF` in the note |
 | Concierge voice / Concierge photos [off] | Read-aloud answers, hands-free conversation mode, and photos in the chat |
-| Ambassador pages [off] | `/<name>` pages for influencers, per-ambassador terms, commission tracking, payouts, emailed progress reports |
+| Ambassador pages [off] | `/<name>` pages for influencers, per-ambassador terms, commission tracking, payouts, emailed progress reports. Members-only featured products show as a locked "Sign in to see" card to visitors (no name, photo or price sent) |
 | Staff sign-in with Face ID [on] | Passkeys (WebAuthn) for staff; added per device in Settings → Staff sign-in |
 | Member sign-in with Face ID [on] | Members add Face ID / Touch ID / fingerprint from a one-click popup after signing in ("Not now" remembered per device) or Account → Face ID, then sign in with one tap |
 | Daily staff password [on] | The shared admin password becomes a new two-word phrase daily (nightly email + Settings); the old fixed password stops after 7 days |

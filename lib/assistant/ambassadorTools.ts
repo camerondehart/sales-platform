@@ -54,7 +54,7 @@ export const AMBASSADOR_DEFS: Def[] = [
   ),
   admin(
     "propose_ambassador",
-    "Prepare adding an ambassador, or changing one (pass ambassador id/name and ONLY the fields that change). Covers their page (name, page address, headline, words, photo link, featured public products, social links, linked discount code, live on/off), their email for reports and their terms. Staff must confirm.",
+    "Prepare adding an ambassador, or changing one (pass ambassador id/name and ONLY the fields that change). Covers their page (name, page address, headline, words, photo link, featured products (members-only ones show locked to visitors who aren't signed-in members), social links, linked discount code, live on/off), their email for reports and their terms. Staff must confirm.",
     {
       ambassador: str("To change someone: their id or name. Leave empty to add a new ambassador."),
       name: str("Full name"),
@@ -63,7 +63,7 @@ export const AMBASSADOR_DEFS: Def[] = [
       headline: str("Headline on their page"),
       bio: str("A few words on their page"),
       photo: str("Photo link (https://…)"),
-      products: { type: "array", items: { type: "string" }, description: "Featured public-shop products (names or ids), in order. Replaces the current list." },
+      products: { type: "array", items: { type: "string" }, description: "Featured products (names or ids), in order. Public-shop or members-only (members-only ones show as a locked card until a member signs in). Replaces the current list." },
       socials: { type: "array", items: { type: "string" }, description: "Social links (instagram.com/name…). Replaces the current list." },
       discount_code: str("An existing discount code to link (\"\" to unlink)"),
       active: bool("Page live (true) or off (false)"),
@@ -204,7 +204,7 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
       if (args.photo !== undefined) setF("photo", "Photo updated", s(args.photo, 600));
       if (args.active !== undefined) setF("active", args.active ? "Page: live" : "Page: off", !!args.active);
       if (Array.isArray(args.products)) {
-        const all = (await getProducts()).filter(isExternal);
+        const all = await getProducts();
         const ids: string[] = [];
         const missing: string[] = [];
         for (const w of args.products.map((x) => s(x, 120)).filter(Boolean).slice(0, 24)) {
@@ -213,7 +213,8 @@ export async function runAmbassadorTool(name: string, args: Record<string, unkno
           if (hit) ids.push(hit.id);
           else missing.push(w);
         }
-        setF("productIds", `Featured: ${ids.map((id) => all.find((p) => p.id === id)!.name).join(", ") || "(whole shop)"}${missing.length ? ` · not in the public shop, left off: ${missing.join(", ")}` : ""}`, ids);
+        const label = (id: string) => { const p = all.find((x) => x.id === id)!; return isExternal(p) ? p.name : `${p.name} (members only, locked for visitors)`; };
+        setF("productIds", `Featured: ${ids.map(label).join(", ") || "(whole shop)"}${missing.length ? ` · not found, left off: ${missing.join(", ")}` : ""}`, ids);
       }
       if (Array.isArray(args.socials)) setF("socials", `Social links: ${args.socials.map((x) => s(x, 200)).filter(Boolean).join(", ") || "(none)"}`, args.socials.map((x) => ({ url: s(x, 400) })).filter((x) => x.url));
       if (args.discount_code !== undefined) {

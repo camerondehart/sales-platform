@@ -131,7 +131,8 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
       .catch(() => {});
   }, []);
 
-  const publicProducts = useMemo(() => products.filter(isPublic).sort((a, b) => a.name.localeCompare(b.name)), [products]);
+  // Members-only products can be featured too: visitors who aren't signed-in members see them locked.
+  const pickable = useMemo(() => products.slice().sort((a, b) => a.name.localeCompare(b.name)), [products]);
   const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const sorted = useMemo(() => {
     const l = (list || []).slice();
@@ -343,7 +344,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
             <ol className="amb-picked">
               {form.productIds.map((id, i) => (
                 <li key={id}>
-                  <span className="amb-picked-name">{byId.get(id)?.name || "Removed product"}{byId.get(id) && !isPublic(byId.get(id)!) && <span className="dc-chip ended">Members only — won&rsquo;t show</span>}</span>
+                  <span className="amb-picked-name">{byId.get(id)?.name || "Removed product"}{byId.get(id) && !isPublic(byId.get(id)!) && <span className="dc-chip members">Members only</span>}</span>
                   <span className="prod-move">
                     <button type="button" onClick={() => moveProduct(id, -1)} disabled={i === 0} aria-label="Move up">↑</button>
                     <button type="button" onClick={() => moveProduct(id, 1)} disabled={i === form.productIds.length - 1} aria-label="Move down">↓</button>
@@ -355,17 +356,18 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           )}
           <input type="search" value={pq} onChange={(e) => setPq(e.target.value)} placeholder="Filter products…" className="store-pq" />
           <div className="store-products">
-            {publicProducts.filter((p) => !pq || p.name.toLowerCase().includes(pq.toLowerCase())).map((p) => {
+            {pickable.filter((p) => !pq || p.name.toLowerCase().includes(pq.toLowerCase())).map((p) => {
               const on = form.productIds.includes(p.id);
               return (
                 <label key={p.id} className={`store-product${on ? " on" : ""}`}>
                   <input type="checkbox" checked={on} onChange={() => set({ productIds: on ? form.productIds.filter((x) => x !== p.id) : [...form.productIds, p.id] })} />
                   {p.name}
+                  {!isPublic(p) && <span className="dc-chip members">Members only</span>}
                 </label>
               );
             })}
           </div>
-          <div className="field-hint">Only public-shop products can be featured. None picked = the page shows the whole shop.</div>
+          <div className="field-hint">Members-only products show as a locked card until a member signs in (no name, photo or price for anyone else). None picked = the page shows the whole shop.</div>
         </div>
         <div className="field full">
           <label>Their socials</label>

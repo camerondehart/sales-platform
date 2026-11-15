@@ -4,6 +4,7 @@ import { getProducts, isExternal } from "@/lib/storage";
 import { applyVideoFlag, isEnabled } from "@/lib/flags";
 import { applyStockFlag } from "@/lib/stock";
 import AuthForms from "./AuthForms";
+import { safeNext } from "@/lib/signInNext";
 import Scene from "./components/Scene";
 import ScrollHint from "./components/ScrollHint";
 import { AskAssistantLink } from "./components/assistant/AskAssistant";
@@ -12,8 +13,9 @@ import { brand } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  if (await getApprovedVisitor()) redirect("/gallery");
+export default async function Home({ searchParams }: { searchParams?: { next?: string } }) {
+  // ?next=/<ambassador page>: "Sign in to see" on their page brings members back there.
+  if (await getApprovedVisitor()) redirect(safeNext(searchParams?.next) || "/gallery");
 
   // The public shop lives on the homepage below the sign-in hero, so a
   // visitor who isn't a member has something to do rather than a dead end.

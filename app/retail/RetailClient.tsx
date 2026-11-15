@@ -38,6 +38,8 @@ export default function RetailClient({
   pickedBy,
   outro,
   pickup = false,
+  memberPicks,
+  signInNext,
 }: {
   products: Product[];
   embedded?: boolean;
@@ -53,6 +55,14 @@ export default function RetailClient({
   outro?: React.ReactNode;
   /** cash_pickup switch: Local pickup (invoice or cash at pickup) in checkout. */
   pickup?: boolean;
+  /**
+   * Ambassador pages: members-only picks, keyed by their entry in featuredIds. A product for a
+   * signed-in member (a real card that opens it in the members' shop); null for everyone else
+   * (a locked card: the server never sends its name, photo or price).
+   */
+  memberPicks?: Record<string, Product | null>;
+  /** Ambassador pages: where "Sign in to see" brings them back to (their page). */
+  signInNext?: string;
 }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   // Phone layout: two per row by default, one per row if they prefer.
@@ -121,9 +131,15 @@ export default function RetailClient({
   }
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
-  const shown = useMemo(
-    () => (featuredIds ? featuredIds.map((id) => productMap.get(id)).filter((p): p is Product => !!p) : products),
-    [featuredIds, productMap, products]
+  // The grid in featured order, members-only picks in their place.
+  const tiles = useMemo(
+    () =>
+      featuredIds
+        ? featuredIds
+            .map((id) => (memberPicks && id in memberPicks ? { key: id, member: true as const, product: memberPicks[id] } : { key: id, member: false as const, product: productMap.get(id) || null }))
+            .filter((t) => t.member || t.product)
+        : products.map((p) => ({ key: p.id, member: false as const, product: p as Product | null })),
+    [featuredIds, memberPicks, productMap, products]
   );
   const detailed = useMemo(
     () =>
@@ -177,7 +193,7 @@ export default function RetailClient({
         </div>
         )}
 
-        {shown.length === 0 ? (
+        {tiles.length === 0 ? (
           <div className="empty">Our shop is being restocked. Please check back soon.</div>
         ) : (
           <>
@@ -196,7 +212,10 @@ export default function RetailClient({
             </button>
           </div>
           <div className={`grid${oneUp ? " grid-one-up" : ""}`}>
-            {shown.map((p, idx) => (
+            {tiles.map(({ key, member, product: p }, idx) =>
+              member ? (
+                <MemberPickCard key={key} product={p} pickedBy={pickedBy} next={signInNext} delay={Math.min(idx * 60, 480)} />
+              ) : p && (
               <article key={p.id} className="card fade-rise" style={{ animationDelay: `${Math.min(idx * 60, 480)}ms` }}>
                 <div className="card-image" onClick={() => setSelected(p)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -216,7 +235,8 @@ export default function RetailClient({
                   Add to cart
                 </button>
               </article>
-            ))}
+              )
+            )}
           </div>
           </>
         )}
@@ -668,5 +688,62 @@ function RetailCheckout({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * A members-only pick on an ambassador's page. Signed-in members get the real product,
+ * opening in the members' shop. Everyone else gets a frosted placeholder with no product
+ * details at all (none were sent), a way to sign in and come back here, and a way to join.
+ */
+function MemberPickCard({ product, pickedBy, next, delay }: { product: Product | null; pickedBy?: string; next?: string; delay: number }) {
+  const style = { animationDelay: `${delay}ms` };
+  if (product) {
+    const href = `/gallery?product=${encodeURIComponent(product.id)}`;
+    return (
+      <article className="card card-members fade-rise" style={style}>
+        <a className="card-image" href={href}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={product.image} alt={product.name} loading="lazy" />
+          <ProductFlags product={product} />
+          <span className="card-members-tag">Members only</span>
+          {pickedBy && <span className="card-pick">♥ {pickedBy}&rsquo;s pick</span>}
+        </a>
+        <a className="card-meta" href={href}>
+          <div>
+            <div className="card-name">{product.name}</div>
+            {product.category && <div className="card-category">{product.category}</div>}
+          </div>
+          <PriceTag product={product} />
+        </a>
+        <a className="card-add card-add-link" href={href}>View in members&rsquo; shop</a>
+      </article>
+    );
+  }
+  const signIn = `/?next=${encodeURIComponent(next || "/")}#top`;
+  return (
+    <article className="card card-locked fade-rise" style={style} aria-label="Members-only pick">
+      <div className="card-image card-locked-art" aria-hidden="true">
+        <span className="card-locked-blob card-locked-blob-1" />
+        <span className="card-locked-blob card-locked-blob-2" />
+        <span className="card-locked-blob card-locked-blob-3" />
+        <span className="card-locked-lock">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="5" y="10.5" width="14" height="10" rx="2.2" />
+            <path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3" />
+          </svg>
+        </span>
+        <span className="card-members-tag">Members only</span>
+        {pickedBy && <span className="card-pick">♥ {pickedBy}&rsquo;s pick</span>}
+      </div>
+      <div className="card-meta card-locked-meta">
+        <div>
+          <div className="card-name">A members-only favorite</div>
+          <div className="card-category">Sign in to see what {pickedBy || "they"} picked</div>
+        </div>
+      </div>
+      <a className="card-add card-add-link" href={signIn}>Sign in to see</a>
+      <a className="card-locked-join" href="/#join">Not a member? Request membership&nbsp;→</a>
+    </article>
   );
 }

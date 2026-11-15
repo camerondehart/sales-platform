@@ -800,6 +800,24 @@ _s,_h=page("/mayarose")
 check("ambassadors: their page shows their name, words, socials and featured product", _s==200 and "morning ritual" in _h and "Truly." in _h and "instagram.com/mayarose" in _h and "My TikTok" in _h and "Harmony Blend Extract" in _h, (_s,_h[:200]))
 check("ambassadors: members-only products never show on a public page", "Secret Member Tincture" not in _h)
 check("ambassadors: the page remembers the ambassador for attribution", "RememberAmbassador" in _h or "mayarose" in _h)
+# Members-only picks: a locked card for visitors, with nothing about the product in the page (name, price, id, photo, words)
+check("ambassadors: a members-only pick shows as a locked card for visitors", 'class="card card-locked' in _h and "Members only" in _h and "Sign in to see" in _h, 'card-locked' in _h)
+check("ambassadors: a logged-out page never contains the members-only product's name, price, id or words", all(x not in _h for x in ("Secret Member Tincture","$40","40.00","p_mem","Members only.","Tinctures")), [x for x in ("Secret Member Tincture","$40","40.00","p_mem","Members only.","Tinctures") if x in _h])
+check("ambassadors: the locked card's sign-in comes back to this page, and offers membership", 'href="/?next=%2Fmayarose#top"' in _h and re.search(r'class="card-locked-join" href="/#join"', _h) is not None)
+check("ambassadors: the pick count includes the locked one", re.search(r"(<!-- -->)?2(<!-- -->)? (<!-- -->)?favorites", _h) is not None)
+_s,_hm=page("/mayarose", cookie=MEMBER)
+check("ambassadors: a signed-in member sees the real members-only pick, opening in the members' shop", _s==200 and "Secret Member Tincture" in _hm and 'href="/gallery?product=p_mem"' in _hm and "Sign in to see" not in _hm and 'card-locked' not in _hm, (_s,'card-locked' in _hm))
+class _NoRedir(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k): return None
+def _where(path, cookie):
+    r=urllib.request.Request(BASE+path); r.add_header("cookie", cookie)
+    try:
+        with urllib.request.build_opener(_NoRedir).open(r, timeout=60) as resp: return resp.status, ""
+    except urllib.error.HTTPError as e: return e.code, e.headers.get("location","")
+_s,_loc=_where("/?next=%2Fmayarose", MEMBER)
+check("sign-in return: a signed-in member sent to sign in goes back to the ambassador page", _s in (307,308) and _loc.endswith("/mayarose"), (_s,_loc))
+_s,_loc=_where("/?next=%2F%2Fevil.example", MEMBER)
+check("sign-in return: only this site's page names are followed (others go to the gallery)", _s in (307,308) and _loc.endswith("/gallery"), (_s,_loc))
 _s,_h=page("/MAYAROSE")
 check("ambassadors: the address works in any capitals", _s==200 and "morning ritual" in _h, _s)
 _s,_h=page("/nosuchperson")
@@ -1004,7 +1022,7 @@ _q=_c["request"]; _s,_x=req(_q["url"], _q["body"], method=_q["method"], headers=
 check("concierge: confirming changes their terms and keeps the rest", _s==200 and _x["ambassador"]["terms"]["commissionPct"]==18 and _x["ambassador"]["discountCode"]=="MAYA10" and len(_x["ambassador"]["payouts"])==2, (_s,_x))
 _r=atool("propose_ambassador", {"name":"Toni Nagy","email":"toni@example.com","products":["Harmony Blend Extract","Secret Member Tincture"],"socials":["instagram.com/toni"],"start_date":"2026-01-01","trial_days":30})
 _c=(_r.get("actions") or [None])[0]
-check("concierge: add-ambassador card (default terms: 10%, no higher rate; public products only)", _c and _c["title"]=="Add ambassador: Toni Nagy" and _c["request"]["body"]["productIds"]==["p_pub"] and _c["request"]["body"]["terms"]["commissionPct"]==10 and _c["request"]["body"]["terms"].get("growthPct") is None and _c["request"]["body"]["terms"]["discountPct"]==10, _c and _c["request"]["body"])
+check("concierge: add-ambassador card (default terms: 10%, no higher rate; members-only picks allowed, marked locked)", _c and _c["title"]=="Add ambassador: Toni Nagy" and _c["request"]["body"]["productIds"]==["p_pub","p_mem"] and "Secret Member Tincture (members only, locked for visitors)" in json.dumps(_c) and _c["request"]["body"]["terms"]["commissionPct"]==10 and _c["request"]["body"]["terms"].get("growthPct") is None and _c["request"]["body"]["terms"]["discountPct"]==10, _c and _c["request"]["body"])
 _q=_c["request"]; _s,_x=req(_q["url"], _q["body"], method=_q["method"], headers={"x-fp-source":"assistant","x-fp-proposal":_c["kind"]})
 check("concierge: confirming adds them", _s==200 and _x["ambassador"]["slug"]=="toninagy", (_s,_x))
 _r=atool("propose_discount_code", {"code":"TONI10","type":"percentage","value":10,"public_shop":True})

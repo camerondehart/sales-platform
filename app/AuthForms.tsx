@@ -7,6 +7,7 @@ import { track } from "@/lib/track";
 import { brand } from "@/lib/brand";
 import { unlockName } from "@/lib/unlockName";
 import { FaceIdIcon, markSignedIn } from "@/app/components/MemberFaceId";
+import { afterSignIn } from "@/lib/signInNext";
 
 type Mode = "signin" | "signup" | "forgot" | "code" | "firsttime";
 
@@ -91,7 +92,7 @@ function CodeSignInForm({ onBack, initialEmail = "" }: { onBack: () => void; ini
     });
     if (res.ok) {
       markSignedIn("code");
-      router.push("/gallery");
+      router.push(afterSignIn());
       router.refresh();
       return;
     }
@@ -175,7 +176,7 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId =
       const v = await fetch("/api/login/member-passkey", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", response }) });
       if (v.ok) {
         markSignedIn("passkey");
-        router.push("/gallery");
+        router.push(afterSignIn());
         router.refresh();
         return;
       }
@@ -252,7 +253,7 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId =
         return;
       }
       markSignedIn("password");
-      router.push("/gallery");
+      router.push(afterSignIn());
       router.refresh();
       return;
     }
