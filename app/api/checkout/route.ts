@@ -10,6 +10,7 @@ import { buildCashPickupEmail } from "@/lib/cashPickupEmail";
 import { findDiscountByCode, validateDiscount, recordDiscountUse } from "@/lib/discounts";
 import { getSettings } from "@/lib/settings";
 import { priceCart, type Bundle, type CartLine } from "@/lib/bundles";
+import { memberCodeCap } from "@/lib/pricing";
 import { liveBundles } from "@/lib/bundleStore";
 import { validateRedemption, adjustPoints } from "@/lib/loyalty";
 import { mutateUsers } from "@/lib/users";
@@ -19,6 +20,9 @@ import { reserveForOrder, returnStock } from "@/lib/stock";
 import { creditFor } from "@/lib/ambassadors";
 import { isEnabled } from "@/lib/flags";
 import { recordRisk } from "@/lib/riskLog";
+import { giftWallet, spendBalance, returnHold } from "@/lib/giftCards";
+import { giftApplies } from "@/lib/giftCardRules";
+import crypto from "crypto";
 
 const SHIPPING_FLAT = 10;
 
@@ -153,7 +157,7 @@ export async function POST(req: Request) {
   let codeAmount = 0;
   if (!isInquiry && body.discountCode?.trim()) {
     const found = await findDiscountByCode(body.discountCode);
-    const check = validateDiscount(found, Math.max(0, subtotal - discount), user.id);
+    const check = validateDiscount(found, Math.max(0, subtotal - discount), user.id, memberCodeCap(user));
     if (!check.ok) {
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
@@ -176,7 +180,25 @@ export async function POST(req: Request) {
 
   const totalDiscount = Math.round((discount + codeAmount + pointsCredit) * 100) / 100;
   const shippingCost = isInquiry ? 0 : shippingMethod === "ship" ? SHIPPING_FLAT : 0;
-  const total = isInquiry ? 0 : Math.max(0, subtotal - totalDiscount + shippingCost);
+  const beforeGift = isInquiry ? 0 : Math.max(0, subtotal - totalDiscount + shippingCost);
+
+  // Gift card balance pays what it can (shipping included). It's a payment, not
+  // a discount: points still count it (lib/loyalty.ts). Taken now, under a hold
+  // key the order keeps, and put back if the order doesn't save or is cancelled.
+  let giftApplied = 0;
+  let giftHold: string | undefined;
+  // Applied automatically: any balance comes off at checkout.
+  if (!isInquiry && beforeGift > 0 && (await isEnabled("gift_cards").catch(() => false))) {
+    const wallet = await giftWallet(user);
+    giftApplied = giftApplies(wallet.balance, beforeGift);
+    if (giftApplied > 0) {
+      giftHold = `hold_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+      const spent = await spendBalance(user, giftApplied, giftHold, "Spent on an order");
+      if (!spent.ok) return NextResponse.json({ error: spent.error }, { status: 409 });
+    }
+  }
+  const total = Math.round(Math.max(0, beforeGift - giftApplied) * 100) / 100;
+  const paidByGift = giftApplied > 0 && total <= 0;
 
   // Ambassador pages: credit an ambassador via their linked code or the page the member
   // came from (attribution only). Not for orders staff place with "Log in as".
@@ -187,7 +209,10 @@ export async function POST(req: Request) {
       : undefined;
 
   // Stock counts (switch on): take the units; lines at 0 are marked restocking.
-  const stock = await reserveForOrder(orderItems, productMap);
+  const stock = await reserveForOrder(orderItems, productMap).catch(async (err) => {
+    if (giftHold) await returnHold(giftHold).catch(() => {});
+    throw err;
+  });
   const order = await addOrder({
     userId: user.id,
     userName: user.name,
@@ -206,17 +231,21 @@ export async function POST(req: Request) {
     bundleSavings: priced.bundleSavings > 0 ? priced.bundleSavings : undefined,
     bundles: priced.bundles.length ? priced.bundles : undefined,
     total,
+    ...(giftApplied > 0 ? { giftCardApplied: giftApplied, giftHold } : {}),
     note: note?.slice(0, 2000) || undefined,
     isInquiry,
-    paymentMethod,
+    // Fully paid by gift card: nothing to collect, so it's paid already.
+    paymentMethod: paidByGift ? "invoice" : paymentMethod,
     source: "member",
-    status: isInquiry ? "inquiry" : "pending",
+    status: isInquiry ? "inquiry" : paidByGift ? "paid" : "pending",
+    ...(paidByGift ? { paidAt: Date.now() } : {}),
     // Staff using "Log in as" — the order says who actually placed it.
     ...(await getVisitor().then((v) => (v?.as ? { placedBy: v.as } : {})).catch(() => ({}))),
     ...(ambassador ? { ambassador } : {}),
   }).catch(async (err) => {
-    // The order didn't save: give the units back.
+    // The order didn't save: give the units (and any gift card balance) back.
     if (stock.stockTaken) await returnStock(stock.stockTaken).catch(() => {});
+    if (giftHold) await returnHold(giftHold).catch(() => {});
     throw err;
   });
 
@@ -286,7 +315,7 @@ export async function POST(req: Request) {
 
   if (apiKey) {
     const resend = new Resend(apiKey);
-    if (!isInquiry && paymentMethod === "cash") {
+    if (!isInquiry && paymentMethod === "cash" && !paidByGift) {
       // Cash at pickup: no invoice, just a confirmation with pickup details.
       try {
         // Resend reports a refusal (bad address, limits…) in `error` rather than throwing.
@@ -340,7 +369,7 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, orderId: order.id, emailed });
+  return NextResponse.json({ ok: true, orderId: order.id, emailed, ...(giftApplied > 0 ? { giftApplied, paidByGift } : {}) });
 }
 
 // Put a warning banner at the top of an email's body (or the start, if it has no <body>).

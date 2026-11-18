@@ -7,7 +7,7 @@ import path from "path";
 import { VersionedStore } from "./versionedStore";
 import { isEnabled, isEnabledStrict } from "./flags";
 import { singleton } from "./assistant/singleton";
-import { capPercentOff } from "./pricing";
+import { capPercentOff, PERCENT_OFF_CAP } from "./pricing";
 
 export type DiscountType = "percentage" | "fixed";
 
@@ -186,7 +186,7 @@ export function generateCode(prefix = ""): string {
 }
 
 export type DiscountCheck =
-  | { ok: true; discount: Discount; amount: number }
+  | { ok: true; discount: Discount; amount: number; capped?: true; cap?: number }
   | { ok: false; error: string };
 
 // Validate a code against an order subtotal for a specific member.
@@ -194,7 +194,9 @@ export type DiscountCheck =
 export function validateDiscount(
   discount: Discount | undefined,
   subtotal: number,
-  userId: string
+  userId: string,
+  /** Most a percentage code can take off this order (memberCodeCap; default $100). */
+  cap: number = PERCENT_OFF_CAP
 ): DiscountCheck {
   if (!discount) return { ok: false, error: "That code isn't valid." };
   if (!discount.active) return { ok: false, error: "That code is no longer active." };
@@ -217,16 +219,19 @@ export function validateDiscount(
     };
   }
 
-  // A percentage code takes at most $100 off an order; fixed-dollar codes are not capped.
+  // A percentage code takes at most $100 off an order (or the member's own
+  // limit, set by staff); fixed-dollar codes are not capped.
   const raw =
     discount.type === "percentage"
-      ? capPercentOff(subtotal * (discount.value / 100))
+      ? capPercentOff(subtotal * (discount.value / 100), cap)
       : discount.value;
   // Never discount below zero.
   const amount = Math.min(Math.round(raw * 100) / 100, subtotal);
   if (amount <= 0) return { ok: false, error: "That code doesn't apply to this order." };
+  // Flag it when the limit was reached, so checkout can say "(max $X off)".
+  const capped = discount.type === "percentage" && raw >= cap;
 
-  return { ok: true, discount, amount };
+  return { ok: true, discount, amount, ...(capped ? { capped: true as const, cap } : {}) };
 }
 
 /** Can this code be used in the public shop? (Marked for it, or a live ambassador's code.) */

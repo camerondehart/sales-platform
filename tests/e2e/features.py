@@ -473,7 +473,7 @@ _aud=[json.loads(l) for l in open(D+"audit.jsonl")] if os.path.exists(D+"audit.j
 check("stock: count changes are in the Activity log", any(a.get("action")=="product.stock" for a in _aud), [a.get("action") for a in _aud][-6:])
 
 # ---------------- Venmo payment matching (forwarded "paid you" emails → confirm cards)
-import subprocess
+import subprocess, shutil
 VDIR="/tmp/harness/venmo"
 def vsign(mid, **o):
     out=subprocess.run(["node","/tmp/harness/venmo-sign.cjs",VDIR,"/tmp/final",mid,json.dumps(o)],capture_output=True,text=True)
@@ -518,6 +518,22 @@ os.makedirs(VDIR, exist_ok=True)
 open(VDIR+"/g1.eml","w").write("From: Gmail Team <forwarding-noreply@google.com>\r\nTo: x@example.resend.app\r\nSubject: (#123456789) Gmail Forwarding Confirmation - Receive Mail from owner@example.com\r\nContent-Type: text/plain\r\n\r\nConfirmation code: 123456789\r\nTo allow owner@example.com to automatically forward mail to your address, please click the link below.\r\n")
 _s,_r=vin("g1")
 check("venmo: Gmail's forwarding code shows in Setup", _s==200 and _r.get("kind")=="setup" and any("123456789" in m["text"] for m in vbox()["setup"]), _r)
+# Zelle (Wells Fargo) emails share the inbox
+vsign("z1", zelle=True, payer="Zed Zelle", amount=3.21, note="just a test", txn="0PE0ZELLE001")
+_s,_r=vin("z1")
+_pz=vpay("zt_0PE0ZELLE001")
+check("zelle: a genuine Wells Fargo Zelle email is taken in, verified and marked Zelle", _s==200 and _r.get("verified") is True and _pz and _pz.get("source")=="zelle" and _pz["payer"]=="Zed Zelle" and _pz["amount"]==3.21 and _pz["note"]=="just a test", (_r,_pz))
+vsign("z2", zelle=True, amount=3.22, txn="0PE0ZELLE002", unsigned=True)
+_s,_r=vin("z2")
+check("zelle: an unsigned 'Zelle' email is quarantined", _s==200 and _r.get("verified") is False, _r)
+# One that came in before Zelle was supported (checked as Venmo) is checked again as Zelle
+vsign("z3", zelle=True, payer="Early Zelle", amount=4.56, note="early", txn="0PE0ZELLE003")
+_rows=json.load(open(D+"venmo-payments.json"))
+_rows.append({"id":"vm_earlyzelle","receivedAt":int(time.time()*1000),"subject":"You received money with Zelle","verified":False,"reason":"Google's record doesn't show Venmo's signature passing when the email arrived.","guessed":True,"payer":"Early Zelle","amount":4.56,"note":"","text":"","rawUrl":"local:vm_earlyzelle.eml","state":"new"})
+open(D+"venmo-payments.json","w").write(json.dumps(_rows))
+shutil.copy(VDIR+"/z3.eml", D+"venmo-raw/vm_earlyzelle.eml")
+_pe=vpay("vm_earlyzelle")
+check("zelle: an early Zelle email quarantined as Venmo is re-checked as Zelle", _pe and _pe.get("source")=="zelle" and _pe["verified"] is True and not _pe.get("reason") and _pe["note"]=="early" and _pe.get("txnId")=="0PE0ZELLE003", _pe)
 # medium: same amount + name, no ref (second order)
 _s,_r=buy(1,"10.92.0.2",email="sam.stock2@example.com")
 _vo2=order_of(_r["orderId"])
@@ -1273,7 +1289,7 @@ req("/api/admin/flags", {"key":"consultation_form","on":True})
 _s,_h=page("/privacy")
 check("privacy: policy page is live and matches the site", _s==200 and "Privacy Policy" in _h and "Northwind Goods" in _h and "Four Peaks" not in _h and "fourpeaks" not in _h and "hashed" in _h and "Do Not Track" in _h and "30 days, then deleted automatically" in _h and "AI" not in _h.split("<article",1)[-1].split("</article>")[0], _s)
 _s,_h=page("/terms")
-check("terms: updated terms (Concierge, consultations, brand state law, links to Privacy)", _s==200 and "Our Concierge" in _h and "/consultation" in _h and "Northwind Goods" in _h and "California" in _h and "laws of the State of" in _h and "Butte" not in _h and "Four Peaks" not in _h and 'href="/privacy"' in _h and "November 1, 2026" in _h, _s)
+check("terms: updated terms (Concierge, consultations, brand state law, links to Privacy)", _s==200 and "Our Concierge" in _h and "/consultation" in _h and "Northwind Goods" in _h and "California" in _h and "laws of the State of" in _h and "Butte" not in _h and "Four Peaks" not in _h and 'href="/privacy"' in _h and "November 18, 2026" in _h, _s)
 check("footer: Privacy linked on every page", 'href="/privacy"' in page("/")[1] and 'href="/privacy"' in page("/retail")[1])
 
 # =============== Seasonal entrance animations (Settings → Entrance animation)

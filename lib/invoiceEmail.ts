@@ -96,8 +96,11 @@ export function addressBlock(order: Order): string {
 }
 
 export function buildInvoiceEmail(order: Order, payLink: string, note?: string | null): string {
-  const shippingLabel =
-    order.shippingMethod === "pickup" ? "Local pickup" : "Shipping / adjustment";
+  const shippingLabel = order.giftCardOrder
+    ? "Delivery (by email)"
+    : order.shippingMethod === "pickup" ? "Local pickup" : "Shipping / adjustment";
+  // Paid in full with gift card balance (lib/giftCards.ts): nothing left to send.
+  const paidByGift = !!order.giftCardApplied && order.total <= 0;
   return `
   <!DOCTYPE html>
   <html><head><meta charset="UTF-8"></head>
@@ -118,11 +121,13 @@ export function buildInvoiceEmail(order: Order, payLink: string, note?: string |
           ${order.bundles?.length ? order.bundles.map((b) => `<div style="margin: 0.4rem 0; color: #6fa336;">${escapeHtml(b.name)} bundle${b.sets > 1 ? ` ×${b.sets}` : ""}: <strong>−$${b.savings.toFixed(2)}</strong></div>`).join("") : ""}
           ${order.discount && order.discount - (order.bundleSavings || 0) > 0.004 ? `<div style="margin: 0.4rem 0; color: #6fa336;">${order.bundleSavings ? "Other savings" : "Promo savings"}: <strong>−$${(order.discount - (order.bundleSavings || 0)).toFixed(2)}</strong></div>` : ""}
           <div style="margin: 0.4rem 0;">${shippingLabel}: <strong>${order.shippingCost === 0 ? "Free" : `$${order.shippingCost.toFixed(2)}`}</strong></div>
+          ${order.giftCardApplied ? `<div style="margin: 0.4rem 0; color: #6fa336;">Gift card: <strong>−$${order.giftCardApplied.toFixed(2)}</strong></div>` : ""}
           <div style="margin: 0.9rem 0 0; font-size: 1.2rem; border-top: 1px solid #abaeb2; padding-top: 0.9rem;">Total: <strong>$${order.total.toFixed(2)}</strong></div>
         </div>
-        ${addressBlock(order)}
-        ${order.shippingMethod === "pickup" ? pickupInstructionsHtml() : ""}
+        ${order.giftCardOrder ? `<p style="margin-top: 1.25rem; line-height: 1.6; font-size: 0.92rem;">Your gift card is sent to its recipient as soon as we've confirmed your payment.</p>` : addressBlock(order)}
+        ${order.shippingMethod === "pickup" && !order.giftCardOrder ? pickupInstructionsHtml() : ""}
         ${note ? `<div style="margin-top: 1.25rem; background: #e8e5e5; padding: 1rem; border-radius: 4px; font-size: 0.9rem;"><strong>Note:</strong><br/>${escapeHtml(note)}</div>` : ""}
+        ${paidByGift ? `<div style="margin-top: 1.75rem; background: #f3f6ec; padding: 1.25rem; border-radius: 8px; text-align: center; line-height: 1.6;"><strong>Paid in full with your gift card.</strong> Nothing more to pay: we'll get your order ready.</div>` : `
         <div style="margin-top: 1.75rem; background: #f3f6ec; padding: 1.25rem; border-radius: 8px;">
           <div style="font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: #85ba45; font-weight: 700; text-align: center;">Completing your consultation &mdash; 2 steps</div>
 
@@ -156,7 +161,7 @@ export function buildInvoiceEmail(order: Order, payLink: string, note?: string |
           </div>
 
           <p style="font-size: 0.78rem; color: #81858b; margin: 1rem 0 0; line-height: 1.55; text-align: center;"><strong>Please note:</strong> if your order doesn't come up right away, give it a minute and try again &mdash; the system may just be updating.</p>
-        </div>
+        </div>`}
         <div style="margin-top: 2rem; font-size: 0.8rem; color: #81858b; border-top: 1px solid #abaeb2; padding-top: 1rem;">
           Thank you for shopping with ${brand.name}. Questions? Reach out to <a href="mailto:${brand.supportEmail}" style="color: #6fa336;">${brand.supportEmail}</a>.
         </div>

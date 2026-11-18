@@ -31,7 +31,13 @@ async function POST_handler(req: Request) {
     pointsPerDollarRedeemed: (v: any) => Math.max(1, num(v, 100, 1)),
     minPointsToRedeem: (v: any) => Math.max(0, num(v, 100, 0)),
     packagingOz: (v: any) => Math.min(320, num(v, 0, 0)),
+    giftBonusEnabled: (v: any) => !!v,
+    giftBonusPer: (v: any) => Math.min(500, Math.round(num(v, 5, 0) * 100) / 100),
+    giftBonusStep: (v: any) => Math.min(1000, Math.max(1, Math.floor(num(v, 50, 1)))),
+    giftBonusMax: (v: any) => Math.min(500, Math.round(num(v, 20, 0) * 100) / 100),
   };
+  // Saved only when sent (the dashboard's loyalty form doesn't send them).
+  const ownForms: Key[] = ["packagingOz", "giftBonusEnabled", "giftBonusPer", "giftBonusStep", "giftBonusMax"];
   type Key = keyof typeof clean;
   const keys = Object.keys(clean) as Key[];
 
@@ -53,16 +59,17 @@ async function POST_handler(req: Request) {
   } catch {
     /* best effort */
   }
-  // The dashboard's loyalty form doesn't send the box weight — keep what's saved.
-  if (body.partial !== true && !("packagingOz" in body)) {
+  // The dashboard's loyalty form doesn't send the box weight or gift card bonus — keep what's saved.
+  if (body.partial !== true && ownForms.some((k) => !(k in body))) {
     try {
-      next.packagingOz = (await getSettingsForUpdate()).packagingOz;
+      const saved = await getSettingsForUpdate();
+      for (const k of ownForms) if (!(k in body)) (next as any)[k] = saved[k];
     } catch {
       return NextResponse.json({ error: "Couldn't read the current settings. Please try again." }, { status: 503 });
     }
   }
   for (const k of keys) {
-    if ((body.partial === true || k === "packagingOz") && !(k in body)) continue;
+    if ((body.partial === true || ownForms.includes(k)) && !(k in body)) continue;
     (next as any)[k] = clean[k](body[k]);
   }
   const saved = await saveSettings(next);

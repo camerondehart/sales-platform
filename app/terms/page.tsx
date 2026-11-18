@@ -17,11 +17,13 @@ export const metadata = {
  * the Concierge, consultations, emails), update this page and /privacy, and
  * bump LAST_UPDATED. Members are emailed about significant changes (§18).
  */
-const LAST_UPDATED = "November 1, 2026";
+const LAST_UPDATED = "November 18, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const PAY = [brand.payments.venmoHandle ? "Venmo" : "", brand.payments.zelle ? "Zelle" : ""].filter(Boolean);
 const PAY_TEXT = PAY.length ? PAY.join(" or ") : "the payment apps shown at checkout";
+/** Who sends the payment emails we match (Venmo itself; Zelle through our bank). */
+const PAY_FROM = [brand.payments.venmoHandle ? "Venmo" : "", brand.payments.zelle ? "our bank" : ""].filter(Boolean).join(" and from ");
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,7 @@ const Mail = () => <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a>;
 
 export default async function TermsPage() {
   const stores = await isEnabled("store_locator").catch(() => false);
+  const gifts = await isEnabled("gift_cards").catch(() => false);
   return (
     <div className="shell">
       <header className="masthead">
@@ -98,14 +101,26 @@ export default async function TermsPage() {
             pick up, where that&rsquo;s offered. Some sale prices are for local pickup paid in cash only, and say so. Unpaid
             orders may be cancelled. Please put your order number in the payment note so we can match it.
           </p>
-          {brand.payments.venmoHandle && (
+          {PAY.length > 0 && (
             <p>
-              To confirm Venmo payments, we receive Venmo&rsquo;s payment notification emails. We use the payer name, amount,
-              note and date only to match a payment to your order, and a team member confirms every match before an order is
-              marked paid.
+              To confirm {PAY.join(" and ")} payments, we receive the payment notification emails from {PAY_FROM}. We use the payer
+              name, amount, note and date only to match a payment to your order, and a team member confirms every match before an
+              order is marked paid.
             </p>
           )}
           <p>Payment apps are run by their own companies, and their terms apply to your payment.</p>
+
+          {gifts && (
+            <p>
+              <strong>Gift cards.</strong> Members can buy gift cards on the site and pay for them like any order. A card is sent
+              to the recipient by email, and added to their account, once we&rsquo;ve confirmed the payment. Gift cards don&rsquo;t
+              expire, are spent in {brand.members}&rsquo;s members&rsquo; shop (the balance comes off automatically at checkout,
+              including shipping), and can&rsquo;t be exchanged for cash except where the law requires it{brand.legal.state === "California" ? " (in California, a balance under $10 can be cashed out on request)" : ""}. Treat
+              the code like cash: anyone with it can add the card to their account. Bonus credit given with a gift card purchase is
+              a promotion: it has no cash value and is covered by §7. If a gift card order is cancelled or refunded before the card
+              is spent, the card (and any bonus credit) is cancelled.
+            </p>
+          )}
 
           <h3>6. Shipping, pickup and returns</h3>
           <p>

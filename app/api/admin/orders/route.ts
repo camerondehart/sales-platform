@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { getOrders, getOrderById, updateOrder, type OrderStatus } from "@/lib/orders";
 
 import { syncOrderPoints } from "@/lib/loyalty";
+import { giftCardsFollowStatus, siteUrlFrom } from "@/lib/giftCardDelivery";
 import { normalizeStatus } from "@/lib/orderStatus";
 import { audited, auditDetail } from "@/lib/audit";
 import { returnStock, takeStock } from "@/lib/stock";
@@ -100,7 +101,19 @@ async function PATCH_handler(req: Request) {
     console.error("[orders] couldn't update loyalty points", err);
   }
 
-  return NextResponse.json({ ok: true, order });
+  // Gift cards (lib/giftCardDelivery.ts): staff setting Paid/Completed confirms the
+  // payment and delivers a gift card order; cancelling voids unspent cards and puts
+  // back gift card balance the order used.
+  let gift: Awaited<ReturnType<typeof giftCardsFollowStatus>> = {};
+  try {
+    gift = await giftCardsFollowStatus(existing, order, siteUrlFrom(req), true);
+    if (gift.delivered || gift.voided || gift.returned || gift.retaken) auditDetail({ after: { status: nextStatus, giftCards: gift } });
+  } catch (err) {
+    console.error("[orders] gift cards", err);
+    gift = { spentWarning: "The gift cards on this order couldn't be updated. Try again in a minute." };
+  }
+  const shown = order.giftCardOrder && gift.delivered && order.status === "paid" ? { ...order, status: "completed" as const } : order;
+  return NextResponse.json({ ok: true, order: shown, ...(gift.spentWarning ? { warning: gift.spentWarning } : {}), ...(gift.delivered ? { giftCardsDelivered: gift.delivered } : {}) });
 }
 
 // One audit-log entry per request (see lib/audit.ts).

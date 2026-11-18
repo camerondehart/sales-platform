@@ -48,6 +48,7 @@ export const FLAG_KEYS = [
   "suspicious_activity",
   "retail_portal",
   "local_events_note",
+  "gift_cards",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -136,8 +137,8 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     built: true,
   },
   venmo_matching: {
-    label: "Venmo payment matching",
-    description: "Orders → Venmo payments: Venmo's “paid you” emails (forwarded from Gmail) are checked, read and matched to unpaid orders. Staff confirm every match; nothing is marked paid on its own. Also adds a Today item and the Concierge's confirm cards. Emails are collected even with this off.",
+    label: "Venmo / Zelle payment matching",
+    description: "Orders → Venmo / Zelle payments: Venmo's “paid you” emails and the bank's Zelle “sent you” emails (forwarded from Gmail) are checked, read and matched to unpaid orders. Staff confirm every match; nothing is marked paid on its own. Also adds a Today item and the Concierge's confirm cards. Emails are collected even with this off.",
     defaults: { production: false, preview: true, development: true },
     built: true,
   },
@@ -228,6 +229,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   retail_portal: {
     label: "Retail store portal",
     description: "Shops that carry our products sign in at /store-portal (password, emailed code or Face ID) to request more stock, see each request's progress and everything we've shipped them, with the Concierge to do any of it for them. No prices or money in the portal. Staff create store accounts, review requests and manage the store map in the Retail tab; new requests email the team and show on the Today list. Off = the portal is closed (accounts and requests stay saved; the Retail tab still works).",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  gift_cards: {
+    label: "Gift cards",
+    description: "Members can buy animated gift cards (Birthday, Holidays, Just because, Thank you, with a note) on the Gift cards page. The card is sent to the recipient's email and account only once payment is confirmed: a matched Venmo/Zelle payment, or staff setting the order to Paid or Completed. Buyers get the bonus credit set in Settings → Gift cards (e.g. $5 per $50). Members spend their balance at checkout. Off = the page and checkout option are hidden; cards already sent keep their balance and show again when it's back on.",
     defaults: { production: false, preview: true, development: true },
     built: true,
   },

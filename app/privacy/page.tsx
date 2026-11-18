@@ -17,12 +17,14 @@ export const metadata = {
  * §14; bump EFFECTIVE when it changes. The 12-month / 7-year retention
  * periods come from the lawyer's draft; the business confirms them.
  */
-const EFFECTIVE = "November 14, 2026";
+const EFFECTIVE = "November 18, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const HOST = brand.siteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
 const PAY = [brand.payments.venmoHandle ? "Venmo" : "", brand.payments.zelle ? "Zelle" : ""].filter(Boolean);
 const PAY_TEXT = PAY.length ? PAY.join(" or ") : "the payment apps shown at checkout";
+/** Who sends the payment emails we match (Venmo itself; Zelle through our bank). */
+const PAY_FROM = [brand.payments.venmoHandle ? "Venmo" : "", brand.payments.zelle ? "our bank" : ""].filter(Boolean).join(" or ");
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +33,7 @@ const Mail = () => <a href={`mailto:${SUPPORT}`}>{SUPPORT}</a>;
 const COLLECT: Array<[string, string, string]> = [
   ["Contact and account details", "Name, email, phone, shipping address", "When you order, request membership, sign up for emails, register for an event, ask for a consultation or contact us"],
   ["Sign-in details", "Your password, stored only in scrambled (hashed) form. If you use Face ID, Touch ID or a fingerprint sensor, your fingerprint or face never leaves your device: we keep only a security key from it", "When you create a password or set up Face ID / Touch ID"],
-  ["Orders and payments", `Items, totals, order history, payment status.${brand.payments.venmoHandle ? " To confirm Venmo payments, Venmo's notification email with the payer name, amount, note and date" : ""}`, "When you order. We never see your card or bank details"],
+  ["Orders and payments", `Items, totals, order history, payment status.${PAY.length ? ` To confirm ${PAY.join(" and ")} payments, the notification email from ${PAY_FROM} with the payer name, amount, note (memo) and date` : ""}`, "When you order. We never see your card or bank details"],
   ["Membership and loyalty", "Membership request, approval status, loyalty points", "When you request or use membership"],
   ["Our previous online store", "If you were a customer of our earlier shop, the account details and order history you had there", "When we moved our customers to this site"],
   ["Events and consultations", "Event registrations and notes. Consultation requests: your interest, preferred time, comments and the name you typed to sign the acknowledgement", "When you register or ask for a consultation"],
@@ -39,6 +41,7 @@ const COLLECT: Array<[string, string, string]> = [
   ["Email activity", "Whether our emails are opened and which links are clicked", "When you open our emails"],
   ["Site information", "Pages viewed, products looked at, which link or code brought you here and country, counted as daily totals. Your browser remembers a creator's page you came through", "Automatically, as you use the site. We don't keep a record of individual visits"],
   ["Fraud checks", "The internet (IP) address, browser type and country a membership request or an order came from", "When you request membership or place an order. We use it only to spot fake accounts and fake orders, and a person on our team reviews anything it flags"],
+  ["Gift cards", "When you send a gift card: the recipient's name and email, the name you sign it with, your note and the occasion. For each card: its code, balance and where it was spent", "When you buy a gift card, and when a card is used at checkout. We use the recipient's email only to send them the card and put it in their account"],
   ["Retail store accounts", "For shops that stock our products: the store's name, a contact name and phone, each login's name and email, the stock requests the store sends (products, quantities and notes) and what we've shipped to it. Store logins sign in the same ways as members", "When we set up a store's portal account, and when the store uses it"],
   ["Approximate area when you sign in", "The rough area (about city level) that your internet (IP) address points to", "When you open the members' area. Used only to decide whether to tell you about our events near you. The area isn't stored: we only note that you've seen the note"],
   ["Location you choose to share", "Your browser's location", "Only when you tap \"use my location\" on the store map. It's used once to sort stores and not stored"],
@@ -54,11 +57,13 @@ const KEEP: Array<[string, string]> = [
   ["Site information", "Daily totals, kept to see trends. They don't identify you"],
   ["Fraud checks", "180 days, then deleted automatically"],
   ["Approximate area when you sign in", "Not kept. We only keep the date you were shown the events note"],
+  ["Gift cards", "As part of our business records while the card has a balance, and afterwards as ordinary business records"],
   ["Retail store accounts and stock requests", "While the store's account is open, then as part of our ordinary business records"],
 ];
 
 export default async function PrivacyPage() {
   const stores = await isEnabled("store_locator").catch(() => false);
+  const gifts = await isEnabled("gift_cards").catch(() => false);
   return (
     <div className="shell">
       <header className="masthead">
@@ -92,7 +97,7 @@ export default async function PrivacyPage() {
             <table className="legal-table">
               <thead><tr><th>What</th><th>Examples</th><th>When</th></tr></thead>
               <tbody>
-                {COLLECT.map(([a, b, c]) => (
+                {COLLECT.filter(([a]) => gifts || a !== "Gift cards").map(([a, b, c]) => (
                   <tr key={a}><td>{a}</td><td>{b}</td><td>{c}</td></tr>
                 ))}
               </tbody>
@@ -148,7 +153,7 @@ export default async function PrivacyPage() {
             <table className="legal-table">
               <thead><tr><th>Information</th><th>How long</th></tr></thead>
               <tbody>
-                {KEEP.map(([a, b]) => (
+                {KEEP.filter(([a]) => gifts || a !== "Gift cards").map(([a, b]) => (
                   <tr key={a}><td>{a}</td><td>{b}</td></tr>
                 ))}
               </tbody>

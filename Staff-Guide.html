@@ -706,6 +706,7 @@ Deleting an event throws away everyone who signed up. If a date moves or a price
 <tr><td>Rep / source</td><td>A label to track where it came from</td></tr>
 <tr><td>Also works in the public shop</td><td>Off = members only (the default). On = anyone can use it in the public shop too, on public products, without an account</td></tr>
 </table>
+<p><strong>The $100 limit:</strong> a percentage code takes at most $100 off one order. To give one member a different limit, open them in Members, press <kbd>Edit</kbd>, and type a dollar amount in <strong>Discount limit ($)</strong>. Leave it blank for the usual $100. It only changes percentage codes for that member; fixed-dollar codes have no limit, and sales, BOGO and bundles keep $100 for everyone.</p>
 <p>The dashboard tracks every use, so you can see what's working. Codes that work in the public shop show a <strong>Public shop too</strong> chip. Switch one either way with the <kbd>Public shop too</kbd> / <kbd>Members only</kbd> button in the list. A code linked to an ambassador always works in the public shop.</p>
 <p><strong>Changing a code later:</strong> press <kbd>Edit</kbd> on it in the list. The form above fills in with its settings; change the amount, type, label, last day, limits or public-shop setting and press <kbd>Save changes</kbd> (or <kbd>Cancel</kbd>). The code itself can't be renamed, because orders, use counts and any ambassador are linked to it: make a new code instead. Changes apply from the next checkout; past orders keep what they got. Every edit is in the Activity log.</p>
 <p>The list files codes by state: <strong>Live</strong> (on and still working), <strong>Inactive</strong> (you pressed Deactivate) and <strong>Ended</strong> (past its last day, or every allowed use taken). Ended is the archive: codes move there by themselves and keep their history. Use the search box to find a code or a rep's label, and <strong>Show more</strong> for older ones. A live code within a week of its last day shows an <em>Ends in…</em> tag.</p>
@@ -1234,8 +1235,8 @@ It arrives automatically every night with revenue for today, 7 days, 30 days and
 <h3>How money reaches you</h3>
 <p>The invoice offers Venmo or Zelle, and the memo always reads <strong>Order for</strong> followed by the customer's name and the order number (e.g. <strong>#4K9Q2X</strong>). Pickup customers can also choose cash.</p>
 
-<h3>Venmo payments, matched for you</h3>
-<p><span class="where" style="display:inline">Orders tab → Venmo payments</span> (when the <strong>Venmo payment matching</strong> switch is on). Venmo's “paid you” emails show up here, already checked and matched to the unpaid order they pay for. The invoice's Venmo button fills the note with the order number (e.g. <strong>#4K9Q2X</strong>), so most payments match by themselves.</p>
+<h3>Venmo and Zelle payments, matched for you</h3>
+<p><span class="where" style="display:inline">Orders tab → Venmo / Zelle payments</span> (when the <strong>Venmo / Zelle payment matching</strong> switch is on). Venmo's “paid you” emails, and the bank's “You received money with Zelle” emails (marked <strong>Zelle</strong>), show up here, already checked and matched to the unpaid order they pay for. A Zelle memo is matched just like a Venmo note. The invoice's Venmo button fills the note with the order number (e.g. <strong>#4K9Q2X</strong>), so most payments match by themselves.</p>
 <table>
 <tr><th>You see</th><th>Means</th><th>Do</th></tr>
 <tr><td><strong>Sure</strong></td><td>The Venmo note had the order number, and the amount fits</td><td>Tap <kbd>Mark paid</kbd></td></tr>
@@ -1244,6 +1245,9 @@ It arrives automatically every night with revenue for today, 7 days, 30 days and
 <tr><td><strong>Quarantined</strong></td><td>Failed the security check (may not really be from Venmo)</td><td>Check the Venmo app itself before marking anything paid</td></tr>
 </table>
 <p>Nothing is ever marked paid until someone taps. The Today list shows Venmo payments waiting, and the Concierge can prepare the same confirm cards. One-time setup (forwarding the Venmo emails from the inbox that receives them) is under <strong>Setup</strong> at the bottom of that panel.</p>
+
+<h3>Gift cards</h3>
+<p><span class="where" style="display:inline">Settings → Gift cards</span> (when the <strong>Gift cards</strong> switch is on). Members buy a card on the Gift cards page (the gift icon in the shop header), pick an occasion and add a note. It arrives as a normal order marked <strong>🎁 Gift card</strong>, waiting for payment. The card is only sent once the payment is confirmed: confirm the matched Venmo/Zelle payment, or check the money landed and set the order to <strong>Paid</strong> or <strong>Completed</strong>. The customer's own “I've paid” never sends it. Sending completes the order, emails the recipient, puts the card in their account, and adds the buyer's bonus credit (set in Settings → Gift cards; $5 per $50, at most $20 per card, to start). Members' balances come off at checkout by themselves, shipping included. Cards never expire. Cancelling the order cancels a card that hasn't been spent.</p>
 
 <h3>When a customer reports paying</h3>
 <p>Every order email carries a confirmation button, and what it does depends on how they're paying:</p>

@@ -6,7 +6,9 @@
 // options: payer, amount, note, txn, to, from, signDomain, subject, tamper
 //          [from, to], extraSubject, unsigned, bodyLength, html (HTML-only body), fwd,
 //          group (passed through a Google Group: From rewritten, ARC sealed;
-//          { address, sealer, firstDkim, firstDmarc, noArc, footer, tamper })
+//          { address, sealer, firstDkim, firstDmarc, noArc, footer, tamper }),
+//          zelle (a Wells Fargo "You received money with Zelle" email instead;
+//          note = the memo, txn = the confirmation number)
 const fs = require("fs"), path = require("path"), crypto = require("crypto");
 
 function keyPair(outDir) {
@@ -18,7 +20,7 @@ function keyPair(outDir) {
     const p = publicKey.export({ type: "spki", format: "der" }).toString("base64");
     // Venmo's real selector names are unknown here; any works for the test.
     const rec = `v=DKIM1; k=rsa; p=${p}`;
-    fs.writeFileSync(path.join(outDir, "keys.json"), JSON.stringify({ "s1._domainkey.venmo.com": rec, "s1._domainkey.attacker.test": rec, "arc1._domainkey.google.com": rec, "arc1._domainkey.attacker.test": rec }));
+    fs.writeFileSync(path.join(outDir, "keys.json"), JSON.stringify({ "s1._domainkey.venmo.com": rec, "s1._domainkey.notify.wellsfargo.com": rec, "s1._domainkey.attacker.test": rec, "arc1._domainkey.google.com": rec, "arc1._domainkey.attacker.test": rec }));
   }
   return fs.readFileSync(pemFile, "utf8");
 }
@@ -27,13 +29,16 @@ async function build(outDir, appDir, id, o) {
   const { dkimSign } = require(path.join(appDir, "node_modules/mailauth"));
   const amount = Number(o.amount ?? 64).toFixed(2);
   const payer = o.payer || "Shannon Garrett";
-  const subject = o.subject || `${o.fwd ? "Fwd: " : ""}${payer} paid you $${amount}`;
+  const z = !!o.zelle;
+  const subject = o.subject || (z ? "You received money with Zelle" : `${o.fwd ? "Fwd: " : ""}${payer} paid you $${amount}`);
   const note = o.note ?? "Consultation for Shannon Garrett";
-  const txn = o.txn === undefined ? String(4000000000000000000n + BigInt(Math.floor(Math.random() * 1e12))) : o.txn;
+  const txn = o.txn === undefined ? (z ? "0PE0" + crypto.randomBytes(4).toString("hex").toUpperCase() : String(4000000000000000000n + BigInt(Math.floor(Math.random() * 1e12)))) : o.txn;
   const text = [`${payer} paid you`, `$${amount}`, note, txn ? `Transaction ID ${txn}` : "", "Date Oct 27, 2026", "See transaction https://venmo.com/story/abc123XYZ9"].filter((l) => l !== "").join("\r\n");
-  const html = `<html><body><table><tr><td><p>${payer} paid you</p></td></tr><tr><td>$${amount}</td></tr><tr><td><p>${note}</p></td></tr>${txn ? `<tr><td>Transaction ID</td><td>${txn}</td></tr>` : ""}</table></body></html>`;
+  // Wells Fargo's layout (HTML only), trimmed from a real one.
+  const zhtml = `<!DOCTYPE html><html lang="en"><head><title>Wells Fargo Alert</title><style>.bodycontentarea p {text-align: left;}</style></head><body><table><tr><td><h1 style="font-size: 40px">\r\n            ${payer} sent you $${amount}\r\n</h1></td></tr><tr><!--[if mso]>\r\n<td style="padding:16px 0 0 0">\r\n<![endif]--><!--[if !mso]><!--><td><!--<![endif]--><div class="bodycontentarea"><p>Date: <strong>10/27/2026</strong></p></div></td></tr>${txn ? `<tr><td><div class="bodycontentarea"><p>Confirmation: <strong>${txn}</strong></p></div></td></tr>` : ""}${note ? `<tr><td><div class="bodycontentarea"><p>Memo: <strong>${note}</strong></p></div></td></tr>` : ""}<tr><td><div class="bodycontentarea"><p>We deposited the money into your Wells Fargo account ending in ...1234.</p></div></td></tr><tr><td><div class="footercontentarea"><p>Enrollment with Zelle<sup>&reg;</sup> through Wells Fargo Online<sup>&reg;</sup> is required.</p></div></td></tr></table></body></html>`;
+  const html = z ? zhtml : `<html><body><table><tr><td><p>${payer} paid you</p></td></tr><tr><td>$${amount}</td></tr><tr><td><p>${note}</p></td></tr>${txn ? `<tr><td>Transaction ID</td><td>${txn}</td></tr>` : ""}</table></body></html>`;
   const headers = [
-    `From: ${o.from || "Venmo <venmo@venmo.com>"}`,
+    `From: ${o.from || (z ? "Wells Fargo Online <alerts@notify.wellsfargo.com>" : "Venmo <venmo@venmo.com>")}`,
     `To: ${o.to || "owner@example.com"}`,
     `Subject: ${subject}`,
     `Date: ${o.date || "Tue, 27 Oct 2026 18:04:00 +0000"}`,
@@ -41,7 +46,7 @@ async function build(outDir, appDir, id, o) {
     `MIME-Version: 1.0`,
   ];
   let body;
-  if (o.html) {
+  if (o.html || z) {
     headers.push(`Content-Type: text/html; charset=utf-8`, `Content-Transfer-Encoding: base64`);
     body = Buffer.from(html).toString("base64").replace(/(.{76})/g, "$1\r\n");
   } else {
@@ -52,12 +57,12 @@ async function build(outDir, appDir, id, o) {
   if (!o.unsigned) {
     const sig = await dkimSign(msg, {
       canonicalization: "relaxed/relaxed",
-      signatureData: [{ signingDomain: o.signDomain || "venmo.com", selector: "s1", privateKey: keyPair(outDir), headerList: ["from", "to", "subject", "date", "message-id"], ...(o.bodyLength ? { maxBodyLength: o.bodyLength } : {}) }],
+      signatureData: [{ signingDomain: o.signDomain || (z ? "notify.wellsfargo.com" : "venmo.com"), selector: "s1", privateKey: keyPair(outDir), headerList: ["from", "to", "subject", "date", "message-id"], ...(o.bodyLength ? { maxBodyLength: o.bodyLength } : {}) }],
     });
     if (sig.errors?.length) throw new Error(JSON.stringify(sig.errors));
     msg = sig.signatures + msg;
   }
-  if (o.group) msg = await throughGroup(msg, o.group, keyPair(outDir), appDir);
+  if (o.group) msg = await throughGroup(msg, z ? { firstDkim: "notify.wellsfargo.com", fromDomain: "notify.wellsfargo.com", label: "Wells Fargo", ...o.group } : o.group, keyPair(outDir), appDir);
   // What Gmail's auto-forward adds on top (not signed, not changed).
   msg = `Delivered-To: venmo-inbox@example.resend.app\r\nX-Forwarded-To: venmo-inbox@example.resend.app\r\nX-Forwarded-For: owner@example.com venmo-inbox@example.resend.app\r\n` + msg;
   if (o.extraSubject) msg = `Subject: ${o.extraSubject}\r\n` + msg;
@@ -78,9 +83,10 @@ async function throughGroup(msg, g, pem, appDir) {
   const seal = async (m, authResults, cv) =>
     (await sealMessage(Buffer.from(m), { signingDomain: sealer, selector: "arc1", privateKey: pem, authResults, cv })).toString() + m;
   if (!g.noArc) {
-    msg = await seal(msg, `mx.google.com; dkim=pass header.i=@${g.firstDkim || "venmo.com"} header.s=s1 header.b=abc; spf=pass smtp.mailfrom=${g.firstDkim || "venmo.com"}; dmarc=${g.firstDmarc || "pass"} (p=REJECT sp=REJECT dis=NONE) header.from=venmo.com`, "none");
+    msg = await seal(msg, `mx.google.com; dkim=pass header.i=@${g.firstDkim || "venmo.com"} header.s=s1 header.b=abc; spf=pass smtp.mailfrom=${g.firstDkim || "venmo.com"}; dmarc=${g.firstDmarc || "pass"} (p=REJECT sp=REJECT dis=NONE) header.from=${g.fromDomain || "venmo.com"}`, "none");
   }
-  msg = msg.replace(/^From: .*$/m, `From: 'Venmo' via support <${address}>\r\nReply-To: Venmo No-reply <no-reply@venmo.com>\r\nX-Original-From: Venmo <venmo@venmo.com>`);
+  if (g.label) msg = msg.replace(/^From: (.*)$/m, (_m, orig) => `From: '${g.label}' via support <${address}>\r\nReply-To: ${orig}\r\nX-Original-From: ${orig}`);
+  else msg = msg.replace(/^From: .*$/m, `From: 'Venmo' via support <${address}>\r\nReply-To: Venmo No-reply <no-reply@venmo.com>\r\nX-Original-From: Venmo <venmo@venmo.com>`);
   if (g.footer) msg = msg.replace(/--b1--/, `--b1--\r\n-- \r\nYou received this message because you are subscribed to the group.`);
   if (!g.noArc) {
     msg = await seal(msg, "mx.google.com; dkim=pass header.i=@example-com.20260707.gappssmtp.com header.s=20230601 header.b=xyz; arc=pass (i=1)", "pass");

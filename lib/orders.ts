@@ -95,6 +95,12 @@ export type Order = {
   stockTaken?: Array<{ productId: string; qty: number }>;
   /** When a cancel put stockTaken back (cleared if the order is un-cancelled and takes it again). */
   stockReturnedAt?: number;
+  /** A gift card purchase (lib/giftCards.ts): nothing to ship, earns no points, delivered once payment is confirmed. */
+  giftCardOrder?: boolean;
+  /** Paid with gift card balance (lib/giftCards.ts). Counts like a payment, not a discount: already taken off `total`. */
+  giftCardApplied?: number;
+  /** The key the spent gift card balance is held under (put back if the order is cancelled). */
+  giftHold?: string;
   /** Never saved: a Venmo payment staff marked "Handled off-site", shaped like an order for the revenue figures only (lib/venmoInbox.ts offsiteSales). */
   offSite?: boolean;
 };

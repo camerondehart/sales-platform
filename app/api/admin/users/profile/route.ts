@@ -4,7 +4,8 @@ import { updateUserProfile, toPublic, ADDRESS_FIELDS, type AddressField } from "
 import { renameSubscriberEmail } from "@/lib/subscribers";
 import { audited, auditDetail } from "@/lib/audit";
 
-// Admin correction of a member's name / email / shipping address / phone.
+// Admin correction of a member's name / email / shipping address / phone,
+// and their own percentage-code limit (percentCap; null = default $100).
 // Password, status and points are untouched.
 
 async function PATCH_handler(req: Request) {
@@ -12,19 +13,20 @@ async function PATCH_handler(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { id, name, email, address } = (await req.json()) as {
+  const { id, name, email, address, percentCap } = (await req.json()) as {
     id: string;
     name?: string;
     email?: string;
     address?: Partial<Record<AddressField, string>>;
+    percentCap?: number | null;
   };
-  if (!id || (name === undefined && email === undefined && !address)) {
+  if (!id || (name === undefined && email === undefined && !address && percentCap === undefined)) {
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
   let result;
   try {
-    result = await updateUserProfile(id, { name, email, address: address && typeof address === "object" ? address : undefined });
+    result = await updateUserProfile(id, { name, email, address: address && typeof address === "object" ? address : undefined, percentCap });
   } catch (err) {
     console.error("Failed to update member profile", err);
     return NextResponse.json(
@@ -35,7 +37,13 @@ async function PATCH_handler(req: Request) {
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
   const now: Partial<Record<AddressField, string>> = {};
   for (const k of ADDRESS_FIELDS) if (result.user[k]) now[k] = result.user[k];
-  auditDetail({ targetId: id, before: { email: result.previousEmail, ...result.previousAddress }, after: { email: result.user.email, name: result.user.name, ...now } });
+  const capLog = (c?: number) => (c === undefined ? "default ($100)" : `$${c}`);
+  const capChanged = result.previousPercentCap !== result.user.percentCap;
+  auditDetail({
+    targetId: id,
+    before: { email: result.previousEmail, ...result.previousAddress, ...(capChanged ? { discountLimit: capLog(result.previousPercentCap) } : {}) },
+    after: { email: result.user.email, name: result.user.name, ...now, ...(capChanged ? { discountLimit: capLog(result.user.percentCap) } : {}) },
+  });
 
   // If the email changed, move their mailing-list row too so campaigns
   // reach the corrected inbox. Best effort — the member fix already stuck.

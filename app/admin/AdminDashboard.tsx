@@ -34,6 +34,7 @@ import QaIcon, { type QaIconName } from "./QaIcon";
 import FaqPanel from "./FaqPanel";
 import EntrancePanel from "./EntrancePanel";
 import EventsNotePanel, { EventNoteControls } from "./EventsNotePanel";
+import GiftCardsPanel from "./GiftCardsPanel";
 import SiteRequestsPanel from "./SiteRequestsPanel";
 import SuspiciousPanel from "./SuspiciousPanel";
 import ShippingWeights from "./ShippingWeights";
@@ -223,6 +224,9 @@ export default function AdminDashboard({
   const blankAddr: EmAddr = { addressLine1: "", addressLine2: "", city: "", state: "", postalCode: "", phone: "" };
   const [emAddr, setEmAddr] = useState<EmAddr>(blankAddr);
   const addrOf = (u: PublicUser): EmAddr => ({ addressLine1: u.addressLine1 || "", addressLine2: u.addressLine2 || "", city: u.city || "", state: u.state || "", postalCode: u.postalCode || "", phone: u.phone || "" });
+  // Their own percentage-code limit in dollars; blank = the default $100.
+  const [emCap, setEmCap] = useState("");
+  const capOf = (u: PublicUser) => (typeof u.percentCap === "number" ? String(u.percentCap) : "");
   const [emSubmitting, setEmSubmitting] = useState(false);
   const [emMsg, setEmMsg] = useState("");
   const [pwResetValue, setPwResetValue] = useState("");
@@ -1263,6 +1267,9 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       alert("Could not update order status. Please try again.");
     } else {
       const data = await res.json().catch(() => ({}));
+      // Gift cards: say when a card went out, or when a cancel couldn't undo everything.
+      if (data.warning) alert(data.warning);
+      else if (data.giftCardsDelivered) alert(`🎁 Gift card sent. The recipient has their email and the card is in their account; the order is now Completed.`);
       if (data.order) {
         setOrders((prev) => prev.map((o) => (o.id === id ? data.order : o)));
         setDetailOrder((d) => (d && d.id === id ? data.order : d));
@@ -2097,6 +2104,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setEmName(u.name);
     setEmEmail(u.email);
     setEmAddr(addrOf(u));
+    setEmCap(capOf(u));
     setEmMsg("");
   }
   function closeEditMember() {
@@ -2112,18 +2120,23 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmMsg("That doesn't look like a valid email."); return; }
     const before = addrOf(editMember);
     const addrChanged = EM_ADDR.some((k) => emAddr[k].trim() !== before[k]);
-    if (name === editMember.name && email === editMember.email.toLowerCase() && !addrChanged) { setEmMsg("Nothing changed."); return; }
+    const capText = emCap.trim().replace(/^\$/, "").replace(/,/g, "");
+    const capNum = capText === "" ? null : Number(capText);
+    if (capNum !== null && (!Number.isFinite(capNum) || capNum < 0)) { setEmMsg("The discount limit must be a dollar amount, or blank for the default $100."); return; }
+    const capChanged = (capNum === null ? "" : String(capNum)) !== capOf(editMember);
+    if (name === editMember.name && email === editMember.email.toLowerCase() && !addrChanged && !capChanged) { setEmMsg("Nothing changed."); return; }
     setEmSubmitting(true);
     setEmMsg("");
     try {
       const res = await adminFetch("/api/admin/users/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editMember.id, name, email, ...(addrChanged ? { address: emAddr } : {}) }),
+        body: JSON.stringify({ id: editMember.id, name, email, ...(addrChanged ? { address: emAddr } : {}), ...(capChanged ? { percentCap: capNum } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.user) {
-        setUsers((prev) => prev.map((u) => (u.id === data.user.id ? { ...u, ...data.user } : u)));
+        // percentCap is missing from the reply when cleared, so set it explicitly.
+        setUsers((prev) => prev.map((u) => (u.id === data.user.id ? { ...u, ...data.user, percentCap: data.user.percentCap } : u)));
         // Keep the on-screen subscriber list honest if their email moved.
         if (data.subscriberMoved) loadSubscribers();
         setEmMsg(
@@ -2131,8 +2144,9 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             ? `Saved. They now sign in with ${email}${data.subscriberMoved ? " — mailing list updated too." : "."}`
             : "Saved."
         );
-        setEditMember({ ...editMember, ...data.user });
+        setEditMember({ ...editMember, ...data.user, percentCap: data.user.percentCap });
         setEmAddr(addrOf(data.user));
+        setEmCap(capOf(data.user));
       } else {
         setEmMsg(data.error || "Something went wrong.");
       }
@@ -3113,7 +3127,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       {o.items.map((i) => `${i.productName} ×${i.quantity}${i.restocking ? " (restocking)" : ""}`).join(", ")}
                     </div>
                     <div className="user-meta">
-                      {formatDateTime(o.createdAt)} · {o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
+                      {formatDateTime(o.createdAt)} · {o.giftCardOrder ? "🎁 Gift card" : o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
                       {o.trackingNumber && <> · Tracking <TrackingLink n={o.trackingNumber} /></>}
                     </div>
                   </div>
@@ -4167,6 +4181,7 @@ We just finished a new run and wanted you to hear it first.
             ) },
             { key: "site-requests", icon: "🛠️", title: "Site requests", summary: "Changes to the website staff have asked for, and the developer's approvals.", render: () => <SiteRequestsPanel /> },
             { key: "entrance", icon: "🌲", title: "Entrance animation", summary: "Seasonal and holiday versions of the members' entrance: preview them and choose one, or Auto.", render: () => <EntrancePanel /> },
+            { key: "gift-cards", icon: "🎁", title: "Gift cards", summary: "The buyer's bonus (e.g. $5 per $50) and every gift card: sent, waiting for payment, balances.", render: () => <GiftCardsPanel /> },
             { key: "events-note", icon: "🎟️", title: "Events popup", summary: "The small note about upcoming events for members nearby: town, miles, heading, which events.", render: () => <EventsNotePanel /> },
             { key: "faq", icon: "❓", title: "FAQ page", summary: "Questions and answers for /faq, which the Concierge also uses.", render: () => <FaqPanel /> },
             { key: "stores", icon: "📍", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
@@ -4343,6 +4358,11 @@ We just finished a new run and wanted you to hear it first.
                 <div className="field">
                   <label>Phone (optional)</label>
                   <input value={emAddr.phone} onChange={(e) => setEmAddr({ ...emAddr, phone: e.target.value })} placeholder="—" autoComplete="off" inputMode="tel" />
+                </div>
+                <div className="field">
+                  <label>Discount limit ($)</label>
+                  <input value={emCap} onChange={(e) => setEmCap(e.target.value)} placeholder="100 (default)" autoComplete="off" inputMode="decimal" />
+                  <div className="field-hint">The most a percentage code can take off one of their orders. Leave blank for the default $100. Sales, BOGO and bundles keep the $100 limit.</div>
                 </div>
                 <button type="submit" className="submit" disabled={emSubmitting}>{emSubmitting ? "Saving…" : "Save changes"}</button>
                 {emMsg && (
@@ -5119,9 +5139,15 @@ function OrderDetailModal({
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "space-between", padding: "0.3rem 0", fontSize: "0.9rem", color: "var(--ink-soft)" }}>
-              <span>{order.shippingMethod === "pickup" ? "Local pickup" : "Shipping"}</span>
+              <span>{order.giftCardOrder ? "Delivery (by email)" : order.shippingMethod === "pickup" ? "Local pickup" : "Shipping"}</span>
               <span>{order.shippingCost === 0 ? "Free" : `$${order.shippingCost.toFixed(2)}`}</span>
             </div>
+            {(order.giftCardApplied || 0) > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "0.3rem 0", fontSize: "0.9rem", color: "var(--accent-strong)" }}>
+                <span>Paid with gift card</span>
+                <span>−${(order.giftCardApplied || 0).toFixed(2)}</span>
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "0.6rem", marginTop: "0.4rem", borderTop: "1px solid var(--rule-soft)", fontWeight: 700 }}>
               <span>Total</span>
               <span>${order.total.toFixed(2)}</span>
@@ -5137,6 +5163,12 @@ function OrderDetailModal({
           )}
           {order.note && (
             <div className="user-note" style={{ marginBottom: "1.25rem", fontSize: "0.9rem" }}>"{order.note}"</div>
+          )}
+
+          {order.giftCardOrder && (
+            <div className="notice" style={{ fontSize: "0.88rem", marginBottom: "1rem" }}>
+              🎁 <strong>Gift card order.</strong> Nothing to ship. Once you&apos;ve checked the money arrived, Mark paid (or match the Venmo/Zelle payment) and the card is sent to the recipient automatically, with the buyer&apos;s bonus. Cancelling voids the card if it hasn&apos;t been spent.
+            </div>
           )}
 
           {/* Status */}

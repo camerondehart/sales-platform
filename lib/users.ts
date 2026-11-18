@@ -31,6 +31,9 @@ export type User = {
   welcomeEmailSentAt?: number;
   /** When the one-time events note for locals was shown (lib/localEvents.ts). */
   eventsNoteSeenAt?: number;
+  /** Their own limit on what a percentage code can take off one order, in dollars.
+   *  Unset = the default $100 (memberCodeCap in lib/pricing.ts). Staff set it in Edit member. */
+  percentCap?: number;
   // ---------- imported customers (e.g. from a previous Shopify store) ----------
   phone?: string;
   company?: string;
@@ -362,13 +365,18 @@ export type AddressField = (typeof ADDRESS_FIELDS)[number];
 
 export async function updateUserProfile(
   id: string,
-  changes: { name?: string; email?: string; address?: Partial<Record<AddressField, string>> }
-): Promise<{ ok: true; user: User; previousEmail: string; previousAddress: Partial<Record<AddressField, string>> } | { ok: false; error: string }> {
+  changes: { name?: string; email?: string; address?: Partial<Record<AddressField, string>>; percentCap?: number | null }
+): Promise<{ ok: true; user: User; previousEmail: string; previousAddress: Partial<Record<AddressField, string>>; previousPercentCap?: number } | { ok: false; error: string }> {
   const name = changes.name?.trim();
   const email = changes.email?.trim().toLowerCase();
   if (name !== undefined && !name) return { ok: false, error: "Name can't be empty." };
   if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: "That doesn't look like a valid email address." };
+  }
+  // Their own percentage-code limit: null clears it (back to the default $100).
+  const cap = changes.percentCap;
+  if (cap !== undefined && cap !== null && (typeof cap !== "number" || !Number.isFinite(cap) || cap < 0 || cap > 100000)) {
+    return { ok: false, error: "The discount limit must be a dollar amount between $0 and $100,000, or blank for the default." };
   }
 
   // Address and phone: trimmed, capped; an empty box clears that line.
@@ -379,7 +387,7 @@ export async function updateUserProfile(
     addr[k] = String(v).replace(/\s+/g, " ").trim().slice(0, k === "postalCode" ? 12 : k === "state" ? 40 : 120) || undefined;
   }
 
-  type R = { ok: true; user: User; previousEmail: string; previousAddress: Partial<Record<AddressField, string>> } | { ok: false; error: string };
+  type R = { ok: true; user: User; previousEmail: string; previousAddress: Partial<Record<AddressField, string>>; previousPercentCap?: number } | { ok: false; error: string };
   return mutateUsers<R>((users) => {
     if (users.length === 0) return { users: null, result: { ok: false, error: "Could not load members; please try again." } };
     const u = users.find((x) => x.id === id);
@@ -396,7 +404,9 @@ export async function updateUserProfile(
     const previousAddress: Partial<Record<AddressField, string>> = {};
     for (const k of ADDRESS_FIELDS) if (u[k]) previousAddress[k] = u[k];
     for (const [k, v] of Object.entries(addr) as Array<[AddressField, string | undefined]>) u[k] = v;
-    return { users, result: { ok: true, user: u, previousEmail, previousAddress } };
+    const previousPercentCap = u.percentCap;
+    if (cap !== undefined) u.percentCap = cap === null ? undefined : Math.round(cap * 100) / 100;
+    return { users, result: { ok: true, user: u, previousEmail, previousAddress, previousPercentCap } };
   });
 }
 

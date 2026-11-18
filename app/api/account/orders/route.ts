@@ -26,6 +26,8 @@ export async function GET() {
       trackingNumber: o.trackingNumber || null,
       // Cash-at-pickup orders confirm collection rather than payment.
       paymentMethod: o.paymentMethod || "invoice",
+      giftCardOrder: !!o.giftCardOrder,
+      giftCardApplied: o.giftCardApplied || 0,
       // Token lets them reach their own pay page for pending orders
       paymentToken: o.status === "pending" ? o.paymentToken : null,
     })),

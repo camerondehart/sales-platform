@@ -1,5 +1,8 @@
 "use client";
 
+import GiftWallet, { type GiftData, seenGiftIds, markGiftsSeen } from "@/app/components/GiftWallet";
+import { giftApplies } from "@/lib/giftCardRules";
+
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import NavIcon from "@/app/components/NavIcon";
 import ForestEntrance from "@/app/components/ForestEntrance";
@@ -7,7 +10,7 @@ import type { EntranceKey } from "@/lib/entranceThemes";
 import { ambassadorRef } from "@/lib/ambassadorRef";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/storage";
-import { parsePrice, effectivePrice, promoLabel, asCash, PERCENT_OFF_CAP, CAP_NOTE } from "@/lib/pricing";
+import { parsePrice, effectivePrice, promoLabel, asCash, CAP_NOTE, capNote } from "@/lib/pricing";
 import { priceCart, nextBundleHint, type Bundle } from "@/lib/bundles";
 import { ProductFlags, PriceTag, RestockNote } from "@/app/components/ProductPrice";
 import FormattedDescription from "@/app/components/FormattedDescription";
@@ -41,11 +44,20 @@ type MemberOrder = {
   trackingNumber: string | null;
   paymentMethod: "invoice" | "cash";
   paymentToken: string | null;
+  giftCardOrder?: boolean;
+  giftCardApplied?: number;
 };
 
 // Inline line-art icons — stroke-based so they inherit text color
-function Icon({ name }: { name: "orders" | "address" | "key" | "signout" | "basket" | "user" }) {
+function Icon({ name }: { name: "orders" | "address" | "key" | "signout" | "basket" | "user" | "gift" }) {
   const paths: Record<string, React.ReactNode> = {
+    gift: (
+      <>
+        <rect x="4" y="9" width="16" height="4" rx="1" />
+        <path d="M5.5 13v7h13v-7M12 9v11" />
+        <path d="M12 9c-1.2-3.2-5.2-4.3-5.2-1.6C6.8 9 10 9 12 9zM12 9c1.2-3.2 5.2-4.3 5.2-1.6C17.2 9 14 9 12 9z" />
+      </>
+    ),
     user: (
       <>
         <circle cx="12" cy="8.5" r="3.6" />
@@ -147,6 +159,7 @@ export default function GalleryClient({
   consult = false,
   entranceTheme = "classic",
   localEvent = null,
+  giftCards = false,
 }: {
   products: Product[];
   userName: string;
@@ -164,6 +177,8 @@ export default function GalleryClient({
   entranceTheme?: EntranceKey;
   /** local_events_note: the one-time events note for members near the Events popup town (lib/localEvents.ts). */
   localEvent?: LocalEventNoteData | null;
+  /** gift_cards switch: Gift cards page link, Account → Gift cards, balance off at checkout. */
+  giftCards?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -293,6 +308,32 @@ export default function GalleryClient({
       .catch(() => {});
   }, [isAdminPreview]);
   useEffect(() => { loadLoyalty(); }, [loadLoyalty]);
+
+  // Gift cards (lib/giftCards.ts): balance and cards. A card this device
+  // hasn't shown yet opens Account → Gift cards with its envelope.
+  const [gifts, setGifts] = useState<GiftData | null>(null);
+  const [giftsOpen, setGiftsOpen] = useState(false);
+  const [freshGifts, setFreshGifts] = useState<string[]>([]);
+  const loadGifts = useCallback((first = false) => {
+    if (isAdminPreview || !giftCards) return;
+    fetch("/api/gift-cards", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: GiftData | null) => {
+        if (!d || !d.enabled) return;
+        setGifts(d);
+        if (!first) return;
+        const seen = seenGiftIds();
+        const fresh = d.cards.filter((c) => c.state === "active" && c.balance > 0 && !seen.includes(c.id)).map((c) => c.id);
+        const asked = new URLSearchParams(window.location.search).get("giftcards") === "1";
+        if (fresh.length || asked) {
+          setFreshGifts(fresh);
+          setGiftsOpen(true);
+          markGiftsSeen(fresh);
+        }
+      })
+      .catch(() => {});
+  }, [isAdminPreview, giftCards]);
+  useEffect(() => { loadGifts(true); }, [loadGifts]);
 
   // Site settings (bundle rule, loyalty config)
   const [settings, setSettings] = useState<SiteSettingsLite | null>(null);
@@ -535,6 +576,11 @@ export default function GalleryClient({
               <a href="/events" className="nav-pill">
                 <NavIcon name="events" /> <em>Events</em>
               </a>
+              {giftCards && !isAdminPreview && (
+                <a href="/gift-cards" className="nav-pill nav-gift">
+                  <NavIcon name="gift" /> <em>Gift cards</em>
+                </a>
+              )}
               <a href="/retail" className="nav-pill">
                 <NavIcon name="shop" /> <em className="nl-long">Shop</em>
                 <em className="nl-short">Shop</em>
@@ -573,6 +619,16 @@ export default function GalleryClient({
                         <span style={{ marginLeft: "auto", fontWeight: 700, color: "var(--accent-strong)" }}>
                           {loyalty.points}
                         </span>
+                      </button>
+                    )}
+                    {gifts && (
+                      <button onClick={() => { setMenuOpen(false); setFreshGifts([]); setGiftsOpen(true); loadGifts(); }}>
+                        <Icon name="gift" /> Gift cards
+                        {gifts.balance > 0 && (
+                          <span style={{ marginLeft: "auto", fontWeight: 700, color: "var(--accent-strong)" }}>
+                            ${gifts.balance.toFixed(2)}
+                          </span>
+                        )}
                       </button>
                     )}
                     <button onClick={() => { setMenuOpen(false); setAddressOpen(true); }}>
@@ -914,11 +970,16 @@ export default function GalleryClient({
           bundles={bundles}
           settings={settings}
           loyalty={loyalty}
-          onOrderPlaced={loadLoyalty}
+          giftBalance={gifts?.balance || 0}
+          onOrderPlaced={() => { loadLoyalty(); loadGifts(); }}
           defaultAddress={{ addressLine1, addressLine2, city, state, postalCode }}
           onClose={() => setCheckoutOpen(false)}
           onComplete={() => clearCart()}
         />
+      )}
+
+      {giftsOpen && gifts && (
+        <GiftWallet data={gifts} fresh={freshGifts} onClose={() => { setGiftsOpen(false); setFreshGifts([]); }} onChanged={() => loadGifts()} />
       )}
 
       {/* Points & rewards modal */}
@@ -1007,6 +1068,12 @@ export default function GalleryClient({
                           <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
                             <span>Promo savings</span>
                             <span>−${o.discount.toFixed(2)}</span>
+                          </div>
+                        )}
+                        {(o.giftCardApplied || 0) > 0 && (
+                          <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
+                            <span>Gift card</span>
+                            <span>−${(o.giftCardApplied || 0).toFixed(2)}</span>
                           </div>
                         )}
                         {!o.isInquiry && (
@@ -1168,6 +1235,7 @@ function CheckoutModal({
   bundles,
   settings,
   loyalty,
+  giftBalance = 0,
   onOrderPlaced,
   defaultAddress,
   onClose,
@@ -1179,6 +1247,8 @@ function CheckoutModal({
   bundles: Bundle[];
   settings: SiteSettingsLite | null;
   loyalty: { enabled: boolean; points: number; pointsPerDollarRedeemed: number; minPointsToRedeem: number } | null;
+  /** Gift card balance: comes off automatically, shipping included. */
+  giftBalance?: number;
   onOrderPlaced: () => void;
   defaultAddress: {
     addressLine1: string;
@@ -1198,7 +1268,7 @@ function CheckoutModal({
   const [codeInput, setCodeInput] = useState("");
   const [codeChecking, setCodeChecking] = useState(false);
   const [codeError, setCodeError] = useState("");
-  const [applied, setApplied] = useState<null | { code: string; amount: number; capped?: boolean }>(null);
+  const [applied, setApplied] = useState<null | { code: string; amount: number; capped?: boolean; cap?: number }>(null);
   // Came through an ambassador's page: their code is ready in the box (press Apply).
   useEffect(() => {
     const code = ambassadorRef()?.code;
@@ -1218,7 +1288,8 @@ function CheckoutModal({
       });
       const data = await res.json();
       if (data.ok) {
-        setApplied({ code: data.code, amount: data.amount, capped: data.type === "percentage" && data.amount >= PERCENT_OFF_CAP });
+        // The server says when the limit was reached ($100, or the member's own limit set by staff).
+        setApplied({ code: data.code, amount: data.amount, capped: !!data.capped, cap: typeof data.cap === "number" ? data.cap : undefined });
         setCodeError("");
       } else {
         setApplied(null);
@@ -1238,6 +1309,7 @@ function CheckoutModal({
     pickup: boolean;
     cash: boolean;
     total: number;
+    paidByGift?: boolean;
   }>(null);
   const [error, setError] = useState("");
 
@@ -1300,9 +1372,13 @@ function CheckoutModal({
 
   const shippingCost =
     isInquiry ? 0 : shippingMethod === "ship" ? SHIPPING_FLAT : 0;
-  const total = isInquiry
+  const beforeGift = isInquiry
     ? 0
     : Math.max(0, subtotal - discount - bundleSavings - codeSavings - pointsCredit + shippingCost);
+  // Same as the server: gift card balance pays what it can, automatically.
+  const giftApplied = isInquiry ? 0 : giftApplies(giftBalance, beforeGift);
+  const total = Math.round(Math.max(0, beforeGift - giftApplied) * 100) / 100;
+  const paidByGift = giftApplied > 0 && total <= 0;
   const addressRequired = shippingMethod === "ship" && !isInquiry;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1364,8 +1440,9 @@ function CheckoutModal({
         isInquiry,
         emailed: !!data.emailed,
         pickup: shippingMethod === "pickup",
-        cash: shippingMethod === "pickup" && paymentMethod === "cash",
-        total,
+        cash: shippingMethod === "pickup" && paymentMethod === "cash" && !data.paidByGift,
+        total: typeof data.giftApplied === "number" ? Math.max(0, Math.round((beforeGift - data.giftApplied) * 100) / 100) : total,
+        paidByGift: !!data.paidByGift,
       });
     } catch {
       setError("Network error. Please try again.");
@@ -1391,7 +1468,9 @@ function CheckoutModal({
                 <>
                   Thank you — your order has been placed! 🌿
                   <div style={{ fontSize: "0.9rem", marginTop: "1rem", fontStyle: "normal", color: "var(--ink-soft)" }}>
-                    {placed.cash
+                    {placed.paidByGift
+                      ? "Paid in full with your gift card, so there's nothing more to pay. A confirmation is on its way to your inbox."
+                      : placed.cash
                       ? `No payment needed now — just bring $${placed.total.toFixed(2)} in cash when you pick up. A confirmation with pickup details is on its way to your inbox, along with a button to tap once you've collected it.`
                       : placed.emailed
                       ? "An invoice with payment instructions is on its way to your inbox. Once you've paid, use the link in the email to let us know."
@@ -1456,7 +1535,7 @@ function CheckoutModal({
                 )}
                 {codeSavings > 0 && applied && (
                   <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
-                    <span>Code {applied.code}{applied.capped ? CAP_NOTE : ""}</span>
+                    <span>Code {applied.code}{applied.capped ? capNote(applied.cap) : ""}</span>
                     <span>−${codeSavings.toFixed(2)}</span>
                   </div>
                 )}
@@ -1472,6 +1551,12 @@ function CheckoutModal({
                   </span>
                   <span>{shippingCost === 0 ? "Free" : `$${shippingCost.toFixed(2)}`}</span>
                 </div>
+                {giftApplied > 0 && (
+                  <div className="pay-item checkout-gift-line" style={{ color: "var(--accent-strong)" }}>
+                    <span>🎁 Gift card balance</span>
+                    <span>−${giftApplied.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="pay-item pay-total">
                   <span>{isInquiry ? "Total (just asking — no order)" : "Total"}</span>
                   <span>${total.toFixed(2)}</span>
@@ -1542,7 +1627,7 @@ function CheckoutModal({
                     <label>Discount code (optional)</label>
                     {applied ? (
                       <div className="code-applied">
-                        <span>✓ <strong>{applied.code}</strong> applied — saving ${applied.amount.toFixed(2)}{applied.capped ? CAP_NOTE : ""}</span>
+                        <span>✓ <strong>{applied.code}</strong> applied — saving ${applied.amount.toFixed(2)}{applied.capped ? capNote(applied.cap) : ""}</span>
                         <button
                           type="button"
                           onClick={() => { setApplied(null); setCodeInput(""); }}

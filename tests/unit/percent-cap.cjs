@@ -66,5 +66,22 @@ check("capped BOGO and rule are flagged", r.promoCapped === true && r.ruleCapped
 r = bundles.priceCart([{ product: p1, quantity: 5 }, { product: bogo, quantity: 4 }], [], rule);
 check("under the cap: no flags", !("promoCapped" in r) && !("ruleCapped" in r), r);
 
+// A member's own limit on percentage codes. Blank = $100.
+check("no own limit: $100", pr.memberCodeCap({}) === 100 && pr.memberCodeCap(null) === 100);
+check("own limit used", pr.memberCodeCap({ percentCap: 250 }) === 250);
+check("own limit $0 kept", pr.memberCodeCap({ percentCap: 0 }) === 0);
+const amtCap = (d, sub, cap) => { const r = dc.validateDiscount(d, sub, "u", cap); return r.ok ? r.amount : r.error; };
+check("20% on $2000 with a $250 limit: $250", amtCap(code("percentage", 20), 2000, 250) === 250, amtCap(code("percentage", 20), 2000, 250));
+check("20% on $800 with a $250 limit: $160 (under it)", amtCap(code("percentage", 20), 800, 250) === 160);
+check("20% on $800 with a $50 limit: $50", amtCap(code("percentage", 20), 800, 50) === 50);
+check("fixed $150 code ignores the member limit", amtCap(code("fixed", 150), 400, 50) === 150);
+let v = dc.validateDiscount(code("percentage", 20), 2000, "u", 250);
+check("hitting the own limit is flagged with it", v.ok && v.capped === true && v.cap === 250, v);
+v = dc.validateDiscount(code("percentage", 20), 800, "u", 250);
+check("under the own limit: no flag", v.ok && !("capped" in v), v);
+v = dc.validateDiscount(code("percentage", 20), 800, "u");
+check("default $100 limit is flagged", v.ok && v.capped === true && v.cap === 100, v);
+check("note shows the member's limit", pr.capNote(250) === " (max $250 off)" && pr.capNote() === " (max $100 off)", pr.capNote(250));
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

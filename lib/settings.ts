@@ -16,6 +16,12 @@ export type SiteSettings = {
   minPointsToRedeem: number;
   /** Box and packing added to every parcel's weight, in ounces (shipping labels). */
   packagingOz?: number;
+  /** Gift cards (lib/giftCardRules.ts): the buyer's bonus credit, e.g. $5 for every $50. */
+  giftBonusEnabled?: boolean;
+  giftBonusPer?: number;
+  giftBonusStep?: number;
+  /** Most bonus one gift card can earn (default $20). */
+  giftBonusMax?: number;
   updatedAt: number;
 };
 

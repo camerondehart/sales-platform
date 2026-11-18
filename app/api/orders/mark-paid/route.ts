@@ -27,6 +27,8 @@ export async function GET(req: Request) {
       // Cash-at-pickup orders confirm collection instead of payment.
       paymentMethod: order.paymentMethod || "invoice",
       createdAt: order.createdAt,
+      ...(order.giftCardOrder ? { giftCardOrder: true } : {}),
+      ...(order.giftCardApplied ? { giftCardApplied: order.giftCardApplied } : {}),
     },
   });
 }
@@ -95,7 +97,7 @@ export async function POST(req: Request) {
             )}</strong> in cash.</p><p>The order is now marked <strong>Completed</strong>. Check the cash matches, then you're done.</p><p style="margin-top:1rem;"><a href="${adminLink}" style="display:inline-block;background:#85ba45;color:white;padding:0.7rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;">Open this order in admin</a></p>`
           : `<p><strong>${escapeHtml(order.userName)}</strong> (${escapeHtml(order.userEmail)}) marked order <strong>${order.id}</strong> ($${order.total.toFixed(
               2
-            )}) as paid. Verify the payment arrived, then ship or hand off.</p><p style="margin-top:1rem;"><a href="${adminLink}" style="display:inline-block;background:#85ba45;color:white;padding:0.7rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;">Open this order in admin</a></p>`,
+            )}) as paid. ${order.giftCardOrder ? "This is a <strong>gift card</strong>: once you've verified the payment arrived, mark the order Completed (or match the Venmo/Zelle payment) to send the card." : "Verify the payment arrived, then ship or hand off."}</p><p style="margin-top:1rem;"><a href="${adminLink}" style="display:inline-block;background:#85ba45;color:white;padding:0.7rem 1.4rem;border-radius:4px;text-decoration:none;font-weight:700;">Open this order in admin</a></p>`,
       });
     } catch (err) {
       console.error("Failed to send confirmation notification", err);

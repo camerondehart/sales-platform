@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import { splitMessage, addressOf } from "./venmoParse";
+import { brand } from "./brand";
 
 /**
  * Is this really from Venmo? Forwarded mail always fails SPF, so we rely on
@@ -23,6 +24,14 @@ import { splitMessage, addressOf } from "./venmoParse";
 const ARC_SEALER = "google.com";
 
 export const VENMO_DOMAIN = "venmo.com";
+/** Zelle "You received money" emails come from the business's bank (brand.config payments.zelleBank). */
+export const ZELLE_DOMAIN = brand.payments.zelleBank.domain;
+
+export type PaySource = "venmo" | "zelle";
+const SOURCE: Record<PaySource, { domain: string; name: string }> = {
+  venmo: { domain: VENMO_DOMAIN, name: "Venmo" },
+  zelle: { domain: ZELLE_DOMAIN, name: brand.payments.zelleBank.name || "your bank" },
+};
 
 export type Verdict = { ok: true; selector?: string; arc?: string } | { ok: false; reason: string };
 
@@ -40,7 +49,15 @@ async function testResolver(): Promise<Resolver | undefined> {
   };
 }
 
-export async function verifyVenmo(raw: string): Promise<Verdict> {
+/**
+ * Same checks for a Zelle email, with the bank in place of Venmo: its
+ * signature (the bank's domain or a subdomain, e.g. notify.wellsfargo.com),
+ * or Google's record that it passed on arrival.
+ */
+export async function verifyVenmo(raw: string, source: PaySource = "venmo"): Promise<Verdict> {
+  const { domain, name } = SOURCE[source];
+  if (!domain) return { ok: false, reason: "No Zelle bank is set (brand.config payments.zelleBank), so we can't check who sent it." };
+  const isOurs = (d: string) => isDomain(d, domain);
   const { all } = splitMessage(raw);
   const froms = all.filter(([k]) => k === "from").map(([, v]) => v);
   if (froms.length !== 1) return { ok: false, reason: `Has ${froms.length} From lines (expected one).` };
@@ -48,14 +65,14 @@ export async function verifyVenmo(raw: string): Promise<Verdict> {
   const fromDomain = from.split("@")[1] || "";
   const account = (process.env.VENMO_ACCOUNT_EMAIL || "").trim().toLowerCase();
   const viaGroup = !!account && from === account;
-  if (!viaGroup && !isVenmoDomain(fromDomain)) return { ok: false, reason: `Not from Venmo (From: ${from || "none"}).` };
+  if (!viaGroup && !isOurs(fromDomain)) return { ok: false, reason: `Not from ${name} (From: ${from || "none"}).` };
   const subjects = all.filter(([k]) => k === "subject").length;
   if (subjects !== 1) return { ok: false, reason: `Has ${subjects} Subject lines (expected one).` };
   if (!account) return { ok: false, reason: "VENMO_ACCOUNT_EMAIL isn't set, so we can't tell whose Venmo this is for." };
   const tos = all.filter(([k]) => k === "to").map(([, v]) => v);
   const toList = tos.join(",").split(",").map(addressOf).filter(Boolean);
   if (tos.length !== 1 || !toList.includes(account)) return { ok: false, reason: `Sent to ${toList.join(", ") || "nobody"}, not to the Venmo account email.` };
-  if (viaGroup) return verifyViaGoogleGroup(raw);
+  if (viaGroup) return verifyViaGoogleGroup(raw, source);
 
   let result: { results?: Array<any>; arc?: any };
   try {
@@ -71,7 +88,7 @@ export async function verifyVenmo(raw: string): Promise<Verdict> {
     const keys: string[] = (r.signingHeaders?.keys || "").toString().toLowerCase().split(/\s*:\s*/);
     return (
       r.status?.result === "pass" &&
-      d === VENMO_DOMAIN &&
+      (source === "venmo" ? d === VENMO_DOMAIN : isOurs(d)) &&
       !!r.status?.aligned &&
       keys.includes("from") &&
       keys.includes("subject") &&
@@ -81,14 +98,14 @@ export async function verifyVenmo(raw: string): Promise<Verdict> {
   });
   if (!good) {
     const seen = sigs.map((r) => `${r.signingDomain || "?"}: ${r.status?.result || "?"}${r.status?.comment ? ` (${r.status.comment})` : ""}`).join("; ");
-    return { ok: false, reason: sigs.length ? `Venmo's signature didn't check out — ${seen}.` : "No DKIM signature (a real Venmo email always has one)." };
+    return { ok: false, reason: sigs.length ? `${name}'s signature didn't check out — ${seen}.` : `No DKIM signature (a real ${name} email always has one).` };
   }
   return { ok: true, selector: good.selector, arc: result.arc?.status?.result };
 }
 
-function isVenmoDomain(domain: string): boolean {
+function isDomain(domain: string, base: string): boolean {
   const d = domain.toLowerCase().replace(/^@/, "");
-  return d === VENMO_DOMAIN || d.endsWith(`.${VENMO_DOMAIN}`);
+  return d === base || d.endsWith(`.${base}`);
 }
 
 /**
@@ -99,7 +116,8 @@ function isVenmoDomain(domain: string): boolean {
  * results (written by Google when the email arrived from Venmo) say Venmo's
  * DKIM passed and DMARC passed for venmo.com.
  */
-async function verifyViaGoogleGroup(raw: string): Promise<Verdict> {
+async function verifyViaGoogleGroup(raw: string, source: PaySource): Promise<Verdict> {
+  const { domain, name } = SOURCE[source];
   let data: any;
   let first: any;
   let result: any;
@@ -108,7 +126,7 @@ async function verifyViaGoogleGroup(raw: string): Promise<Verdict> {
     const resolver = (await testResolver()) as any;
     data = (await dkimVerify(raw, { resolver }) as any).arc;
     const chain: any[] = (data && data.chain) || [];
-    if (!chain.length) return { ok: false, reason: "Came through the support group but has no Google forwarding record (ARC), so we can't tell it's from Venmo." };
+    if (!chain.length) return { ok: false, reason: `Came through the support group but has no Google forwarding record (ARC), so we can't tell it's from ${name}.` };
     // Copy before arc() tidies the newest entry in place.
     first = JSON.parse(JSON.stringify(chain[0]?.["arc-authentication-results"]?.parsed || null));
     const sealers = chain.map((e) => String(e?.["arc-seal"]?.parsed?.d?.value || "").toLowerCase());
@@ -122,8 +140,8 @@ async function verifyViaGoogleGroup(raw: string): Promise<Verdict> {
   if (!["from", "to", "subject"].every((h) => signed.includes(h))) return { ok: false, reason: "Google's newest signature doesn't cover From, To and Subject." };
   if (result?.signature?.canonBodyLengthLimited) return { ok: false, reason: "Google's newest signature covers only part of the body." };
   if (String(first?.i?.value) !== "1" || String(first?.value || "").toLowerCase() !== "mx.google.com") return { ok: false, reason: "The first hop of the forwarding record isn't Google's." };
-  const venmoDkim = (Array.isArray(first?.dkim) ? first.dkim : []).some((e: any) => e?.value === "pass" && isVenmoDomain(String(e?.header?.d || e?.header?.i || "").split("@").pop() || ""));
-  const venmoDmarc = first?.dmarc?.value === "pass" && isVenmoDomain(String(first?.dmarc?.header?.from || ""));
-  if (!venmoDkim || !venmoDmarc) return { ok: false, reason: "Google's record doesn't show Venmo's signature passing when the email arrived." };
+  const theirDkim = (Array.isArray(first?.dkim) ? first.dkim : []).some((e: any) => e?.value === "pass" && isDomain(String(e?.header?.d || e?.header?.i || "").split("@").pop() || "", domain));
+  const theirDmarc = first?.dmarc?.value === "pass" && isDomain(String(first?.dmarc?.header?.from || ""), domain);
+  if (!theirDkim || !theirDmarc) return { ok: false, reason: `Google's record doesn't show ${name}'s signature passing when the email arrived.` };
   return { ok: true, arc: "pass" };
 }

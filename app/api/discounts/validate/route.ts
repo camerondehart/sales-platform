@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApprovedVisitor } from "@/lib/auth";
 import { findDiscountByCode, validateDiscount } from "@/lib/discounts";
+import { memberCodeCap } from "@/lib/pricing";
 
 // Preview a discount code at checkout. The authoritative check happens
 // again during /api/checkout — this is purely for instant feedback.
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
   }
 
   const discount = await findDiscountByCode(code);
-  const result = validateDiscount(discount, amountBase, user.id);
+  const result = validateDiscount(discount, amountBase, user.id, memberCodeCap(user));
 
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 200 });
@@ -33,5 +34,7 @@ export async function POST(req: Request) {
     type: result.discount.type,
     value: result.discount.value,
     amount: result.amount,
+    // Set when a percentage code hit the limit ($100, or this member's own limit).
+    ...(result.capped ? { capped: true, cap: result.cap } : {}),
   });
 }

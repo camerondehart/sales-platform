@@ -111,12 +111,14 @@ export async function pointsForOrder(productTotal: number): Promise<number> {
 
 /** Does this order earn points under the rule (member order, completed for over an hour)? */
 export function orderEarns(o: Order, now = Date.now()): boolean {
-  return !!o.userId && o.userId !== "retail" && o.source !== "retail" && !o.isInquiry && isCompleted(o.status) && now - completedSince(o) >= POINTS_DELAY_MS;
+  // Buying a gift card earns nothing (the products it's later spent on do).
+  return !!o.userId && o.userId !== "retail" && o.source !== "retail" && !o.isInquiry && !o.giftCardOrder && isCompleted(o.status) && now - completedSince(o) >= POINTS_DELAY_MS;
 }
 
 /** Points the rule gives an order: $1 of products (total minus shipping) = pointsPerDollar. */
-function rulePoints(o: Pick<Order, "total" | "shippingCost">, pointsPerDollar: number): number {
-  return Math.max(0, Math.floor(Math.max(0, (o.total || 0) - (o.shippingCost || 0)) * pointsPerDollar));
+// Gift card balance spent on the order is a payment, so it still earns.
+function rulePoints(o: Pick<Order, "total" | "shippingCost" | "giftCardApplied">, pointsPerDollar: number): number {
+  return Math.max(0, Math.floor(Math.max(0, (o.total || 0) + (o.giftCardApplied || 0) - (o.shippingCost || 0)) * pointsPerDollar));
 }
 
 export type SyncResult = { earned: number; takenBack: number; returned: number; respent: number };

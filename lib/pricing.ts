@@ -45,9 +45,22 @@ export function formatMoney(n: number): string {
  * order. Fixed-dollar codes, fixed sale prices and set-price bundles are not capped.
  */
 export const PERCENT_OFF_CAP = 100;
-export const capPercentOff = (amount: number): number => Math.min(amount, PERCENT_OFF_CAP);
+export const capPercentOff = (amount: number, cap: number = PERCENT_OFF_CAP): number => Math.min(amount, cap);
 /** Shown beside a saving that reached the cap, so the customer understands the amount. */
 export const CAP_NOTE = ` (max ${formatMoney(PERCENT_OFF_CAP)} off)`;
+/** The same note for a member with their own limit. */
+export const capNote = (cap: number = PERCENT_OFF_CAP): string => ` (max ${formatMoney(cap)} off)`;
+
+/**
+ * Per-member limit for percentage codes: staff can give a
+ * member their own dollar limit in Edit member. Blank means the default $100.
+ * It only changes the per-order limit on percentage codes; percent sales,
+ * BOGO and bundles keep PERCENT_OFF_CAP for everyone.
+ */
+export function memberCodeCap(member?: { percentCap?: number } | null): number {
+  const c = member?.percentCap;
+  return typeof c === "number" && Number.isFinite(c) && c >= 0 ? c : PERCENT_OFF_CAP;
+}
 
 /**
  * The unit price a customer actually pays:

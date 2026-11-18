@@ -205,6 +205,36 @@ export function guessVenmo(raw: string): { payer: string; amount?: number; note:
   return { payer, amount, note, txnId: txn?.[1], sentAt: Number.isFinite(date) ? date : undefined, text: text.slice(0, 6000) };
 }
 
+/**
+ * Zelle: the bank's "You received money with Zelle" email (layout from a real
+ * Wells Fargo one; other banks fall back to guessVenmo):
+ *   "<Name> sent you $1.00" / "Date: 11/18/2026" / "Confirmation: 0PE0XBF1MUUW" / "Memo: <note>"
+ * The memo line is left out when the sender wrote none.
+ */
+const ZELLE_SENT = /^(?:(?:fwd?|fw):\s*)*(.{1,80}?) sent you \$([\d,]+(?:\.\d{1,2})?)\b/i;
+
+export function isZelle(raw: string): boolean {
+  const { headers } = splitMessage(raw);
+  const subject = decodeWords(headers.get("subject") || "");
+  return /received money with zelle/i.test(subject);
+}
+
+export function parseZelle(raw: string): ParsedVenmo {
+  const { headers } = splitMessage(raw);
+  const text = messageText(raw);
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+  const m = lines.map((l) => l.match(ZELLE_SENT)).find(Boolean);
+  if (!m) return { ok: false, error: "Doesn't look like a Zelle “sent you” email." };
+  const payer = m[1].replace(/^["']|["']$/g, "").trim();
+  const amount = Math.round(Number(m[2].replace(/,/g, "")) * 100) / 100;
+  if (!payer || !(amount > 0) || amount > 100000) return { ok: false, error: "Couldn't read the payer or the amount." };
+  const field = (name: string) => lines.map((l) => l.match(new RegExp(`^${name}\\s*:\\s*(.+)$`, "i"))?.[1]?.trim()).find(Boolean) || "";
+  const note = field("memo").slice(0, 280);
+  const conf = field("confirmation").match(/^[0-9A-Z]{6,30}$/i)?.[0];
+  const date = Date.parse(headers.get("date") || "");
+  return { ok: true, payer, amount, note, txnId: conf ? conf.toUpperCase() : undefined, sentAt: Number.isFinite(date) ? date : undefined, text: text.slice(0, 6000) };
+}
+
 /** "Consultation+for+Marisa+strong+#5ZCNN6" (a pay link that encoded spaces as +) → spaces. */
 function plusSpaces(note: string): string {
   return !/\s/.test(note) && /\w\+\w/.test(note) ? note.replace(/\+/g, " ") : note;

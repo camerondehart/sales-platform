@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { promises as fs } from "fs";
 import { VersionedStore } from "./versionedStore";
 import { getOrders, normalizeStatus, type Order } from "./orders";
-import { parseVenmo, guessVenmo, splitMessage, addressOf, decodeWords, messageText } from "./venmoParse";
+import { parseVenmo, guessVenmo, parseZelle, isZelle, splitMessage, addressOf, decodeWords, messageText } from "./venmoParse";
 import { verifyVenmo } from "./venmoVerify";
 import { matchPayment, type Match } from "./venmoMatch";
 
@@ -19,6 +19,8 @@ export type VenmoPayment = {
   id: string;
   receivedAt: number;
   subject: string;
+  /** "zelle": a Zelle email from the bank (brand.config payments.zelleBank). Missing = Venmo. */
+  source?: "zelle";
   /** Passed the security check: the only ones that can be marked paid from here. */
   verified: boolean;
   /** Not in a layout we know: payer/amount/note are a best guess. */
@@ -102,15 +104,18 @@ export async function ingest(raw: string): Promise<{ kind: "venmo" | "setup" | "
 
   // Everything else that lands here is kept and matched as well as we can
   // (2026-11-11): staff review every match anyway.
-  const strict = parseVenmo(raw);
+  // Zelle emails (from the bank in brand.config payments.zelleBank) share the inbox, matching and decisions.
+  const zelle = isZelle(raw);
+  const strict = zelle ? parseZelle(raw) : parseVenmo(raw);
   const parsed = strict.ok ? strict : { ...guessVenmo(raw), ok: true as const };
   const guessed = !strict.ok;
 
-  const verdict = await verifyVenmo(raw);
+  const verdict = await verifyVenmo(raw, zelle ? "zelle" : "venmo");
   const verified = verdict.ok;
   const reason = !verdict.ok ? verdict.reason : undefined;
   // Real Venmo transaction ID when we trust it; otherwise the message hash.
-  const id = verified && parsed.txnId ? `vt_${parsed.txnId}` : `vm_${hash}`;
+  // (Zelle: the bank's confirmation number.)
+  const id = verified && parsed.txnId ? `${zelle ? "zt" : "vt"}_${parsed.txnId}` : `vm_${hash}`;
 
   const existing = (await payments.read()).data.find((r) => r.id === id);
   if (existing) return { kind: "duplicate", id };
@@ -119,6 +124,7 @@ export async function ingest(raw: string): Promise<{ kind: "venmo" | "setup" | "
     id,
     receivedAt: Date.now(),
     subject,
+    ...(zelle ? { source: "zelle" as const } : {}),
     verified,
     reason,
     ...(guessed ? { guessed: true } : {}),
@@ -153,11 +159,68 @@ export function recentlyPaid(orders: Order[], rows: VenmoPayment[], now = Date.n
   });
 }
 
+async function readRaw(rawUrl: string): Promise<string | undefined> {
+  try {
+    if (rawUrl.startsWith("local:")) return await fs.readFile(path.join(process.cwd(), "data", "venmo-raw", path.basename(rawUrl.slice(6))), "utf8");
+    if (!/^https:\/\//.test(rawUrl)) return undefined;
+    const r = await fetch(rawUrl, { cache: "no-store" });
+    return r.ok ? await r.text() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Zelle emails that arrived before Zelle was supported were
+ * checked as if from Venmo and quarantined. Check their saved message again
+ * as Zelle, once: the result (pass or the real reason) replaces the old one.
+ */
+async function recheckEarlyZelle(rows: VenmoPayment[]): Promise<boolean> {
+  const early = rows.filter((r) => r.state === "new" && !r.verified && !r.source && r.rawUrl && /received money with zelle/i.test(r.subject));
+  if (!early.length) return false;
+  const fixed = new Map<string, Partial<VenmoPayment>>();
+  for (const r of early) {
+    const raw = await readRaw(r.rawUrl!);
+    if (!raw || !isZelle(raw)) continue;
+    const strict = parseZelle(raw);
+    const parsed = strict.ok ? strict : { ...guessVenmo(raw), ok: true as const };
+    const verdict = await verifyVenmo(raw, "zelle");
+    fixed.set(r.id, {
+      source: "zelle",
+      verified: verdict.ok,
+      reason: verdict.ok ? undefined : verdict.reason,
+      guessed: strict.ok ? undefined : true,
+      payer: parsed.payer,
+      amount: parsed.amount,
+      note: parsed.note.slice(0, 300),
+      txnId: parsed.txnId,
+      sentAt: parsed.sentAt,
+    });
+  }
+  if (!fixed.size) return false;
+  await payments.mutate((all) => {
+    let changed = false;
+    const out = all.map((r) => {
+      const f = fixed.get(r.id);
+      if (!f || r.source || r.state !== "new") return r;
+      changed = true;
+      const next: VenmoPayment = { ...r, ...f };
+      if (!next.reason) delete next.reason;
+      if (!next.guessed) delete next.guessed;
+      return next;
+    });
+    return { data: changed ? out : null, result: null };
+  });
+  return true;
+}
+
 export type InboxRow = VenmoPayment & { match?: Match };
 
 /** Every payment, newest first, with a fresh match for the ones still to sort out. */
 export async function inbox(): Promise<{ rows: InboxRow[]; orders: Order[]; paidOrders: Order[]; setup: SetupMessage[] }> {
-  const [rows, orders, setupRows] = await Promise.all([payments.read().then((s) => s.data), getOrders(), setup.read().then((s) => s.data).catch(() => [])]);
+  const [firstRows, orders, setupRows] = await Promise.all([payments.read().then((s) => s.data), getOrders(), setup.read().then((s) => s.data).catch(() => [])]);
+  let rows = firstRows;
+  if (await recheckEarlyZelle(rows).catch((err) => (console.error("[venmo] zelle recheck", err), false))) rows = (await payments.read()).data;
   const open = awaitingPayment(orders);
   const paid = recentlyPaid(orders, rows);
   const out = rows
@@ -212,7 +275,7 @@ export function offsiteAsOrders(rows: VenmoPayment[]): Order[] {
     .map((r): Order => ({
       id: `offsite_${r.id}`,
       userId: `offsite:${(r.payer || "unknown").trim().toLowerCase()}`,
-      userName: r.payer || "Off-site Venmo",
+      userName: r.payer || (r.source === "zelle" ? "Off-site Zelle" : "Off-site Venmo"),
       userEmail: "",
       items: [],
       shippingMethod: "pickup",

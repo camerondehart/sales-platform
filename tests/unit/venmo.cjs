@@ -12,7 +12,9 @@ const load = (file, deps = {}) => {
 };
 const parse = load("lib/venmoParse.ts");
 const match = load("lib/venmoMatch.ts");
-const verify = load("lib/venmoVerify.ts", { "./venmoParse": parse });
+// Zelle bank = the brand.config default (Wells Fargo).
+const brandStub = { brand: { payments: { zelleBank: { name: "Wells Fargo", domain: "wellsfargo.com" } } } };
+const verify = load("lib/venmoVerify.ts", { "./venmoParse": parse, "./brand": brandStub });
 const { build } = require(path.join(repo, "tests/e2e/venmo-sign.cjs"));
 
 let pass = 0, fail = 0;
@@ -109,6 +111,28 @@ const check = (name, ok, d) => { ok ? pass++ : fail++; console.log(`${ok ? "PASS
   v = await verify.verifyVenmo(good);
   check("dkim: the test key is ignored on Vercel (real DNS only)", !v.ok, v);
   delete process.env.VERCEL;
+
+  // ---- Zelle (Wells Fargo, the default bank), through a Google Group like Venmo
+  const zg = await mk("z1", { zelle: true, group: {}, payer: "Kelly Huber", amount: 1, note: "Order #4K9Q2X", txn: "0PE0XBF1MUUW" });
+  check("zelle: recognised by its subject", parse.isZelle(zg) && !parse.isZelle(good), null);
+  p = parse.parseZelle(zg);
+  check("zelle: payer, amount, memo, confirmation", p.ok && p.payer === "Kelly Huber" && p.amount === 1 && p.note === "Order #4K9Q2X" && p.txnId === "0PE0XBF1MUUW", p);
+  p = parse.parseZelle(await mk("z2", { zelle: true, group: {}, payer: "Ana María López", amount: 1234.5, note: "" }));
+  check("zelle: no memo, accents, $1,234.50", p.ok && p.payer === "Ana María López" && p.amount === 1234.5 && p.note === "", p);
+  v = await verify.verifyVenmo(zg, "zelle");
+  check("zelle: Google's record shows Wells Fargo passed → passes", v.ok, v);
+  v = await verify.verifyVenmo(zg);
+  check("zelle: a Zelle email doesn't pass as Venmo", !v.ok, v);
+  v = await verify.verifyVenmo(await mk("z3", { group: {} }), "zelle");
+  check("zelle: a Venmo email doesn't pass as Zelle", !v.ok && /Wells Fargo/.test(v.reason), v);
+  v = await verify.verifyVenmo(await mk("z4", { zelle: true, group: { tamper: ["Subject: You received money with Zelle", "Subject: You received money with Zelle (2)"] }, amount: 1 }), "zelle");
+  check("zelle: subject changed after Google sealed it → quarantined", !v.ok, v);
+  v = await verify.verifyVenmo(await mk("z5", { zelle: true, group: { firstDkim: "attacker.test", fromDomain: "attacker.test" }, signDomain: "attacker.test" }), "zelle");
+  check("zelle: first hop shows a non-Wells Fargo signature → quarantined", !v.ok, v);
+  v = await verify.verifyVenmo(await mk("z6", { zelle: true }), "zelle");
+  check("zelle: sent straight from Wells Fargo (not via the group) → passes", v.ok, v);
+  v = await verify.verifyVenmo(await mk("z7", { zelle: true, from: "Wells Fargo <alerts@wellsfargo.attacker.test>", signDomain: "attacker.test" }), "zelle");
+  check("zelle: look-alike domain → quarantined", !v.ok, v);
 
   // ---- matching
   const now = Date.now();

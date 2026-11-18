@@ -68,6 +68,14 @@ const brandConfig = {
   payments: {
     venmoHandle: "",
     zelle: "",
+    /**
+     * Zelle payment matching (Orders → Venmo / Zelle payments): the bank that
+     * emails you "You received money with Zelle". Its emails are trusted only
+     * when signed by this domain (or a subdomain, e.g. notify.wellsfargo.com).
+     * Reading is tuned to Wells Fargo's layout; other banks' emails are read as a
+     * best guess that staff check. Env: ZELLE_BANK_NAME / ZELLE_BANK_DOMAIN.
+     */
+    zelleBank: { name: "Wells Fargo", domain: "wellsfargo.com" },
   },
 
   /** IANA time zone the business runs on (reports, "today", cron windows). */

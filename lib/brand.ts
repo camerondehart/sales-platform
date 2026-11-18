@@ -33,6 +33,10 @@ export const brand = {
   payments: {
     venmoHandle: env("NEXT_PUBLIC_VENMO_HANDLE", brandConfig.payments.venmoHandle),
     zelle: env("NEXT_PUBLIC_ZELLE_CONTACT", brandConfig.payments.zelle),
+    zelleBank: {
+      name: env("ZELLE_BANK_NAME", brandConfig.payments.zelleBank.name),
+      domain: env("ZELLE_BANK_DOMAIN", brandConfig.payments.zelleBank.domain).toLowerCase().replace(/^@/, ""),
+    },
   },
 };
 

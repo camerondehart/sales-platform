@@ -136,7 +136,7 @@ export async function getAmbassadorBySlug(slug: string): Promise<Ambassador | nu
  */
 export const RESERVED_SLUGS = new Set([
   "about", "account", "admin", "ambassador", "ambassadors", "api", "app", "assets", "blog", "cart", "checkout", "contact",
-  "events", "favicon", "gallery", "help", "home", "index", "join", "login", "logout", "media", "members", "new", "orders",
+  "events", "favicon", "gallery", "gift", "gift-cards", "giftcards", "help", "home", "index", "join", "login", "logout", "media", "members", "new", "orders",
   "p", "pay", "privacy", "public", "retail", "robots", "set-password", "settings", "shop", "signup", "sitemap", "static",
   "stores", "support", "terms", "unsubscribe", "welcome", "www",
 ]);

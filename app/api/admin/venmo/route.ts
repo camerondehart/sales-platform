@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdmin, adminActor } from "@/lib/auth";
 import { getOrderById, updateOrder, normalizeStatus } from "@/lib/orders";
+import { deliverGiftCards, siteUrlFrom } from "@/lib/giftCardDelivery";
 import { syncOrderPoints } from "@/lib/loyalty";
 import { audited, auditDetail } from "@/lib/audit";
 import { decide, getPayment, inbox, undoOffsite } from "@/lib/venmoInbox";
@@ -39,6 +40,8 @@ async function confirmOne(paymentId: string, orderId: string, by: string) {
     // Already marked paid by hand: link the payment to it, change nothing on the order.
     const linked = await decide(paymentId, { state: "confirmed", orderId, linked: true }, by);
     if (!linked.ok) return { ok: false as const, status: 409, error: linked.error };
+    // A verified payment confirms a gift card order: deliver it (lib/giftCardDelivery.ts).
+    if (o.giftCardOrder) await deliverGiftCards(o, siteUrlFrom()).catch((err) => console.error("[venmo] gift cards", err));
     return { ok: true as const, order: o, payment: linked.payment, before: { status: o.status, total: o.total }, linked: true };
   }
   if (status !== "pending") return { ok: false as const, status: 409, error: `Order ${refOf(o.id)} is already ${status}.` };
@@ -47,6 +50,7 @@ async function confirmOne(paymentId: string, orderId: string, by: string) {
   const updated = await updateOrder(orderId, { status: "paid", paidAt: Date.now() });
   // Paid isn't completed: points come when the order is completed.
   if (updated) await syncOrderPoints(updated).catch((err) => console.error("[venmo] points", err));
+  if (updated?.giftCardOrder) await deliverGiftCards(updated, siteUrlFrom()).catch((err) => console.error("[venmo] gift cards", err));
   return { ok: true as const, order: updated, payment: claimed.payment, before: { status: o.status, total: o.total }, linked: false };
 }
 

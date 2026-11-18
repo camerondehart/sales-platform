@@ -22,6 +22,8 @@ type OrderSummary = {
   status: string;
   paymentMethod: "invoice" | "cash";
   createdAt: number;
+  giftCardOrder?: boolean;
+  giftCardApplied?: number;
 };
 
 export default function PayClient({ token }: { token: string }) {
@@ -148,8 +150,14 @@ export default function PayClient({ token }: { token: string }) {
                   <span>−${order.discount.toFixed(2)}</span>
                 </div>
               )}
+              {(order.giftCardApplied || 0) > 0 && (
+                <div className="pay-item" style={{ color: "var(--accent-strong)" }}>
+                  <span>Gift card</span>
+                  <span>−${(order.giftCardApplied || 0).toFixed(2)}</span>
+                </div>
+              )}
               <div className="pay-item">
-                <span>{order.shippingMethod === "pickup" ? "Local pickup" : "Shipping"}</span>
+                <span>{order.giftCardOrder ? "Delivery (by email)" : order.shippingMethod === "pickup" ? "Local pickup" : "Shipping"}</span>
                 <span>{order.shippingCost === 0 ? "Free" : `$${order.shippingCost.toFixed(2)}`}</span>
               </div>
               <div className="pay-item pay-total">
