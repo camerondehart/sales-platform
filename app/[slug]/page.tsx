@@ -203,6 +203,7 @@ export default async function AmbassadorPage({ params, searchParams }: { params:
         pickedBy={featured.length ? first : undefined}
         memberPicks={Object.keys(memberPicks).length ? memberPicks : undefined}
         signInNext={`/${a.slug}`}
+        ambassadorId={preview ? undefined : a.id}
         intro={intro}
         outro={
           <>

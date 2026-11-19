@@ -5,6 +5,7 @@ import { addSubscriber } from "@/lib/subscribers";
 import { Resend } from "resend";
 import { brand } from "@/lib/brand";
 import { recordRisk } from "@/lib/riskLog";
+import { countAmbassadorJoin } from "@/lib/ambassadorData";
 
 export async function POST(req: Request) {
   // Stop scripts flooding this form (lib/publicLimits.ts).
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
     ageVerified?: boolean;
     priorCustomer?: boolean;
     subscribe?: boolean;
+    /** The ambassador page this browser came through (lib/ambassadorRef.ts), only counted. */
+    ambassador?: unknown;
   };
 
   // Enforce the age gate here too — the form check can be bypassed by
@@ -36,6 +39,8 @@ export async function POST(req: Request) {
 
   // Members → Suspicious activity: note where this request came from. Flags only, never blocks.
   await recordRisk(req, "signup", result.user.id, result.user.email);
+  // Ambassador panel: count it for the ambassador they came through (a number, nothing on the member).
+  await countAmbassadorJoin(body.ambassador);
 
   // Every new member joins the mailing list (Cam, 2026-10-31; agreement §4.3 lets
   // the business choose automatic opt-in). They can unsubscribe from any email.

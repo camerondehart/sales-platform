@@ -11,11 +11,16 @@ export function safeNext(raw: string | null | undefined): string | null {
   return NEXT_RE.test(v) ? v : null;
 }
 
-/** In the browser: the page to go to after signing in. */
-export function afterSignIn(): string {
+/**
+ * In the browser: the page to go to after signing in. `to` = where the server
+ * says this member lands (an ambassador's panel, "/ambassador"); a ?next= page
+ * still wins, so "Sign in to see" on a page returns there.
+ */
+export function afterSignIn(to?: string): string {
+  const home = to === "/ambassador" ? to : "/gallery";
   try {
-    return safeNext(new URLSearchParams(window.location.search).get("next")) || "/gallery";
+    return safeNext(new URLSearchParams(window.location.search).get("next")) || home;
   } catch {
-    return "/gallery";
+    return home;
   }
 }

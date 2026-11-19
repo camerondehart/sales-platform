@@ -160,6 +160,7 @@ export default function GalleryClient({
   entranceTheme = "classic",
   localEvent = null,
   giftCards = false,
+  ambassadorPanel = false,
 }: {
   products: Product[];
   userName: string;
@@ -179,6 +180,8 @@ export default function GalleryClient({
   localEvent?: LocalEventNoteData | null;
   /** gift_cards switch: Gift cards page link, Account → Gift cards, balance off at checkout. */
   giftCards?: boolean;
+  /** ambassador_panel: this member is a linked ambassador, so the nav links to their panel. */
+  ambassadorPanel?: boolean;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Product | null>(null);
@@ -573,6 +576,12 @@ export default function GalleryClient({
           </a>
           <div className="masthead-meta">
             <nav className="masthead-nav" aria-label="Other pages">
+              {ambassadorPanel && !isAdminPreview && (
+                <a href="/ambassador" className="nav-pill nav-amb">
+                  <NavIcon name="chart" /> <em className="nl-long">Ambassador panel</em>
+                  <em className="nl-short">My panel</em>
+                </a>
+              )}
               <a href="/events" className="nav-pill">
                 <NavIcon name="events" /> <em>Events</em>
               </a>
@@ -610,6 +619,11 @@ export default function GalleryClient({
                       <div className="account-dropdown-name">{userName}</div>
                       <div className="account-dropdown-email">{userEmail}</div>
                     </div>
+                    {ambassadorPanel && !isAdminPreview && (
+                      <button onClick={() => window.location.assign("/ambassador")}>
+                        <NavIcon name="chart" /> Ambassador panel
+                      </button>
+                    )}
                     <button onClick={openOrders}>
                       <Icon name="orders" /> My orders
                     </button>

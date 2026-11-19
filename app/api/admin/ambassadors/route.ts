@@ -3,6 +3,7 @@ import { isAdmin } from "@/lib/auth";
 import { audited, auditDetail } from "@/lib/audit";
 import { addPayout, deleteAmbassador, getAmbassadors, removePayout, saveAmbassador } from "@/lib/ambassadors";
 import { ambassadorStatsFor } from "@/lib/ambassadorData";
+import { getUsers } from "@/lib/users";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,15 @@ export async function GET() {
   const live = ambassadors.filter((a) => a.active);
   const sum = (k: "visits" | "orders" | "sales" | "earnedAllTime" | "paidOut" | "owed") => Math.round(Object.values(stats).reduce((n, s) => n + s[k], 0) * 100) / 100;
   const overview = { live: live.length, total: ambassadors.length, visits: sum("visits"), orders: sum("orders"), sales: sum("sales"), earned: sum("earnedAllTime"), paidOut: sum("paidOut"), owed: sum("owed") };
-  return NextResponse.json({ ambassadors, stats, overview }, { headers: { "Cache-Control": "no-store" } });
+  // Ambassador panel: whether each linked sign-in email is a member account that can sign in.
+  const users = ambassadors.some((a) => a.account) ? await getUsers().catch(() => []) : [];
+  const accounts: Record<string, "approved" | "pending" | "rejected" | "none"> = {};
+  for (const a of ambassadors) {
+    if (!a.account) continue;
+    const u = users.find((x) => x.email.toLowerCase() === a.account);
+    accounts[a.id] = u ? (u.status as "approved" | "pending" | "rejected") : "none";
+  }
+  return NextResponse.json({ ambassadors, stats, overview, accounts }, { headers: { "Cache-Control": "no-store" } });
 }
 
 async function readBody(req: Request): Promise<Record<string, unknown> | null> {
@@ -28,8 +37,8 @@ async function readBody(req: Request): Promise<Record<string, unknown> | null> {
   }
 }
 
-const summary = (a: { name: string; slug: string; active: boolean; productIds: string[]; discountCode?: string; socials: unknown[]; email?: string; terms?: { commissionPct: number; growthOn: boolean; growthPct?: number; trialDays: number; windowDays: number; repeatPurchases: boolean } }) => ({
-  name: a.name, page: `/${a.slug}`, live: a.active, products: a.productIds.length, socials: a.socials.length, code: a.discountCode || null, email: a.email || null,
+const summary = (a: { name: string; slug: string; active: boolean; productIds: string[]; discountCode?: string; socials: unknown[]; email?: string; account?: string; terms?: { commissionPct: number; growthOn: boolean; growthPct?: number; trialDays: number; windowDays: number; repeatPurchases: boolean } }) => ({
+  name: a.name, page: `/${a.slug}`, live: a.active, products: a.productIds.length, socials: a.socials.length, code: a.discountCode || null, email: a.email || null, panelSignIn: a.account || null,
   ...(a.terms ? { commission: a.terms.growthOn ? a.terms.growthPct : a.terms.commissionPct, trialDays: a.terms.trialDays, windowDays: a.terms.windowDays, repeat: a.terms.repeatPurchases } : {}),
 });
 

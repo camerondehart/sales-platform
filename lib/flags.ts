@@ -49,6 +49,7 @@ export const FLAG_KEYS = [
   "retail_portal",
   "local_events_note",
   "gift_cards",
+  "ambassador_panel",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -235,6 +236,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   gift_cards: {
     label: "Gift cards",
     description: "Members can buy animated gift cards (Birthday, Holidays, Just because, Thank you, with a note) on the Gift cards page. The card is sent to the recipient's email and account only once payment is confirmed: a matched Venmo/Zelle payment, or staff setting the order to Paid or Completed. Buyers get the bonus credit set in Settings → Gift cards (e.g. $5 per $50). Members spend their balance at checkout. Off = the page and checkout option are hidden; cards already sent keep their balance and show again when it's back on.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  ambassador_panel: {
+    label: "Ambassador panel",
+    description: "Ambassadors sign in with the member email linked to them in the Ambassadors tab (Edit → Panel sign-in) and land on their own panel at /ambassador: their link and QR code, their code, their terms, visits, product views, membership requests, orders, sales and commission over a date range with a chart, their recent orders (order number, date, products and amounts, never who bought) and their payouts. They can choose and reorder the products on their page; everything else stays staff-only. They can still shop as members. Off = sign-in goes to the shop as usual and /ambassador is closed (links stay saved).",
     defaults: { production: false, preview: true, development: true },
     built: true,
   },

@@ -8,6 +8,7 @@ import { brand } from "@/lib/brand";
 import { unlockName } from "@/lib/unlockName";
 import { FaceIdIcon, markSignedIn } from "@/app/components/MemberFaceId";
 import { afterSignIn } from "@/lib/signInNext";
+import { ambassadorRef } from "@/lib/ambassadorRef";
 
 type Mode = "signin" | "signup" | "forgot" | "code" | "firsttime";
 
@@ -97,8 +98,9 @@ function CodeSignInForm({ onBack, initialEmail = "" }: { onBack: () => void; ini
       body: JSON.stringify({ action: "verify", email, code }),
     });
     if (res.ok) {
+      const ok = await res.json().catch(() => ({}));
       markSignedIn("code");
-      router.push(afterSignIn());
+      router.push(afterSignIn(ok.to));
       router.refresh();
       return;
     }
@@ -182,8 +184,9 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId =
       const response = await startAuthentication({ optionsJSON: options });
       const v = await fetch("/api/login/member-passkey", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", response }) });
       if (v.ok) {
+        const ok = await v.json().catch(() => ({}));
         markSignedIn("passkey");
-        router.push(afterSignIn());
+        router.push(afterSignIn(ok.to));
         router.refresh();
         return;
       }
@@ -260,7 +263,7 @@ function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId =
         return;
       }
       markSignedIn("password");
-      router.push(afterSignIn());
+      router.push(afterSignIn(ok.to));
       router.refresh();
       return;
     }
@@ -471,7 +474,7 @@ function SignUpForm({ consult = false, initialEmail = "" }: { consult?: boolean;
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, message, ageVerified, priorCustomer, subscribe }),
+      body: JSON.stringify({ name, email, password, message, ageVerified, priorCustomer, subscribe, ambassador: ambassadorRef() }),
     });
 
     if (res.ok) {

@@ -116,6 +116,9 @@ export function recordEvent(name: string, props: Record<string, unknown>, ctx: {
     case "product_view": {
       const id = clip(props.id, 80);
       if (id) bump(day, `pv:${id}`);
+      // Opened on an ambassador's page: counted for their panel (just a number per day).
+      const amb = clip(props.amb, 40);
+      if (/^amb_[a-z0-9]{4,30}$/.test(amb)) bump(day, `ambc:${amb}`);
       break;
     }
     case "add_to_cart": {

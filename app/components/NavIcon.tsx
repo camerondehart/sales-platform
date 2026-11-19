@@ -1,5 +1,5 @@
 // Small line icons for the top navigation (same style as the gallery's account/cart icons).
-export type NavIconName = "shop" | "events" | "pin" | "about" | "user" | "basket" | "gift";
+export type NavIconName = "shop" | "events" | "pin" | "about" | "user" | "basket" | "gift" | "chart";
 
 const PATHS: Record<NavIconName, JSX.Element> = {
   shop: (
@@ -37,6 +37,12 @@ const PATHS: Record<NavIconName, JSX.Element> = {
       <rect x="4" y="9" width="16" height="4" rx="1" />
       <path d="M5.5 13v7h13v-7M12 9v11" />
       <path d="M12 9c-1.2-3.2-5.2-4.3-5.2-1.6C6.8 9 10 9 12 9zM12 9c1.2-3.2 5.2-4.3 5.2-1.6C17.2 9 14 9 12 9z" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M4.5 19.5h15" />
+      <path d="M7 16v-4M11 16V8M15 16v-6M19 16V5" />
     </>
   ),
   basket: (

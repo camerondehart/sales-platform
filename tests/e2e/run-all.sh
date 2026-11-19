@@ -55,11 +55,13 @@ echo "Events note for locals (unit): $(node "$REPO/tests/unit/local-events.cjs" 
 node "$REPO/tests/unit/local-events.cjs" >/dev/null 2>&1 || { echo "Events note unit check failed"; exit 1; }
 echo "Gift card bonus and balance (unit): $(node "$REPO/tests/unit/gift-cards.cjs" | tail -1)"
 node "$REPO/tests/unit/gift-cards.cjs" >/dev/null 2>&1 || { echo "Gift card unit check failed"; exit 1; }
+echo "Ambassador panel ranges and chart (unit): $(node "$REPO/tests/unit/ambassador-panel.cjs" | tail -1)"
+node "$REPO/tests/unit/ambassador-panel.cjs" >/dev/null 2>&1 || { echo "Ambassador panel unit check failed"; exit 1; }
 echo "Building…"
 (cd /tmp/final && npx next build >/tmp/harness/build.log 2>&1) || { echo "Build failed — see /tmp/harness/build.log"; exit 1; }
 set +e
 FAILED=0
-for suite in run.sh:core run2.sh:reliability run3.sh:admin-actions run4.sh:insights run5.sh:messages run6.sh:models run7.sh:foundations run8.sh:analytics run9.sh:features run10.sh:sign-in run11.sh:bundles run12.sh:uploads run13.sh:product-cards run14.sh:concierge-actions run15.sh:launch-hardening run16.sh:member-import run17.sh:retail-stores run18.sh:gift-cards; do
+for suite in run.sh:core run2.sh:reliability run3.sh:admin-actions run4.sh:insights run5.sh:messages run6.sh:models run7.sh:foundations run8.sh:analytics run9.sh:features run10.sh:sign-in run11.sh:bundles run12.sh:uploads run13.sh:product-cards run14.sh:concierge-actions run15.sh:launch-hardening run16.sh:member-import run17.sh:retail-stores run18.sh:gift-cards run19.sh:ambassador-panel; do
   script="${suite%%:*}"; name="${suite##*:}"
   sleep 3
   out="$(bash /tmp/harness/$script 2>&1)"

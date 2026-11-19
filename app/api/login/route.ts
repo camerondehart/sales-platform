@@ -14,6 +14,7 @@ import { isEnabled } from "@/lib/flags";
 import { matchesPhrase, oldPasswordStatus } from "@/lib/staffPhrase";
 import { canSignIn, verifyRetailPassword } from "@/lib/retail";
 import { startStoreSession } from "@/lib/retailAuth";
+import { landingFor } from "@/lib/ambassadorPanel";
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -113,5 +114,7 @@ export async function POST(req: Request) {
     maxAge: 60 * 60 * 24 * 7,
   });
 
-  return NextResponse.json({ ok: true, name: user.name });
+  // A linked ambassador lands on their panel (switch ambassador_panel).
+  const to = await landingFor(user.email);
+  return NextResponse.json({ ok: true, name: user.name, ...(to ? { to } : {}) });
 }

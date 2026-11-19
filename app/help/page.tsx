@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { isAdmin } from "@/lib/auth";
 import { COURSE_HTML } from "./courseHtml";
 import { brand } from "@/lib/brand";
+import HelpFrame from "./HelpFrame";
 
 export const metadata = {
   title: `Staff Guide · ${brand.name}`,
@@ -15,16 +16,10 @@ export const dynamic = "force-dynamic";
 // The guide is a complete, self-contained HTML document, so it renders in a
 // sandboxed iframe that fills the viewport. Its own sidebar carries the
 // "Back to dashboard" link — wrapping it in extra page chrome caused the
-// header to smear during scroll in Safari.
+// header to smear during scroll in Safari. The staff Concierge sits beside it
+// (HelpFrame), and the guide's Ask buttons open it.
 export default async function HelpPage() {
   if (!(await isAdmin())) redirect("/admin");
 
-  return (
-    <iframe
-      className="help-frame"
-      title={`${brand.name} staff guide`}
-      srcDoc={COURSE_HTML}
-      sandbox="allow-scripts allow-popups allow-modals allow-top-navigation-by-user-activation"
-    />
-  );
+  return <HelpFrame html={COURSE_HTML} title={`${brand.name} staff guide`} />;
 }

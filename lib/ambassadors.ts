@@ -93,6 +93,12 @@ export type Ambassador = {
   discountCode?: string;
   /** Where progress reports go. */
   email?: string;
+  /**
+   * The member email that opens their Ambassador panel (/ambassador, switch
+   * ambassador_panel). They sign in as that member, the usual ways, and land
+   * on the panel. Empty = no panel. One ambassador per email.
+   */
+  account?: string;
   terms?: AmbassadorTerms;
   payouts?: Payout[];
   lastReportAt?: number;
@@ -226,6 +232,9 @@ export function cleanAmbassador(input: Record<string, unknown>, others: Ambassad
   const discountCode = t(input.discountCode, 40).toUpperCase();
   const email = t(input.email, 200).toLowerCase();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "That email address doesn't look right." };
+  const account = t(input.account, 200).toLowerCase();
+  if (account && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) return { ok: false, error: "The panel sign-in email doesn't look right." };
+  if (account && others.some((a) => a.account === account)) return { ok: false, error: `${account} already opens another ambassador's panel.` };
   const terms = cleanTerms(input.terms);
   if (!terms.ok) return terms;
   return {
@@ -244,6 +253,8 @@ export function cleanAmbassador(input: Record<string, unknown>, others: Ambassad
       ...(input.welcome !== undefined ? { welcome: input.welcome !== false } : {}),
       discountCode: discountCode || undefined,
       email: email || undefined,
+      // Only when sent, so an older form (or the Concierge) never unlinks it.
+      ...(input.account !== undefined ? { account: account || undefined } : {}),
       ...(terms.value ? { terms: terms.value } : {}),
       active: input.active === undefined ? true : !!input.active,
     },
@@ -383,6 +394,33 @@ export async function ambassadorCodes(): Promise<Set<string>> {
   } catch {
     return new Set();
   }
+}
+
+/** The live ambassador whose panel this member email opens (Ambassador panel). */
+export async function ambassadorForAccount(email: string | undefined | null): Promise<Ambassador | null> {
+  const e = String(email || "").trim().toLowerCase();
+  if (!e) return null;
+  return (await getAmbassadors()).find((a) => a.active && a.account === e) || null;
+}
+
+/**
+ * The ambassador's own picks, from their panel: only the order and which
+ * products, nothing else on their record changes. `allowed` = products that
+ * can be featured (the public shop + members-only ones).
+ */
+export async function savePicks(id: string, productIds: unknown, allowed: Set<string>): Promise<{ ok: true; before: string[]; after: string[] } | { ok: false; error: string; status: number }> {
+  if (!Array.isArray(productIds)) return { ok: false, error: "Pick some products first.", status: 400 };
+  const ids = Array.from(new Set(productIds.map((x) => t(x, 80)).filter(Boolean)));
+  if (ids.length > 24) return { ok: false, error: "Feature up to 24 products.", status: 400 };
+  if (ids.some((x) => !allowed.has(x))) return { ok: false, error: "One of those products isn't in the shop any more. Reload and try again.", status: 400 };
+  const r = await store.mutate<{ before: string[]; after: string[] } | null>((rows) => {
+    const i = rows.findIndex((r) => r.id === id);
+    if (i === -1 || !rows[i].active) return { data: null, result: null };
+    const out = rows.slice();
+    out[i] = { ...rows[i], productIds: ids, updatedAt: Date.now() };
+    return { data: out, result: { before: rows[i].productIds, after: ids } };
+  });
+  return r ? { ok: true, ...r } : { ok: false, error: "Your page is switched off right now.", status: 404 };
 }
 
 /** Note when the last progress report went out. */

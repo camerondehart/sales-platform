@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { signVisitorToken, VISITOR_COOKIE } from "@/lib/auth";
+import { landingFor } from "@/lib/ambassadorPanel";
 import { isEnabled } from "@/lib/flags";
 import { findUserByEmail } from "@/lib/users";
 import { issue, useMemberCode } from "@/lib/loginCodes";
@@ -61,7 +62,9 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
-    return NextResponse.json({ ok: true, name: user.name });
+    // A linked ambassador lands on their panel (switch ambassador_panel).
+    const to = await landingFor(user.email);
+    return NextResponse.json({ ok: true, name: user.name, ...(to ? { to } : {}) });
   }
   return NextResponse.json({ error: "Bad request." }, { status: 400 });
 }

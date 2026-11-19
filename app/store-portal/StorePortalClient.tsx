@@ -9,6 +9,7 @@ import FormattedDescription from "@/app/components/FormattedDescription";
 import ProductVideo from "@/app/components/ProductVideo";
 import { unlockName } from "@/lib/unlockName";
 import { FaceIdIcon } from "@/app/components/MemberFaceId";
+import StoreGuide, { STORE_GUIDE_SEEN } from "./StoreGuide";
 
 /**
  * Store portal screens (app/store-portal/page.tsx). Server routes:
@@ -214,6 +215,17 @@ export function StorePortal({ initial, faceOn }: { initial: Data; faceOn: boolea
 
   const open = data.requests.filter((r) => r.status === "pending" || r.status === "approved" || r.status === "shipped");
 
+  // "How it works": opens by itself on this browser's first visit, then from the header.
+  const [guide, setGuide] = useState(false);
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(STORE_GUIDE_SEEN)) {
+        setGuide(true);
+        localStorage.setItem(STORE_GUIDE_SEEN, "1");
+      }
+    } catch {}
+  }, []);
+
   async function signOut() {
     await post("/api/store-portal/auth", { action: "logout" });
     window.location.assign("/store-portal");
@@ -228,10 +240,13 @@ export function StorePortal({ initial, faceOn }: { initial: Data; faceOn: boolea
           <div className="sp-sub">Signed in as {data.me.name} · {data.me.email}</div>
         </div>
         <div className="sp-head-actions">
+          <button type="button" className="sp-btn sp-btn-ghost" onClick={() => setGuide((g) => !g)} aria-expanded={guide}>📖 How it works</button>
           <button type="button" className="sp-btn sp-btn-ghost" onClick={() => window.dispatchEvent(new CustomEvent(EVT_OPEN))}>Ask our Concierge</button>
           <button type="button" className="sp-btn sp-btn-ghost" onClick={signOut}>Sign out</button>
         </div>
       </header>
+
+      {guide && <StoreGuide onClose={() => setGuide(false)} />}
 
       <div className="sp-stats">
         <div className="sp-stat"><strong>{open.length}</strong><span>open request{open.length === 1 ? "" : "s"}</span></div>

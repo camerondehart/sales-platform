@@ -40,6 +40,7 @@ export default function RetailClient({
   pickup = false,
   memberPicks,
   signInNext,
+  ambassadorId,
 }: {
   products: Product[];
   embedded?: boolean;
@@ -63,6 +64,8 @@ export default function RetailClient({
   memberPicks?: Record<string, Product | null>;
   /** Ambassador pages: where "Sign in to see" brings them back to (their page). */
   signInNext?: string;
+  /** Ambassador pages (not staff previews): product views here count toward their panel. */
+  ambassadorId?: string;
 }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   // Phone layout: two per row by default, one per row if they prefer.
@@ -84,8 +87,8 @@ export default function RetailClient({
   // Printed product QR codes land here as ?product=<id>.
   useProductDeepLink(products, setSelected);
   useEffect(() => {
-    if (selected) track("product_view", { id: selected.id });
-  }, [selected]);
+    if (selected) track("product_view", { id: selected.id, ...(ambassadorId ? { amb: ambassadorId } : {}) });
+  }, [selected, ambassadorId]);
   useEffect(() => {
     if (cartOpen) track("cart_open");
   }, [cartOpen]);

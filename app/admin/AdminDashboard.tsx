@@ -2715,7 +2715,8 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           </div>
         )}
         <nav>
-          <a href="/help">📖 Staff guide</a>
+          {/* Opens the guide at the tab you're on. */}
+          <a href={`/help#tab-${tab}`} title={`Staff guide: ${TABS.find((t) => t.key === tab)?.label || "how it all works"}`}>📖 Staff guide</a>
           <a href="/gallery" target="_blank">View site ↗</a>
           <button type="button" className="theme-switch" onClick={theme.cycle} title={theme.title} aria-label={theme.title}>
             {theme.label}

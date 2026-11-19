@@ -155,9 +155,147 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
     section:first-of-type h2.sec{page-break-before:avoid}
     .card,.callout{break-inside:avoid}
   }
+  /* ---------- Theme (light default; dark follows the dashboard) ---------- */
+  :root{
+    --bg:#f2f4ef; --side:#1a2716; --side-ink:#eaf7c9; --code-bg:#f2f4ef;
+    --shadow:0 5px 16px rgba(97,103,109,.18); --chip:rgba(133,186,69,.12);
+    color-scheme:light;
+  }
+  :root[data-theme="dark"]{
+    --green:#85ba45; --green-deep:#a7d36c; --mint:#2ad3b1; --mint-deep:#4fdcbf;
+    --yellow:#b9bc48; --yellow-deep:#d2d56a; --red:#d9787b; --red-deep:#eb9396;
+    --ink:#e3e8db; --ink-soft:#a8b0a1; --ink-faint:#7c8476;
+    --white:#262f22; --rule:#36422f; --rule-soft:#2a3426; --surface:#1b2318;
+    --bg:#121810; --side:#0d130b; --side-ink:#eaf7c9; --code-bg:#0f150d;
+    --shadow:0 5px 18px rgba(0,0,0,.45); --chip:rgba(133,186,69,.16);
+    color-scheme:dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --green:#85ba45; --green-deep:#a7d36c; --mint:#2ad3b1; --mint-deep:#4fdcbf;
+      --yellow:#b9bc48; --yellow-deep:#d2d56a; --red:#d9787b; --red-deep:#eb9396;
+      --ink:#e3e8db; --ink-soft:#a8b0a1; --ink-faint:#7c8476;
+      --white:#262f22; --rule:#36422f; --rule-soft:#2a3426; --surface:#1b2318;
+      --bg:#121810; --side:#0d130b; --code-bg:#0f150d;
+      --shadow:0 5px 18px rgba(0,0,0,.45); --chip:rgba(133,186,69,.16);
+      color-scheme:dark;
+    }
+  }
+  body{background:var(--bg)}
+  .sidebar{background:var(--side)}
+  .code-block{font-family:monospace;font-size:.85rem;white-space:pre-wrap;background:var(--code-bg);padding:.9rem 1rem;border-radius:8px;line-height:1.6;border:1px solid var(--rule-soft)}
+
+  /* ---------- Sidebar extras ---------- */
+  .side-tools{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.9rem}
+  .side-tools button{
+    font-family:inherit;font-size:.74rem;font-weight:700;cursor:pointer;border-radius:8px;
+    padding:.42rem .7rem;border:1px solid rgba(190,227,145,.25);background:transparent;color:rgba(234,247,201,.85);
+  }
+  .side-tools button:hover{background:rgba(133,186,69,.2);color:#fff;border-color:var(--green)}
+  .side-tools .side-ask{background:var(--green);border-color:var(--green);color:#132010}
+  .side-tools .side-ask:hover{background:#9bd05a;color:#132010}
+  .kbd-hint{font-size:.66rem;color:rgba(234,247,201,.4);padding:.3rem 1rem 0}
+
+  /* Concierge pieces only show once the dashboard says the Concierge is live. */
+  .ask-only{display:none!important}
+  html.has-concierge .ask-only{display:revert!important}
+  html.has-concierge .side-tools .ask-only,html.has-concierge .tb-ask.ask-only{display:inline-flex!important}
+
+  /* ---------- Welcome panel ---------- */
+  .hero{
+    background:linear-gradient(135deg,rgba(133,186,69,.16),rgba(15,199,163,.08));border:1px solid var(--rule-soft);
+    border-radius:16px;padding:1.4rem 1.5rem;margin:0 0 2.6rem;
+  }
+  .hero h2{font-family:Georgia,serif;font-style:italic;font-weight:400;font-size:1.7rem;margin-bottom:.2rem}
+  .hero p{color:var(--ink-soft);margin:.2rem 0 .9rem}
+  .hero-ask{display:flex;gap:.5rem;margin:.2rem 0 1rem}
+  .hero-ask input{
+    flex:1;min-width:0;padding:.7rem .9rem;border-radius:10px;border:1px solid var(--rule);background:var(--surface);
+    color:var(--ink);font-family:inherit;font-size:.95rem;
+  }
+  .hero-ask input:focus{outline:2px solid var(--green);outline-offset:1px}
+  .hero-ask button,.ask-row button{
+    border:none;background:var(--green);color:#132010;font-family:inherit;font-weight:700;font-size:.85rem;
+    border-radius:10px;padding:.6rem 1rem;cursor:pointer;white-space:nowrap;
+  }
+  .hero-ask button:hover,.ask-row button:hover{background:var(--green-deep)}
+  :root[data-theme="dark"] .hero-ask button:hover{background:#9bd05a}
+  .hero-sub{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--ink-soft);margin:.6rem 0 .45rem}
+  .quick{display:flex;flex-wrap:wrap;gap:.45rem}
+  .quick a{
+    display:inline-flex;align-items:center;gap:.35rem;text-decoration:none;color:var(--ink);font-size:.85rem;
+    background:var(--surface);border:1px solid var(--rule-soft);border-radius:99px;padding:.38rem .8rem;
+  }
+  .quick a:hover{border-color:var(--green)}
+
+  /* ---------- Section tools (Ask / Open in dashboard / next) ---------- */
+  .sec-tools{display:flex;flex-wrap:wrap;gap:.45rem;margin:-.3rem 0 1rem}
+  .sec-tools button,.sec-tools a{
+    display:inline-flex;align-items:center;gap:.3rem;font-family:inherit;font-size:.78rem;font-weight:600;
+    border-radius:99px;padding:.3rem .75rem;cursor:pointer;text-decoration:none;
+    border:1px solid var(--rule);background:var(--surface);color:var(--ink);
+  }
+  .sec-tools button{border-color:rgba(133,186,69,.5);background:var(--chip);color:var(--green-deep)}
+  .sec-tools button:hover,.sec-tools a:hover{border-color:var(--green)}
+  .sec-foot{display:flex;justify-content:space-between;gap:.7rem;margin-top:2.2rem;padding-top:1rem;border-top:1px solid var(--rule-soft)}
+  .sec-foot a{display:block;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--rule-soft);border-radius:10px;padding:.6rem .9rem;max-width:48%}
+  .sec-foot a:hover{border-color:var(--green)}
+  .sec-foot small{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);font-weight:700}
+  .sec-foot .next{margin-left:auto;text-align:right}
+  .ask-row{display:flex;align-items:center;justify-content:space-between;gap:.7rem;flex-wrap:wrap;margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--rule-soft);font-size:.88rem;color:var(--ink-soft)}
+  .no-results .ask-row{justify-content:center;border-top:none}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:1rem 0}
+  .table-scroll table{margin:0}
+  .to-top{
+    position:fixed;left:1rem;bottom:1rem;z-index:30;display:none;
+    border:1px solid var(--rule);background:var(--surface);color:var(--ink);box-shadow:var(--shadow);
+    border-radius:99px;padding:.4rem .9rem;font-family:inherit;font-size:.75rem;font-weight:700;cursor:pointer;
+  }
+  .to-top.show{display:block}
+
+  /* ---------- Phone top bar + slide-out menu ---------- */
+  .topbar{display:none}
+  .scrim{display:none}
+  @media (min-width:881px){ .to-top{left:calc(272px + 1rem)} }
+  @media (max-width:880px){
+    .topbar{
+      display:flex;align-items:center;gap:.5rem;position:sticky;top:0;z-index:60;
+      background:var(--side);color:#f4f8ea;padding:.55rem .75rem;box-shadow:0 2px 10px rgba(0,0,0,.18);
+    }
+    .topbar button{
+      font-family:inherit;border:1px solid rgba(190,227,145,.28);background:transparent;color:#f4f8ea;
+      border-radius:9px;padding:.42rem .65rem;font-size:.85rem;font-weight:700;cursor:pointer;min-height:38px;
+    }
+    .topbar .tb-ask{background:var(--green);border-color:var(--green);color:#132010}
+    .tb-title{flex:1;font-family:Georgia,serif;font-style:italic;font-size:1.1rem;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tb-title small{font-family:inherit;font-style:normal;font-size:.72rem;color:rgba(234,247,201,.6);margin-left:.35rem}
+    .wrap{display:block}
+    .sidebar{
+      position:fixed!important;top:0;left:0;bottom:0;width:min(86vw,320px)!important;height:100%!important;z-index:80;
+      transform:translateX(-105%);transition:transform .22s ease;box-shadow:6px 0 24px rgba(0,0,0,.3);
+    }
+    html.menu-open .sidebar{transform:none}
+    html.menu-open .scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70}
+    .sidebar a.nav-link{display:flex!important;border-left:3px solid transparent!important;border-bottom:none!important;padding:.55rem 1.1rem!important}
+    .sidebar a.nav-link.active{border-left-color:var(--green)!important}
+    .hero{padding:1.1rem 1rem}
+    .hero-ask{flex-direction:column}
+    .hero-ask input{width:100%}
+    section,section h3{scroll-margin-top:64px}
+    .sec-foot a{max-width:none;flex:1}
+  }
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} .sidebar{transition:none} }
+  @media print{ .topbar,.scrim,.hero,.sec-tools,.sec-foot,.to-top,.ask-row{display:none!important} }
 </style>
 </head>
 <body>
+<header class="topbar">
+  <button type="button" id="menuBtn" aria-label="Open the guide menu">☰ Menu</button>
+  <span class="tb-title">Staff Guide<small id="tbWhere"></small></span>
+  <button type="button" id="tbSearch" aria-label="Search the guide">🔍</button>
+  <button type="button" class="tb-ask ask-only" data-ask="" aria-label="Ask the Concierge">✦ Ask</button>
+</header>
+<div class="scrim" id="scrim"></div>
 <div class="wrap">
 
 <nav class="sidebar">
@@ -165,6 +303,10 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
     <a class="back-link" href="/admin" target="_top">← Back to dashboard</a>
     <h1>Staff Guide</h1>
     <p>{{MEMBERS}}</p>
+    <div class="side-tools">
+      <button type="button" class="side-ask ask-only" data-ask="">✦ Ask the Concierge</button>
+      <button type="button" onclick="window.print()">🖨 Print / PDF</button>
+    </div>
   </div>
   <div class="search-wrap">
     <input type="search" id="search" placeholder="Search the guide…" aria-label="Search the guide" />
@@ -209,6 +351,26 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
 <main>
 <div class="no-results" id="noResults">Nothing in the guide matches that search. Try fewer or shorter words.</div>
 <div class="search-results" id="searchResults" aria-live="polite"></div>
+
+<div class="hero" id="hero">
+<h2>What do you need to do?</h2>
+<p>Search the menu, jump to a common job, or ask the Concierge. It knows this whole guide and can look at today’s orders, members and stock for you.</p>
+<div class="hero-ask ask-only" id="heroAsk">
+<input type="text" maxlength="300" placeholder="Ask anything, e.g. “How do I refund a gift card?”" aria-label="Ask the Concierge" />
+<button type="button">✦ Ask</button>
+</div>
+<div class="hero-sub">Common jobs</div>
+<div class="quick">
+<a href="#daily">☀ Daily routine</a>
+<a href="#job-paid">💵 Take a payment</a>
+<a href="#job-ship">📦 Ship an order</a>
+<a href="#job-pickup">🚗 Handle a pickup</a>
+<a href="#job-message">✉ Message a customer</a>
+<a href="#tab-giftcards">🎁 Gift cards</a>
+<a href="#job-sale">🏷 Run a sale</a>
+<a href="#troubleshoot">🔧 Something’s wrong</a>
+</div>
+</div>
 
 <!-- ===== START ===== -->
 <section id="start">
@@ -680,6 +842,15 @@ Deleting an event throws away everyone who signed up. If a date moves or a price
 
 <h3>What visitors see</h3>
 <p>Published events appear at <strong>/events</strong> as cards. Clicking the photo, the title, or the <strong>Details</strong> button opens a pop-up with the full description, the date and location, the price, and live availability such as "12 of 20 registered." They register from there, or straight from the card.</p>
+
+<h3>The events note for locals</h3>
+<p><span class="where" style="display:inline">Settings → Events popup</span> Members who sign in near the <strong>Center town</strong> (the business's home town, 100 miles, to start) get one small card in the corner about the soonest upcoming event, with how many more are coming. Each member sees it once. Location is a rough guess from their internet connection; the site never asks for or stores it.</p>
+<ul>
+<li>Change the town or <strong>Miles around it</strong> and press Save. Saving checks the town on the map (US only) and shows which place it found.</li>
+<li>Every event is in the popup unless you untick <strong>Show in the events popup for locals</strong> on the event (or in the <strong>Upcoming events</strong> list there). An event can have its own town and miles; blank uses the main area.</li>
+<li><kbd>Show it again to everyone</kbd> lets every member see the note once more, e.g. after you add a big event.</li>
+<li>It’s behind the <strong>Events note for locals</strong> switch.</li>
+</ul>
 </section>
 
 <!-- ===== MARKETING TAB ===== -->
@@ -787,7 +958,7 @@ Anyone on the mailing list whose email also has an approved {{MEMBERS}} account.
 
 <div class="card">
 <h4 style="margin-top:0">A complete example</h4>
-<p style="font-family:monospace;font-size:0.85rem;white-space:pre-wrap;background:#f2f4ef;padding:0.9rem 1rem;border-radius:8px;line-height:1.6;"># Fresh batch just landed
+<p class="code-block"># Fresh batch just landed
 
 We just finished a new run and wanted you to hear it first.
 
@@ -943,6 +1114,21 @@ On stage the link and QR code point at stage. The panel warns you when that’s 
 </ol>
 <p>The report shows their page visits, orders, sales and commission for that period, what they’ve earned, been paid and are still owed since they started, their community’s favorite products, where their trial stands and their link and code. It <strong>never</strong> shows customers’ names or details.</p>
 
+<h3>Their own panel</h3>
+<p>Each ambassador can sign in and see how their page is doing, without asking you. Their panel is at <strong>{{HOST}}/ambassador</strong>.</p>
+<ol class="steps">
+<li>They need to be an <strong>approved member</strong>. If they aren’t yet, have them request membership and approve them in Members.</li>
+<li>Open the ambassador here, press <kbd>Edit</kbd>, type their member email in <strong>Panel sign-in (their member email)</strong> and save. One email per ambassador. Their page in this tab then shows whether that email is an approved member.</li>
+<li>Tell them to sign in the usual member way (password, emailed code or Face ID). They land on their panel. A <strong>How it works</strong> guide opens on their first visit and covers everything below, and the 📖 <kbd>How it works</kbd> button reopens it.</li>
+</ol>
+<table>
+<tr><th>They can</th><th>They can’t</th></tr>
+<tr><td>See their link (Copy, QR code download) and code; visits, QR scans, product views, membership requests, orders, sales and commission over 7, 30 or 90 days, a year or all time, with a chart and the period before; their earnings and recent payouts; their terms; top products; their orders (number, date, status, products, sale and commission)</td><td>See who bought anything</td></tr>
+<tr><td>Choose and reorder up to 24 picks for their page, members-only ones included (shown locked to non-members). Changes are in the Activity log</td><td>Change their terms, payouts, code or anything else: that stays with you</td></tr>
+<tr><td>Shop as a member (the panel link is in the Account menu on phones and the top bar on computers)</td><td></td></tr>
+</table>
+<p>It’s behind the <strong>Ambassador panel</strong> switch (Settings → Feature switches). Off = they sign in to the shop as usual and the panel is closed; their linked emails stay saved.</p>
+
 <h3>Asking the Concierge</h3>
 <p>The staff Concierge knows all of this. Ask it things like <em>“How is Alex doing this month?”</em>, <em>“Who do we owe commission to?”</em> or <em>“Which ambassador sold the most?”</em> and it pulls back the same numbers as this tab. It can also prepare cards for you to confirm: adding an ambassador or changing their terms (<em>“Toni hit her goals, move her to 20%”</em>), recording a payout you’ve made (<em>“I paid Toni $42.50 by Zelle”</em>), and emailing a progress report. Nothing changes until you press the card’s button.</p>
 <p>The Overview’s <strong>Today</strong> list also reminds you when ambassador payouts are due (the first week of the month, or of the quarter for quarterly payouts) and when someone’s trial is over and ready for review.</p>
@@ -970,7 +1156,24 @@ Everything here works with the <strong>Ambassador pages</strong> switch off, so 
 </ol>
 <p>After that they sign in the same ways members do: password, an emailed 6-digit code, or Face ID / Touch ID once they add it in their portal. A store login can’t open the members’ site or this dashboard. <kbd>Send link</kbd> emails a fresh set-password link (also handy if they forget their password); <kbd>Switch off</kbd> stops a login, or a whole store, from signing in straight away.</p>
 
+<h3>Getting a new store started</h3>
+<ol class="steps">
+<li>Add their pin in <strong>Store locations</strong> first (bottom of this tab) if they should be on the “Find us in stores” map.</li>
+<li>Add the store account, linking that pin, with a login for each person who will order.</li>
+<li>Tell them to watch for the <em>Set my password</em> email, then sign in at <strong>{{HOST}}/store-portal</strong>.</li>
+<li>The first time they sign in, a <strong>How it works</strong> guide opens at the top of their portal (they can reopen it from the 📖 <kbd>How it works</kbd> button). It covers requesting stock, the statuses, pressing <em>It arrived</em>, messaging the team, signing in and asking the Concierge, so you don’t have to explain it.</li>
+<li>Check the Retail tab after their first request and <kbd>Approve</kbd> it so they see it moving.</li>
+</ol>
+
 <h3>Stock requests</h3>
+<table>
+<tr><th>Status the store sees</th><th>Means</th><th>Gets there when</th></tr>
+<tr><td><span class="pill p-pending">Waiting for review</span></td><td>New, nobody has looked yet</td><td>The store sends it</td></tr>
+<tr><td><span class="pill p-ship">Approved, being packed</span></td><td>You’ve seen it</td><td>You press <kbd>Approve</kbd></td></tr>
+<tr><td><span class="pill p-paid">Shipped</span></td><td>On its way</td><td>You press <kbd>Mark shipped</kbd></td></tr>
+<tr><td><span class="pill p-inq">Received</span></td><td>Done</td><td>The store presses <em>It arrived</em>, or you press <kbd>Mark received</kbd></td></tr>
+<tr><td><span class="pill p-cancel">Declined / Cancelled</span></td><td>Not going ahead</td><td>You press <kbd>Decline</kbd>, or the store cancels while it’s waiting</td></tr>
+</table>
 <ol class="steps">
 <li>A new request emails the team inbox (the same one as new orders), shows on the Overview’s <strong>Today</strong> list, and puts a number on the Retail tab.</li>
 <li><kbd>Approve</kbd> it when you’ve seen it. <kbd>Note</kbd> adds a message the store sees on that request (e.g. a delivery day or tracking number).</li>
@@ -980,7 +1183,7 @@ Everything here works with the <strong>Ambassador pages</strong> switch off, so 
 </ol>
 
 <h3>What stores see</h3>
-<p>Their open requests, each request’s status and your notes, a <strong>Shipped to you</strong> table (units per product, last shipped, units per month) and their store details. To change their details they press <em>Message the team</em>, which emails the team inbox; reply to that email to answer them. Their portal also has the Concierge, which can do all of this for them (request stock, cancel, confirm a delivery, message the team) with a button they press to confirm.</p>
+<p>A short <strong>How it works</strong> guide (open by itself on their first visit), their open requests, each request’s status and your notes, a <strong>Shipped to you</strong> table (units per product, last shipped, units per month) and their store details. To change their details they press <em>Message the team</em>, which emails the team inbox; reply to that email to answer them. Their portal also has the Concierge, which can do all of this for them (request stock, cancel, confirm a delivery, message the team) with a button they press to confirm.</p>
 
 <h3>The store map</h3>
 <p>The same <strong>Store locations</strong> list as Settings sits at the bottom of this tab, so you can add, edit or hide map pins here too. See <a href="#tab-settings">Settings → Store locations</a>.</p>
@@ -1219,6 +1422,23 @@ Flags are deliberately sensitive, so expect the odd false alarm. <strong>Red</st
 <section id="tab-settings">
 <h2 class="sec">Settings</h2>
 <span class="where">Dashboard → Settings</span>
+<p class="lede">Settings is a set of tiles. Tap one to open it; tap its title again to fold it away.</p>
+<table>
+<tr><th>Tile</th><th>What it’s for</th><th>More</th></tr>
+<tr><td><strong>Sales &amp; loyalty rules</strong></td><td>The bundle rule, loyalty points and the Points check</td><td>Below, and <a href="#job-loyalty">Loyalty points</a></td></tr>
+<tr><td><strong>Feature switches</strong></td><td>Turn parts of the site on or off</td><td>Below</td></tr>
+<tr><td><strong>Payment reminders</strong></td><td>When unpaid-order reminders go and what they say</td><td>Below</td></tr>
+<tr><td><strong>Staff sign-in</strong></td><td>Who can sign in by emailed link or Face ID</td><td>Below</td></tr>
+<tr><td><strong>Steward password</strong></td><td>Today’s staff password</td><td><a href="#signin">Signing in</a></td></tr>
+<tr><td><strong>Email data export</strong></td><td>Send the full report with spreadsheets now</td><td>Below</td></tr>
+<tr><td><strong>Site requests</strong></td><td>Ask for website changes and follow them</td><td><a href="#tab-overview">Overview</a></td></tr>
+<tr><td><strong>Entrance animation</strong></td><td>Pick or preview the seasonal entrance</td><td><a href="#tab-overview">Overview</a></td></tr>
+<tr><td><strong>Gift cards</strong></td><td>The buyer’s bonus and every gift card</td><td><a href="#tab-giftcards">Gift cards</a></td></tr>
+<tr><td><strong>Events popup</strong></td><td>The town and distance for the events note</td><td><a href="#tab-events">Events</a></td></tr>
+<tr><td><strong>FAQ page</strong></td><td>Questions and answers on /faq</td><td><a href="#tab-overview">Overview</a></td></tr>
+<tr><td><strong>Store locations</strong></td><td>The “Find us in stores” map</td><td>Below</td></tr>
+<tr><td><strong>Activity log</strong></td><td>Every change made in the dashboard</td><td>Below</td></tr>
+</table>
 
 <h3>Bundle rule</h3>
 <p>A cart-wide discount. Turn it on, set a minimum number of items and a percentage, and any cart reaching that many items gets the discount. Customers even see a hint at checkout: "Add 1 more item to save 10%." Click <kbd>Save rules</kbd> after changing.</p>
@@ -1260,7 +1480,7 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Assistant can prepare changes</strong>: switch off to make the staff Concierge look-up-only.</li>
 <li><strong>Email template library</strong> and <strong>Product videos</strong>: hide those features without losing anything you saved.</li>
 <li><strong>Automatic payment reminders</strong>, <strong>Sign in with an email code</strong> (members), <strong>Admin sign-in link by email</strong> and <strong>Mix-and-match bundle discounts</strong> start off. Switch each on when you're ready.</li>
-<li><strong>Store locator</strong>, <strong>Stock counts</strong>, <strong>Venmo payment matching</strong>, <strong>Concierge voice</strong>, <strong>Concierge photos</strong> and <strong>Ambassador pages</strong>: each has its own section in this guide. Stores and stock counts can be set up while their switch is off. Customers only see them once it's on.</li>
+<li><strong>Store locator</strong>, <strong>Stock counts</strong>, <strong>Venmo / Zelle payment matching</strong>, <strong>Concierge voice</strong>, <strong>Concierge photos</strong> and <strong>Ambassador pages</strong>: each has its own section in this guide. Stores and stock counts can be set up while their switch is off. Customers only see them once it's on.</li>
 <li><strong>Cash pickup deals &amp; public-shop pickup</strong>: the <em>Cash pickup only</em> tick on sales, and Local pickup (invoice or cash) in the public shop. Off = the public shop is ship-only.</li>
 <li><strong>Daily staff password</strong> (on): the staff password changes every day (see <em>Signing in</em>). Switching it off goes back to the old fixed password. Only do that if your developer asks.</li>
 <li><strong>FAQ page</strong> (on): the /faq page and the Concierge using it. Off hides the page; answers stay saved.</li>
@@ -1273,6 +1493,12 @@ If an address can't be found exactly, the pin goes to the middle of the town and
 <li><strong>Events note for locals</strong> (on): members who sign in near the town in <em>Settings → Events popup</em> (the business's home town, 100 miles, to start) get one small note about the next upcoming event, with a link to the Events page. Each member sees it once, until you press <em>Show it again to everyone</em> there. Change the town, the miles and the heading there too; after Save it shows <em>Found:</em> with the place the map matched (US towns only), so check that it's the right one. Each event has a <em>Show in the events popup for locals</em> tick, in that panel and in the event form, with its own town and miles if you like (blank = the main area). Off = no note.</li>
 <li><strong>Member sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Members get the one-tap sign-in and the popup offering it after they sign in. Off hides both; saved devices stay saved.</li>
 <li><strong>Staff sign-in with Face ID / Touch ID / fingerprint</strong>: on by default. Switch off to hide the Face ID button. Saved Face IDs stay saved for when it's back on.</li>
+<li><strong>Gift cards</strong>: the members' Gift cards page, the gift line at checkout and Account → Gift cards (see <a href="#tab-giftcards">Gift cards</a>). Off hides them; cards already sent keep their balance.</li>
+<li><strong>Ambassador panel</strong>: ambassadors with a linked member email sign in to their own panel (see <a href="#tab-ambassadors">Ambassadors → Their own panel</a>). Off closes the panel; links stay saved.</li>
+<li><strong>Retail store portal</strong>: lets stores sign in at /store-portal (see <a href="#tab-retail">Retail</a>). Off closes the portal; accounts and requests stay saved and the Retail tab still works.</li>
+<li><strong>Visitor analytics</strong>: cookie-free visit counting for the Analytics tab. Off stops counting visits; sales, members and Concierge figures still show.</li>
+<li><strong>Concierge learns from chats</strong>: every night the Concierge rewrites its own notes from the last week (see <a href="#tab-assistant">Assistant → Concierge notes</a>). A few cents a night.</li>
+<li><strong>Concierge tidies product descriptions</strong>: adds a <kbd>Tidy with Concierge</kbd> button to the product form that rewrites the description in the house format. Nothing changes until you press Save.</li>
 <li><strong>Safe storage for products &amp; discount codes</strong> (Stage + live): a behind-the-scenes setting your developer turns on once. Leave it as it is.</li>
 </ul>
 
@@ -1456,7 +1682,7 @@ A sale-priced product, in a qualifying bundle, with a code applied, plus points 
 
 <section id="job-loyalty">
 <h2 class="sec">Loyalty points</h2>
-<span class="where">Dashboard → Settings → Loyalty points · Members → Points</span>
+<span class="where">Dashboard → Settings → Sales &amp; loyalty rules · Members → Points</span>
 <p class="lede">Members earn points on what they buy and spend them as money off later. Everything in one place.</p>
 
 <h3>How it works</h3>
@@ -1467,7 +1693,7 @@ A sale-priced product, in a qualifying bundle, with a code applied, plus points 
 </ul>
 
 <h3>Setting it up</h3>
-<p>In <strong>Settings → Loyalty points</strong>, switch it on and set three numbers (more detail under <a href="#tab-settings">Settings</a>):</p>
+<p>In <strong>Settings → Sales &amp; loyalty rules</strong>, switch it on and set three numbers (more detail under <a href="#tab-settings">Settings</a>):</p>
 <table>
 <tr><th>Setting</th><th>Meaning</th><th>Starting value</th></tr>
 <tr><td>Points per dollar</td><td>Points earned per $1 spent</td><td>1</td></tr>
@@ -1699,7 +1925,7 @@ Payment links opened inside some email preview windows hang, because those windo
 </main>
 </div>
 
-<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+<button type="button" class="to-top" id="toTop">↑ Back to top</button>
 
 <script>
 (function(){
@@ -1883,6 +2109,172 @@ Payment links opened inside some email preview windows hang, because those windo
     if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); render(search.value); jump(0); }
     if (e.key === 'Escape') { search.value = ''; render(''); }
   });
+})();
+</script>
+<script>
+// Guide shell: phone menu, section tools, the Concierge bridge and theme.
+// The guide runs in a sandboxed frame on /help; the page around it hosts the
+// staff Concierge. They talk with postMessage only:
+//   page → guide  {type:'fp-guide-init', concierge, theme, hash}
+//   guide → page  {type:'fp-guide-ask', question} · {type:'fp-guide-at', id}
+(function(){
+  var root = document.documentElement;
+  var main = document.querySelector('main');
+  var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+  var search = document.getElementById('search');
+  var framed = window.parent && window.parent !== window;
+
+  // ---- Concierge ---------------------------------------------------------
+  function ask(q){
+    q = String(q || '').trim();
+    if (!framed || !root.classList.contains('has-concierge')) return;
+    window.parent.postMessage({ type: 'fp-guide-ask', question: q.slice(0, 300) }, '*');
+    closeMenu();
+  }
+  // Live questions for the tabs the Concierge can look at; the rest ask it to
+  // explain that part of the guide.
+  var LIVE = {
+    'tab-overview': 'What needs my attention today?',
+    'daily': 'What needs my attention today?',
+    'tab-orders': 'Which orders need attention right now?',
+    'job-paid': 'Any Venmo or Zelle payments waiting to be confirmed?',
+    'job-ship': 'Which paid orders are ready to ship?',
+    'tab-members': 'Who is waiting to be approved?',
+    'tab-products': 'Which products are out of stock or low?',
+    'tab-events': 'What events are coming up?',
+    'tab-marketing': 'What campaign should we send next?',
+    'tab-ambassadors': 'Who do we owe ambassador commission to?',
+    'tab-retail': 'Any stock requests from stores?',
+    'tab-analytics': 'How did sales do this week compared with last week?',
+    'job-sale': 'What is on sale right now?'
+  };
+  var TAB = { 'tab-overview':'overview','tab-orders':'orders','tab-members':'members','tab-products':'products','tab-events':'events','tab-marketing':'marketing','tab-ambassadors':'ambassadors','tab-retail':'retail','tab-analytics':'analytics','tab-assistant':'assistant','tab-settings':'settings','tab-giftcards':'settings' };
+
+  function titleOf(s){ var h = s.querySelector('h2'); return h ? h.textContent.trim() : s.id; }
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  sections.forEach(function(s, i){
+    var t = titleOf(s);
+    var tools = el('div', 'sec-tools');
+    var b1 = el('button', 'ask-only', '✦ Ask the Concierge about this');
+    b1.type = 'button';
+    b1.setAttribute('data-ask', 'Using the staff guide, explain "' + t + '" in a few short steps.');
+    tools.appendChild(b1);
+    if (LIVE[s.id]) {
+      var b2 = el('button', 'ask-only', '✦ ' + LIVE[s.id]);
+      b2.type = 'button';
+      b2.setAttribute('data-ask', LIVE[s.id]);
+      tools.appendChild(b2);
+    }
+    if (TAB[s.id]) {
+      var a = el('a', '', 'Open ' + (s.id === 'tab-giftcards' ? 'Settings' : t) + ' in the dashboard ↗');
+      a.href = '/admin?tab=' + TAB[s.id];
+      a.target = '_top';
+      tools.appendChild(a);
+    }
+    var anchor = s.querySelector('.where') || s.querySelector('h2');
+    if (anchor) anchor.insertAdjacentElement('afterend', tools);
+
+    var foot = el('div', 'sec-foot');
+    var prev = sections[i - 1], next = sections[i + 1];
+    if (prev) { var p = el('a', 'prev'); p.href = '#' + prev.id; p.appendChild(el('small', '', '← Previous')); p.appendChild(document.createTextNode(titleOf(prev))); foot.appendChild(p); }
+    if (next) { var n = el('a', 'next'); n.href = '#' + next.id; n.appendChild(el('small', '', 'Next →')); n.appendChild(document.createTextNode(titleOf(next))); foot.appendChild(n); }
+    s.appendChild(foot);
+  });
+
+  // Wide tables scroll sideways on their own instead of stretching the page.
+  Array.prototype.forEach.call(document.querySelectorAll('main table'), function(t){
+    var w = el('div', 'table-scroll'); t.parentNode.insertBefore(w, t); w.appendChild(t);
+  });
+
+  document.addEventListener('click', function(e){
+    var b = e.target && e.target.closest ? e.target.closest('[data-ask]') : null;
+    if (!b) return;
+    e.preventDefault();
+    var q = b.getAttribute('data-ask');
+    if (!q && b.hasAttribute('data-ask-search')) q = search.value;
+    ask(q || '');
+  });
+  var heroForm = document.getElementById('heroAsk');
+  // Not a <form>: the sandboxed frame isn't allowed to submit forms.
+  if (heroForm) {
+    var heroIn = heroForm.querySelector('input');
+    var heroGo = function(){ if (heroIn.value.trim()) { ask(heroIn.value); heroIn.value = ''; } };
+    heroForm.querySelector('button').addEventListener('click', heroGo);
+    heroIn.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); heroGo(); } });
+  }
+
+  // Search with nothing (or little) found → offer the Concierge.
+  var results = document.getElementById('searchResults');
+  var noRes = document.getElementById('noResults');
+  var hero = document.getElementById('hero');
+  function addAskRow(box){
+    if (!box || box.querySelector('.ask-row')) return;
+    var row = el('div', 'ask-row ask-only');
+    row.appendChild(el('span', '', 'Not what you need?'));
+    var btn = el('button', '', '✦ Ask the Concierge');
+    btn.type = 'button';
+    btn.setAttribute('data-ask', '');
+    btn.setAttribute('data-ask-search', '');
+    row.appendChild(btn);
+    box.appendChild(row);
+  }
+  addAskRow(noRes);
+  new MutationObserver(function(){ addAskRow(results); }).observe(results, { childList: true });
+  search.addEventListener('input', function(){ if (hero) hero.style.display = search.value.trim() ? 'none' : ''; });
+
+  // ---- Phone menu --------------------------------------------------------
+  var scrim = document.getElementById('scrim');
+  function openMenu(){ root.classList.add('menu-open'); }
+  function closeMenu(){ root.classList.remove('menu-open'); }
+  document.getElementById('menuBtn').addEventListener('click', openMenu);
+  scrim.addEventListener('click', closeMenu);
+  document.getElementById('tbSearch').addEventListener('click', function(){ openMenu(); setTimeout(function(){ search.focus(); }, 230); });
+  document.querySelector('.sidebar').addEventListener('click', function(e){
+    if (e.target.closest && e.target.closest('a.nav-link')) closeMenu();
+  });
+  search.addEventListener('keydown', function(e){ if (e.key === 'Enter') closeMenu(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeMenu();
+    if (e.key === '/' && document.activeElement !== search && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); openMenu(); search.focus(); }
+  });
+
+  // ---- Phone top bar shows where you are; back-to-top --------------------
+  var tbWhere = document.getElementById('tbWhere');
+  var toTop = document.getElementById('toTop');
+  var lastAt = '', settled = !framed, inited = false;
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (!en.isIntersecting) return;
+        var id = en.target.id;
+        tbWhere.textContent = '· ' + titleOf(en.target);
+        if (id !== lastAt && framed && settled) { lastAt = id; window.parent.postMessage({ type: 'fp-guide-at', id: id }, '*'); }
+      });
+    }, { rootMargin: '0px 0px -75% 0px' });
+    sections.forEach(function(s){ io.observe(s); });
+  }
+  window.addEventListener('scroll', function(){ toTop.classList.toggle('show', window.scrollY > 1400); }, { passive: true });
+  toTop.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+  // ---- Messages from the dashboard page -----------------------------------
+  function jumpTo(id){
+    var a = document.createElement('a'); a.href = '#' + id; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();   // reuses the guide's own jump (clears search too)
+  }
+  window.addEventListener('message', function(e){
+    if (e.source !== window.parent) return;
+    var d = e.data || {};
+    if (d.type !== 'fp-guide-init' && d.type !== 'fp-guide-go') return;
+    if (d.type === 'fp-guide-init') { if (inited) return; inited = true; }
+    if (d.theme === 'dark' || d.theme === 'light') root.setAttribute('data-theme', d.theme);
+    if (typeof d.concierge === 'boolean') root.classList.toggle('has-concierge', d.concierge);
+    var id = String(d.hash || '').replace(/^#/, '');
+    if (id && /^[a-z0-9-]+$/.test(id) && document.getElementById(id)) setTimeout(function(){ jumpTo(id); }, d.type === 'fp-guide-init' ? 60 : 0);
+    // Only report where you are once the opening jump is done, so it can't overwrite the link you came in on.
+    if (d.type === 'fp-guide-init') setTimeout(function(){ settled = true; }, 1200);
+  });
+  if (framed) window.parent.postMessage({ type: 'fp-guide-ready' }, '*');
 })();
 </script>
 </body>

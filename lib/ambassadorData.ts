@@ -1,6 +1,6 @@
 import { getOrders, type Order } from "./orders";
 import { readTraffic, recordCounter } from "./traffic";
-import { currentRate, termsOf, type Ambassador } from "./ambassadors";
+import { creditFor, currentRate, termsOf, type Ambassador } from "./ambassadors";
 import { ambassadorStats, pDay, type AmbassadorStats } from "./ambassadorStats";
 
 /**
@@ -13,6 +13,21 @@ import { ambassadorStats, pDay, type AmbassadorStats } from "./ambassadorStats";
 export function countAmbassadorVisit(id: string, qr: boolean) {
   recordCounter(`amb:${id}`);
   if (qr) recordCounter(`ambq:${id}`);
+}
+
+/**
+ * A membership request from someone who came through an ambassador's page
+ * (within their window): one more on that day's count for their panel.
+ * Nothing is saved on the member. Never throws.
+ */
+export async function countAmbassadorJoin(ref: unknown): Promise<void> {
+  try {
+    if (!ref) return;
+    const hit = await creditFor({ ref });
+    if (hit) recordCounter(`ambj:${hit.id}`);
+  } catch {
+    /* counting must never stop a sign-up */
+  }
 }
 
 export async function ambassadorStatsFor(list: Ambassador[], range?: { from: number; to: number }, now = Date.now()): Promise<Record<string, AmbassadorStats>> {

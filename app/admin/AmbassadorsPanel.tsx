@@ -25,7 +25,7 @@ type TermsForm = {
 };
 type Form = {
   id?: string;
-  name: string; slug: string; slugTouched: boolean; email: string;
+  name: string; slug: string; slugTouched: boolean; email: string; account: string;
   headline: string; bio: string; photo: string;
   look: LookChoice;
   emoji: string; showEmoji: boolean; welcome: boolean;
@@ -41,7 +41,7 @@ const blankTerms = (): TermsForm => ({
   commissionPct: "10", growthPct: "", growthGoal: "", growthOn: false, discountPct: "10",
   trialDays: "90", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
 });
-const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, welcome: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
+const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", account: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, welcome: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
 
 const numStr = (n: number | undefined) => (typeof n === "number" ? String(n) : "");
 function termsForm(a: Ambassador): TermsForm {
@@ -54,7 +54,7 @@ function termsForm(a: Ambassador): TermsForm {
   };
 }
 const toForm = (a: Ambassador): Form => ({
-  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "", look: a.look || "auto", emoji: a.emoji || "", showEmoji: a.showEmoji !== false, welcome: a.welcome !== false,
+  id: a.id, name: a.name, slug: a.slug, slugTouched: true, email: a.email || "", account: a.account || "", headline: a.headline || "", bio: a.bio || "", photo: a.photo || "", look: a.look || "auto", emoji: a.emoji || "", showEmoji: a.showEmoji !== false, welcome: a.welcome !== false,
   productIds: a.productIds.slice(), socials: a.socials.length ? a.socials.map((s) => ({ url: s.url, label: s.label || "" })) : [{ url: "", label: "" }],
   discountCode: a.discountCode || "", active: a.active, terms: termsForm(a),
 });
@@ -88,6 +88,9 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
   // Every code's amount (active or not), so the community discount always shows what the code really gives.
   const [offers, setOffers] = useState<Record<string, string | null>>({});
   const [switchOn, setSwitchOn] = useState<boolean | null>(null);
+  const [panelOn, setPanelOn] = useState<boolean | null>(null);
+  // Ambassador panel: is each linked sign-in email a member account (approved / waiting / none)?
+  const [accounts, setAccounts] = useState<Record<string, "approved" | "pending" | "rejected" | "none">>({});
   const [form, setForm] = useState<Form | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,7 +110,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
   const load = () => {
     fetch("/api/admin/ambassadors", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) { setList(d.ambassadors || []); setStats(d.stats || {}); setOverview(d.overview || null); } })
+      .then((d) => { if (d) { setList(d.ambassadors || []); setStats(d.stats || {}); setOverview(d.overview || null); setAccounts(d.accounts || {}); } })
       .catch(() => {});
   };
   // A confirmed Concierge card (new ambassador, payout, report) refreshes the numbers.
@@ -127,6 +130,8 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
       .then((d) => {
         const f = (d?.flags || []).find((x: { key: string; on: boolean }) => x.key === "ambassador_pages");
         if (f) setSwitchOn(!!f.on);
+        const pf = (d?.flags || []).find((x: { key: string; on: boolean }) => x.key === "ambassador_panel");
+        if (pf) setPanelOn(!!pf.on);
       })
       .catch(() => {});
   }, []);
@@ -173,7 +178,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
     if (!form) return;
     const t = form.terms;
     const body = {
-      id: form.id, name: form.name, slug: form.slug, email: form.email, headline: form.headline, bio: form.bio, photo: form.photo, look: form.look, emoji: form.emoji, showEmoji: form.showEmoji, welcome: form.welcome,
+      id: form.id, name: form.name, slug: form.slug, email: form.email, account: form.account, headline: form.headline, bio: form.bio, photo: form.photo, look: form.look, emoji: form.emoji, showEmoji: form.showEmoji, welcome: form.welcome,
       productIds: form.productIds, socials: form.socials.filter((s) => s.url.trim()), discountCode: form.discountCode, active: form.active,
       terms: { ...t },
     };
@@ -387,6 +392,15 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           <input id="amb-email" type="email" value={form.email} maxLength={200} onChange={(e) => set({ email: e.target.value })} placeholder="alex@example.com" />
         </div>
         <div className="field">
+          <label htmlFor="amb-account">Panel sign-in (their member email)</label>
+          <input id="amb-account" type="email" value={form.account} maxLength={200} onChange={(e) => set({ account: e.target.value })} placeholder={form.email || "toni@example.com"} />
+          <div className="field-hint">
+            They sign in as this member (password, emailed code or Face ID) and land on their own Ambassador panel: their link, code, terms, numbers, orders (no customer names) and their picks. They can still shop.
+            {form.email && !form.account && <> <button type="button" className="ap-linkbtn" onClick={() => set({ account: form.email })}>Use {form.email}</button></>}
+            {panelOn === false && <> Turn on <strong>Ambassador panel</strong> in Settings → Feature switches first.</>}
+          </div>
+        </div>
+        <div className="field">
           <label htmlFor="amb-code">Their discount code (optional)</label>
           <select id="amb-code" value={form.discountCode} onChange={(e) => set({ discountCode: e.target.value })}>
             <option value="">None</option>
@@ -480,6 +494,17 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           </div>
           {!isLive && <div className="field-hint">⚠ You&rsquo;re not on the live site, so links and QR codes point here. Share them from the live dashboard.</div>}
           <div className="user-meta">{rateOf(open)}% commission{open.discountCode ? ` · code ${open.discountCode}` : ""}{open.email ? ` · ${open.email}` : " · no email yet"}{open.lastReportAt ? ` · last report ${day(open.lastReportAt)}` : ""}</div>
+          <div className="user-meta amb-panel-line">
+            {open.account ? (
+              <>Panel sign-in: <strong>{open.account}</strong>{" "}
+                {accounts[open.id] === "approved" ? <span className="dc-chip">Member ✓</span>
+                  : accounts[open.id] === "pending" ? <span className="dc-chip inactive">Membership waiting for approval</span>
+                  : accounts[open.id] === "rejected" ? <span className="dc-chip inactive">Member account not active</span>
+                  : <span className="dc-chip inactive">No member account yet: ask them to request membership with this email</span>}
+                {panelOn === false && <> · Ambassador panel switch is off</>}
+              </>
+            ) : <>No panel sign-in yet (Edit → Panel sign-in).</>}
+          </div>
         </div>
         <div className="amb-detail-actions">
           <button className="esc-btn primary" onClick={() => { setReport({ period: "this-month", note: "", signoff: "", testTo: "" }); setPreview(null); }} disabled={busy}>✉ Email a progress report</button>
