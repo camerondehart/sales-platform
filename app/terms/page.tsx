@@ -117,8 +117,9 @@ export default async function TermsPage() {
               expire, are spent in {brand.members}&rsquo;s members&rsquo; shop (the balance comes off automatically at checkout,
               including shipping), and can&rsquo;t be exchanged for cash except where the law requires it{brand.legal.state === "California" ? " (in California, a balance under $10 can be cashed out on request)" : ""}. Treat
               the code like cash: anyone with it can add the card to their account. Bonus credit given with a gift card purchase is
-              a promotion: it has no cash value and is covered by §7. If a gift card order is cancelled or refunded before the card
-              is spent, the card (and any bonus credit) is cancelled.
+              a promotion: it has no cash value and is covered by §7. If a gift card order is cancelled or refunded, the card (and
+              any bonus credit) is cancelled. If part of it was already spent, what&apos;s left is cancelled too and the amount
+              already spent is taken off any refund.
             </p>
           )}
 

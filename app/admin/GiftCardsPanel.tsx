@@ -39,6 +39,8 @@ export default function GiftCardsPanel() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
+  // Edit balance: one card open at a time.
+  const [edit, setEdit] = useState<{ id: string; value: string; reason: string; busy: boolean; error: string } | null>(null);
 
   function load() {
     fetch("/api/admin/gift-cards", { cache: "no-store" })
@@ -89,6 +91,18 @@ export default function GiftCardsPanel() {
     const r = await fetch("/api/admin/gift-cards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "void", id: c.id }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) window.alert(d.error || "Couldn't void it.");
+    load();
+  }
+
+  async function saveBalance() {
+    if (!edit) return;
+    const v = Number(edit.value);
+    if (edit.value.trim() === "" || !Number.isFinite(v) || v < 0) return setEdit({ ...edit, error: "Enter a balance of $0 or more." });
+    setEdit({ ...edit, busy: true, error: "" });
+    const r = await fetch("/api/admin/gift-cards", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "balance", id: edit.id, balance: v, reason: edit.reason }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return setEdit({ ...edit, busy: false, error: d.error || "Couldn't change it." });
+    setEdit(null);
     load();
   }
 
@@ -145,7 +159,36 @@ export default function GiftCardsPanel() {
               </div>
             </div>
             {c.state === "active" && (
-              <button className="gcp-void-btn" onClick={() => voidOne(c)}>Void</button>
+              <div className="gcp-btns">
+                <button className="gcp-edit-btn" onClick={() => setEdit(edit?.id === c.id ? null : { id: c.id, value: String(c.balance), reason: "", busy: false, error: "" })}>Edit balance</button>
+                <button className="gcp-void-btn" onClick={() => voidOne(c)}>Void</button>
+              </div>
+            )}
+            {edit?.id === c.id && (
+              <div className="gcp-edit">
+                <label>
+                  New balance $
+                  <input type="number" min="0" step="0.01" inputMode="decimal" value={edit.value} onChange={(e) => setEdit({ ...edit, value: e.target.value, error: "" })} aria-label="New balance" />
+                </label>
+                <input type="text" placeholder="Reason (optional)" maxLength={200} value={edit.reason} onChange={(e) => setEdit({ ...edit, reason: e.target.value })} aria-label="Reason" />
+                <button className="submit" onClick={saveBalance} disabled={edit.busy}>{edit.busy ? "Saving…" : "Save"}</button>
+                <button type="button" className="gcp-edit-cancel" onClick={() => setEdit(null)}>Cancel</button>
+                <div className="gcp-edit-hint">
+                  Was {giftMoney(c.balance)}
+                  {edit.value.trim() !== "" && Number.isFinite(Number(edit.value)) && Number(edit.value) >= 0 && Math.round((Number(edit.value) - c.balance) * 100) !== 0
+                    ? ` · ${Number(edit.value) > c.balance ? "adds" : "takes off"} ${giftMoney(Math.abs(Math.round((Number(edit.value) - c.balance) * 100) / 100))}`
+                    : ""}
+                  . Recorded in the Activity log.
+                </div>
+                {edit.error && <div className="gcp-edit-error">{edit.error}</div>}
+              </div>
+            )}
+            {c.entries.some((e) => e.note.startsWith("Changed by staff")) && (
+              <div className="gcp-sub gcp-history">
+                {c.entries.filter((e) => e.note.startsWith("Changed by staff")).map((e, i) => (
+                  <div key={i}>{day(e.at)}: {e.amount > 0 ? "+" : "−"}{giftMoney(Math.abs(e.amount))} · {e.note}</div>
+                ))}
+              </div>
             )}
           </div>
         ))}

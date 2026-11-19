@@ -127,7 +127,13 @@ export async function giftCardsFollowStatus(before: Order | null, after: Order, 
     if (after.giftCardOrder) {
       const v = await voidForOrder(after.id);
       out.voided = v.voided;
-      if (v.spent.length) out.spentWarning = `${v.spent.length} card(s) from this order were already partly spent, so they stay active.`;
+      if (v.spent.length) {
+        // Partly spent cards are frozen too; tell staff what was spent and what to refund.
+        const used = Math.round(v.spent.reduce((n, s) => n + s.spent, 0) * 100) / 100;
+        const lines = v.spent.map((s) => `${giftMoney(s.spent)} of ${s.card.kind === "bonus" ? "the buyer's bonus credit" : `${s.card.toName}'s card`} (${s.card.code}), ${giftMoney(s.frozen)} frozen`);
+        const refund = Math.max(0, Math.round(((after.total || 0) - used) * 100) / 100);
+        out.spentWarning = `Some of this gift card order was already spent: ${lines.join("; ")}. What's left is frozen and can't be spent. If the buyer paid, refund ${giftMoney(refund)} (the ${giftMoney(after.total || 0)} paid minus the ${giftMoney(used)} already spent).`;
+      }
     }
     if (after.giftHold) out.returned = await returnHold(after.giftHold, after.id);
     return out;

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
 import { audited, auditDetail } from "@/lib/audit";
 import { isEnabled } from "@/lib/flags";
-import { allGiftCards, voidCard } from "@/lib/giftCards";
+import { adjustBalance, allGiftCards, voidCard } from "@/lib/giftCards";
+import { giftMoney } from "@/lib/giftCardRules";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,21 @@ export async function GET() {
 async function POST_handler(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const body = await req.json().catch(() => ({}));
+  // Edit balance: set an active card to a new amount (never below $0), with an optional reason.
+  if (body.action === "balance" && body.id) {
+    const reason = String(body.reason || "").trim().slice(0, 200);
+    const r = await adjustBalance(String(body.id), Number(body.balance), reason);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: 409 });
+    const c = r.card;
+    auditDetail({
+      action: "giftcard.balance",
+      targetId: c.id,
+      before: { balance: r.before },
+      after: { balance: c.balance, code: c.code, to: c.toEmail, reason: reason || undefined },
+      note: `Gift card ${c.code} balance ${giftMoney(r.before)} → ${giftMoney(c.balance)}${reason ? ` (${reason})` : ""}`,
+    });
+    return NextResponse.json({ ok: true, balance: c.balance });
+  }
   if (body.action !== "void" || !body.id) return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   const before = (await allGiftCards()).find((c) => c.id === body.id);
   const card = await voidCard(String(body.id));

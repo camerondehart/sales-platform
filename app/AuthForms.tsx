@@ -16,8 +16,14 @@ export default function AuthForms({ codeLogin = false, staffLink = false, faceId
   // The email typed on the password form carries over to "Email me a code".
   const [typedEmail, setTypedEmail] = useState("");
   // <site>/#join (e.g. from an ambassador's page) opens the membership request.
+  // ?email= (from a gift card page) fills in the email on sign-in and the membership request.
+  const [prefill, setPrefill] = useState("");
   useEffect(() => {
     if (window.location.hash === "#join") setMode("signup");
+    try {
+      const e = (new URLSearchParams(window.location.search).get("email") || "").trim().slice(0, 200);
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) setPrefill(e);
+    } catch {}
   }, []);
 
   return (
@@ -43,10 +49,10 @@ export default function AuthForms({ codeLogin = false, staffLink = false, faceId
         </button>
       </div>
 
-      {mode === "signin" && <SignInForm faceId={faceId} staffLink={staffLink} onForgot={() => setMode("forgot")} onCode={codeLogin ? (email: string) => { setTypedEmail(email); setMode("code"); } : undefined} onFirstTime={() => setMode("firsttime")} />}
+      {mode === "signin" && <SignInForm faceId={faceId} staffLink={staffLink} onForgot={() => setMode("forgot")} onCode={codeLogin ? (email: string) => { setTypedEmail(email); setMode("code"); } : undefined} onFirstTime={() => setMode("firsttime")} initialEmail={prefill} />}
       {mode === "firsttime" && <FirstTimeForm onBack={() => setMode("signin")} />}
       {mode === "code" && <CodeSignInForm initialEmail={typedEmail} onBack={() => setMode("signin")} />}
-      {mode === "signup" && <SignUpForm consult={consult} />}
+      {mode === "signup" && <SignUpForm consult={consult} initialEmail={prefill} />}
       {mode === "forgot" && <ForgotPasswordForm onBack={() => setMode("signin")} />}
     </div>
   );
@@ -146,9 +152,10 @@ function CodeSignInForm({ onBack, initialEmail = "" }: { onBack: () => void; ini
   );
 }
 
-function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId = false }: { onForgot: () => void; onCode?: (email: string) => void; onFirstTime?: () => void; staffLink?: boolean; faceId?: boolean }) {
+function SignInForm({ onForgot, onCode, onFirstTime, staffLink = false, faceId = false, initialEmail = "" }: { onForgot: () => void; onCode?: (email: string) => void; onFirstTime?: () => void; staffLink?: boolean; faceId?: boolean; initialEmail?: string }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  useEffect(() => { if (initialEmail) setEmail((e) => e || initialEmail); }, [initialEmail]);
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   // Face ID / Touch ID: only on devices that have one built in.
@@ -428,9 +435,10 @@ function ForgotPasswordForm({ onBack }: { onBack: () => void }) {
   );
 }
 
-function SignUpForm({ consult = false }: { consult?: boolean }) {
+function SignUpForm({ consult = false, initialEmail = "" }: { consult?: boolean; initialEmail?: string }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+  useEffect(() => { if (initialEmail) setEmail((e) => e || initialEmail); }, [initialEmail]);
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [ageVerified, setAgeVerified] = useState<boolean | null>(null);

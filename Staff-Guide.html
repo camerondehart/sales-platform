@@ -175,6 +175,7 @@
   <a class="nav-link" href="#tab-marketing"><span class="nav-ico">✦</span>Marketing</a>
   <a class="nav-link" href="#tab-ambassadors"><span class="nav-ico">★</span>Ambassadors</a>
   <a class="nav-link" href="#tab-retail"><span class="nav-ico">🏪</span>Retail</a>
+  <a class="nav-link" href="#tab-giftcards"><span class="nav-ico">🎁</span>Gift cards</a>
   <a class="nav-link" href="#tab-analytics"><span class="nav-ico">📈</span>Analytics</a>
   <a class="nav-link" href="#tab-assistant"><span class="nav-ico">✧</span>Assistant</a>
   <a class="nav-link" href="#tab-settings"><span class="nav-ico">⚙</span>Settings</a>
@@ -979,6 +980,62 @@ Everything here works with the <strong>Ambassador pages</strong> switch off, so 
 <p>The portal is behind the <strong>Retail store portal</strong> switch (Settings → Feature switches). Off = stores can’t sign in; their accounts and requests stay saved.</p>
 </section>
 
+<!-- ===== GIFT CARDS ===== -->
+<section id="tab-giftcards">
+<h2 class="sec">Gift cards</h2>
+<span class="where">Dashboard → Settings → Gift cards</span>
+<p class="lede">Members can buy a gift card for someone: an animated card (Birthday, Holidays, Just because or Thank you) with a short note. Each one is an ordinary order that goes through the same payment steps as any other. The card is only sent once the payment is <strong>confirmed</strong>. This page is where you set the buyer’s bonus and look after every card.</p>
+
+<h3>What members see</h3>
+<ul>
+<li>A 🎁 <strong>Gift cards</strong> button in the members’ shop header opens the gift card page.</li>
+<li>They pick an occasion, an amount ($25, $50, $100, $150, $200, or their own from $10 to $500), who it’s for (name + email) and an optional note.</li>
+<li>They see their bonus credit (if any) and pay with Venmo or Zelle like a normal order.</li>
+<li>In <strong>Account → Gift cards</strong> they see cards they’ve received, cards they’ve sent, and a <em>Have a code?</em> box to add a card by its code.</li>
+<li>At checkout any gift balance and bonus credit come off <strong>automatically</strong>, shipping included, as their own line on the order.</li>
+</ul>
+
+<h3>How a card gets delivered</h3>
+<ol class="steps">
+<li>The member buys it. The order shows <strong>🎁 Gift card</strong> in Orders, and the card shows <em>Waiting for payment</em> here.</li>
+<li>Payment is confirmed in one of two ways: you confirm the matching Venmo or Zelle payment in <strong>Orders → Venmo / Zelle payments</strong>, or you set the order to <strong>Paid</strong> or <strong>Completed</strong>.</li>
+<li>The recipient gets an email with the card and a link to its own page, and the card appears in their account (matched by email). The order moves to <strong>Completed</strong> by itself, and you see “🎁 Gift card sent”.</li>
+<li>The buyer gets their bonus credit in their own account at the same time.</li>
+</ol>
+<div class="callout warn">
+<strong>“I’ve paid” is not enough</strong>
+A customer tapping “I’ve paid” never sends a card. Check the money landed first, then confirm the match or set the order to Paid.
+</div>
+<p>The recipient’s card page has <kbd>Copy code</kbd> and a <kbd>Sign in</kbd> / <kbd>Request membership</kbd> button that fills in their email for them. Someone who isn’t a member yet can request membership and claim the card once approved.</p>
+
+<h3>The buyer’s bonus</h3>
+<p>The buyer gets <strong>credit</strong> in their own account, not a price cut: by default <strong>$5 for every $50</strong> of gift card, <strong>up to $20 per card</strong>. Change the three numbers and press <kbd>Save</kbd>; the line underneath shows what each amount earns (e.g. $100 → $10, $500 → $20). Untick <em>Give the buyer bonus credit</em> to stop it. Cards already bought keep the bonus they were sold with.</p>
+
+<h3>The card list</h3>
+<p>The line at the top shows how many cards there are, how much is unspent on active cards and how many are waiting for payment. Search by name, email, code or order number. Each card shows who it’s from and to, its code, its state (<em>Waiting for payment</em>, <em>Active</em> or <em>Void</em>), what’s left, when it was sent and whether it’s in their account yet. Bonus credit shows as its own “bonus credit” row.</p>
+<table>
+<tr><th>Button</th><th>What it does</th></tr>
+<tr><td><kbd>Edit balance</kbd></td><td>Type the new balance (never below $0) and an optional reason, then <kbd>Save</kbd>. It shows what you’re adding or taking off. The change is kept on the card and in the Activity log.</td></tr>
+<tr><td><kbd>Void</kbd></td><td>Stops the card. Whatever was left can’t be spent after this.</td></tr>
+</table>
+
+<h3>Cancelling a gift card order</h3>
+<ul>
+<li><strong>Nothing spent yet:</strong> set the order to Cancelled and its cards are voided.</li>
+<li><strong>Some of it already spent:</strong> the cards are still voided, and what’s left on them is <strong>frozen</strong> so it can’t be spent. A message tells you what was spent and how much to refund (what they paid, minus what was already spent).</li>
+<li><strong>Changed your mind?</strong> Set the order back to Paid or Completed and the cards, frozen balances included, come back.</li>
+</ul>
+<p>The site never moves money: any refund goes back by Venmo or Zelle by hand.</p>
+
+<h3>Good to know</h3>
+<ul>
+<li>Gift cards never expire.</li>
+<li>Buying a gift card earns no loyalty points. Spending a gift balance counts as payment, so the products bought with it still earn points.</li>
+<li>Gift balance isn’t a discount, so it doesn’t count towards the $100 limit on percentage codes.</li>
+<li>Gift cards are behind the <strong>Gift cards</strong> switch (Settings → Feature switches). Off = the page and checkout line are hidden; cards already sent keep their balance and come back when it’s on.</li>
+</ul>
+</section>
+
 <!-- ===== ANALYTICS TAB ===== -->
 <section id="tab-analytics">
 <h2 class="sec">Analytics</h2>
@@ -1236,15 +1293,15 @@ It arrives automatically every night with revenue for today, 7 days, 30 days and
 <p>The invoice offers Venmo or Zelle, and the memo always reads <strong>Order for</strong> followed by the customer's name and the order number (e.g. <strong>#4K9Q2X</strong>). Pickup customers can also choose cash.</p>
 
 <h3>Venmo and Zelle payments, matched for you</h3>
-<p><span class="where" style="display:inline">Orders tab → Venmo / Zelle payments</span> (when the <strong>Venmo / Zelle payment matching</strong> switch is on). Venmo's “paid you” emails, and the bank's “You received money with Zelle” emails (marked <strong>Zelle</strong>), show up here, already checked and matched to the unpaid order they pay for. A Zelle memo is matched just like a Venmo note. The invoice's Venmo button fills the note with the order number (e.g. <strong>#4K9Q2X</strong>), so most payments match by themselves.</p>
+<p><span class="where" style="display:inline">Orders tab → Venmo / Zelle payments</span> (when the <strong>Venmo / Zelle payment matching</strong> switch is on). Venmo's “paid you” emails, and the bank's “You received money with Zelle” emails (marked <strong>Zelle</strong>), show up here, already checked and matched to the unpaid order they pay for. A Zelle memo is matched just like a Venmo note. The invoice's Venmo button fills the note with the order number (e.g. <strong>#4K9Q2X</strong>), so most payments match by themselves. Confirming a gift card order's payment here also sends the card (see <a href="#tab-giftcards">Gift cards</a>).</p>
 <table>
 <tr><th>You see</th><th>Means</th><th>Do</th></tr>
-<tr><td><strong>Sure</strong></td><td>The Venmo note had the order number, and the amount fits</td><td>Tap <kbd>Mark paid</kbd></td></tr>
+<tr><td><strong>Sure</strong></td><td>The Venmo note or Zelle memo had the order number, and the amount fits</td><td>Tap <kbd>Mark paid</kbd></td></tr>
 <tr><td><strong>Likely</strong></td><td>Same amount and a similar name, but no order number</td><td>Check the name and order, then <kbd>Mark paid</kbd> or <kbd>Not a match</kbd></td></tr>
 <tr><td><strong>No sure match</strong></td><td>Couldn't tell which order</td><td>Pick the order it pays for. If it was a real sale made away from the site, tap <kbd>Handled off-site</kbd>: it counts as revenue without needing an order (tapped it by mistake? <kbd>Undo</kbd> is under <strong>Recently done</strong>). Dismiss it if it isn't a sale at all</td></tr>
-<tr><td><strong>Quarantined</strong></td><td>Failed the security check (may not really be from Venmo)</td><td>Check the Venmo app itself before marking anything paid</td></tr>
+<tr><td><strong>Quarantined</strong></td><td>Failed the security check (may not really be from Venmo or the bank)</td><td>Check the Venmo app or the bank itself before marking anything paid</td></tr>
 </table>
-<p>Nothing is ever marked paid until someone taps. The Today list shows Venmo payments waiting, and the Concierge can prepare the same confirm cards. One-time setup (forwarding the Venmo emails from the inbox that receives them) is under <strong>Setup</strong> at the bottom of that panel.</p>
+<p>Nothing is ever marked paid until someone taps. The Today list shows payments waiting, and the Concierge can prepare the same confirm cards. One-time setup (forwarding the Venmo and Zelle emails from the inbox that receives them) is under <strong>Setup</strong> at the bottom of that panel.</p>
 
 <h3>Gift cards</h3>
 <p><span class="where" style="display:inline">Settings → Gift cards</span> (when the <strong>Gift cards</strong> switch is on). Members buy a card on the Gift cards page (the gift icon in the shop header), pick an occasion and add a note. It arrives as a normal order marked <strong>🎁 Gift card</strong>, waiting for payment. The card is only sent once the payment is confirmed: confirm the matched Venmo/Zelle payment, or check the money landed and set the order to <strong>Paid</strong> or <strong>Completed</strong>. The customer's own “I've paid” never sends it. Sending completes the order, emails the recipient, puts the card in their account, and adds the buyer's bonus credit (set in Settings → Gift cards; $5 per $50, at most $20 per card, to start). Members' balances come off at checkout by themselves, shipping included. Cards never expire. Cancelling the order cancels a card that hasn't been spent.</p>
@@ -1519,13 +1576,19 @@ Payment links opened inside some email preview windows hang, because those windo
 <p class="faq-a">Click <strong>Edit</strong> on the event and change it there. Never delete it and build a new one, because that loses everyone who already signed up. After saving, open <strong>Registrations</strong> and message the people on the list, since the site does not tell them automatically.</p>
 
 <p class="faq-q">I need to cancel an order.</p>
-<p class="faq-a">Open it and set status to Cancelled. If they already paid, refund through Venmo or Zelle directly — the site can't move money.</p>
+<p class="faq-a">Open it and set status to Cancelled. If they already paid, refund through Venmo or Zelle directly — the site can't move money. For a gift card order, see <a href="#tab-giftcards">Gift cards → Cancelling</a>: the site tells you how much to refund if some was already spent.</p>
 
 <p class="faq-q">A product says “Currently restocking” but we have it.</p>
 <p class="faq-a">Its stock count is 0. Products → Stock counts, type the real number, press Save. To stop counting a product, clear its box.</p>
 
-<p class="faq-q">A Venmo payment didn't show up in Venmo payments.</p>
-<p class="faq-a">Give it a couple of minutes. If it's still missing, check that the Gmail filter is still forwarding Venmo emails (Setup at the bottom of the panel), then mark the order paid by hand after checking the Venmo app.</p>
+<p class="faq-q">A Venmo or Zelle payment didn't show up in Venmo / Zelle payments.</p>
+<p class="faq-a">Give it a couple of minutes. If it's still missing, check that the Gmail filters are still forwarding the Venmo and Zelle emails (Setup at the bottom of the panel), then mark the order paid by hand after checking the Venmo app or the bank.</p>
+
+<p class="faq-q">Someone bought a gift card but the recipient never got it.</p>
+<p class="faq-a">It only goes out once the payment is confirmed. Open the order: if it's still Pending payment, check the money landed, then confirm the Venmo / Zelle match or set it to Paid. If it was sent, find the card in Settings → Gift cards and check the recipient's email; they can also add it with the code under Account → Gift cards.</p>
+
+<p class="faq-q">A gift card balance is wrong.</p>
+<p class="faq-a">Settings → Gift cards, search for the card, press <kbd>Edit balance</kbd>, type the right amount and a reason. It's recorded in the Activity log.</p>
 
 <p class="faq-q">The Concierge voice keeps stopping mid-answer in conversation mode.</p>
 <p class="faq-a">It thinks you're talking over it. Usually it's background noise or the speaker being loud. Use headphones or move somewhere quieter, or untick Conversation mode and use ▶ Listen.</p>
@@ -1548,6 +1611,10 @@ Payment links opened inside some email preview windows hang, because those windo
 <tr><td>Where it sells</td><td>Members only, Both, or Public shop only</td></tr>
 <tr><td>Bundle rule</td><td>Cart-wide discount once enough items are added</td></tr>
 <tr><td>BOGO</td><td>Buy one, get one — discounts every second item</td></tr>
+<tr><td>Gift card</td><td>A card a member buys for someone; sent only once payment is confirmed, never expires, comes off checkout automatically</td></tr>
+<tr><td>Bonus credit</td><td>Credit the gift card buyer gets in their own account ($5 per $50, at most $20 per card by default)</td></tr>
+<tr><td>Frozen</td><td>What's left on a partly spent gift card after its order is cancelled. Can't be spent; comes back if the order is restored</td></tr>
+<tr><td>Discount limit</td><td>The most a percentage code takes off one member's order: $100 unless set for them in Edit member</td></tr>
 <tr><td>Points per dollar redeemed</td><td>How many points equal $1 off</td></tr>
 <tr><td>Shippo</td><td>The service that prints USPS labels</td></tr>
 <tr><td>Campaign</td><td>A marketing email to the mailing list</td></tr>
@@ -1577,7 +1644,7 @@ Payment links opened inside some email preview windows hang, because those windo
 <li>Check "Awaiting payment" → nudge anything over 3 days</li>
 <li>Pickups to the pickup spot; mark "Completed" after collection</li>
 <li>Approve anyone waiting to join</li>
-<li>Orders → Venmo payments → confirm the matches</li>
+<li>Orders → Venmo / Zelle payments → confirm the matches (this also sends paid gift cards)</li>
 <li>Check the rust-coloured “on backorder” label in Products → Stock counts</li>
 </ol>
 </div>

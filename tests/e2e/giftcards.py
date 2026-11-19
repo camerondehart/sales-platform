@@ -2,7 +2,7 @@
 # the card is delivered only when payment is CONFIRMED by staff (not by the
 # customer's "I've paid"); the buyer's bonus ($5 per $50); the recipient's
 # account and email; claim by code; balance comes off checkout automatically;
-# cancelling returns balance / voids unspent cards; the switch hides it all.
+# cancelling returns balance / voids cards (partly spent ones are frozen); the switch hides it all.
 import json, urllib.request, os, re
 BASE="http://127.0.0.1:3470"; GW="http://127.0.0.1:4555"; D="/tmp/final/data/"
 T=json.load(open("/tmp/harness/tokens.json")); T2=json.load(open("/tmp/harness/tokens18.json"))
@@ -87,6 +87,7 @@ check("Mia: $10 bonus balance, and the card she sent shows Delivered", r["balanc
 
 s,html=req("/gift/"+gift["token"], cookie=None, raw=True)
 check("card page opens from the email link", s==200 and gift["code"] in html and "gc-card" in html and "Request membership" in html, s)
+check("card page has Copy code, and Sign in / Request membership with the email filled in", "Copy code" in html and "gift-copy-btn" in html and re.search(r'href="/\?next=/gallery&amp;email=[^"]+#join"', html) is not None and re.search(r'href="/\?next=/gallery&amp;email=[^"#]+"', html) is not None, None)
 s,_=req("/gift/"+"0"*48, cookie=None, raw=True)
 check("unknown card link: not found", s==404, s)
 
@@ -144,8 +145,47 @@ s,r=req("/api/admin/gift-cards", cookie=MIA)
 check("staff list: staff only", s==401, s)
 s,r=req("/api/admin/gift-cards")
 check("staff list: every card, no tokens", s==200 and len(r["cards"])==len(cards()) and "token" not in json.dumps(r), s)
+# ---- staff edit a card's balance (Cam, 2026-11-19)
+s,r=req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":40,"reason":"Goodwill top-up"}, cookie=MIA)
+check("edit balance: staff only", s==401, s)
+s,r=req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":-5})
+check("edit balance: can't go below $0", s==409 and [c for c in cards() if c["id"]==c4["id"]][0]["balance"]==25, (s,r))
+s,r=req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":40,"reason":"Goodwill top-up"})
+c4b=[c for c in cards() if c["id"]==c4["id"]][0]
+check("edit balance: set to $40, kept on the card with the reason", s==200 and c4b["balance"]==40 and c4b["entries"][-1]["amount"]==15 and "Goodwill top-up" in c4b["entries"][-1]["note"], (s,r,c4b["entries"][-1:]))
+s,r=req("/api/gift-cards", cookie=KIM)
+check("edit balance: member's balance follows", r["balance"]==40, r)
+aud=[json.loads(l) for l in open(D+"audit.jsonl")]
+ab=[a for a in aud if a["action"]=="giftcard.balance"]
+check("edit balance: Activity log has old, new and reason", ab and ab[-1].get("before",{}).get("balance")==25 and ab[-1].get("after",{}).get("balance")==40 and ab[-1].get("after",{}).get("reason")=="Goodwill top-up", ab[-1:])
+req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":0})
+check("edit balance: down to $0 works", [c for c in cards() if c["id"]==c4["id"]][0]["balance"]==0)
+req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":25})
 s,r=req("/api/admin/gift-cards", {"action":"void","id":c4["id"]})
 check("staff can void a card", s==200 and [c for c in cards() if c["id"]==c4["id"]][0]["state"]=="void", (s,r))
+s,r=req("/api/admin/gift-cards", {"action":"balance","id":c4["id"],"balance":10})
+check("edit balance: not on a void card", s==409, (s,r))
+
+# ---- cancelling a gift card order after part of the card was spent (Cam, 2026-11-18): freeze the rest
+s,r=req("/api/gift-cards", {"action":"buy","amount":100,"occasion":"birthday","toName":"Kim","toEmail":"kim@example.com"}, cookie=MIA)
+oid7=r["orderId"]
+req("/api/admin/orders", {"id":oid7,"status":"completed"}, method="PATCH")
+s,r=req("/api/checkout", {"items":[{"productId":"p_mem","quantity":1}],"shippingMethod":"pickup"}, cookie=KIM)
+check("Kim spends $40 of her new $100 card", s==200 and order(r["orderId"])["giftCardApplied"]==40, (s,r))
+s,r=req("/api/admin/orders", {"id":oid7,"status":"cancelled"}, method="PATCH")
+c7=[c for c in cards() if c["orderId"]==oid7 and c["kind"]=="gift"][0]
+b7=[c for c in cards() if c["orderId"]==oid7 and c["kind"]=="bonus"][0]
+check("partly spent card is voided, the $60 left frozen", c7["state"]=="void" and c7["balance"]==0 and c7.get("frozen")==60, c7)
+check("its unspent bonus is voided too", b7["state"]=="void", b7)
+check("staff told what was spent and what to refund", "$40" in r.get("warning","") and "refund $60" in r.get("warning",""), r)
+s,r=req("/api/gift-cards", cookie=KIM)
+check("frozen card doesn't count toward Kim's balance", s==200 and r["balance"]==0, r)
+s,r=req("/api/checkout", {"items":[{"productId":"p_mem","quantity":1}],"shippingMethod":"pickup"}, cookie=KIM)
+check("…and nothing comes off at checkout", s==200 and not order(r["orderId"]).get("giftCardApplied"), (s,r))
+req("/api/admin/orders", {"id":oid7,"status":"completed"}, method="PATCH")
+c7=[c for c in cards() if c["orderId"]==oid7 and c["kind"]=="gift"][0]
+check("restoring the order brings back the $60", c7["state"]=="active" and c7["balance"]==60 and not c7.get("frozen"), c7)
+req("/api/admin/orders", {"id":oid7,"status":"cancelled"}, method="PATCH")
 s,r=req("/api/admin/settings", {"partial":True,"giftBonusPer":10,"giftBonusStep":100})
 s,r=req("/api/admin/settings")
 check("bonus rule saved from Settings", r["settings"].get("giftBonusPer")==10 and r["settings"].get("giftBonusStep")==100, r)

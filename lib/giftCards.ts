@@ -23,7 +23,7 @@ export type GiftCardEntry = {
   at: number;
   /** Negative = spent, positive = put back. */
   amount: number;
-  /** The order's hold key (spent / put back) or "issue". */
+  /** The order's hold key (spent / put back), "issue", or "staff" (balance changed in admin). */
   ref: string;
   orderId?: string;
   note: string;
@@ -62,6 +62,8 @@ export type GiftCard = {
   emailedAt?: number;
   voidedAt?: number;
   voidReason?: "cancelled" | "staff";
+  /** What was left when its order was cancelled after part of it was spent (put back if the order is restored). */
+  frozen?: number;
   entries: GiftCardEntry[];
 };
 
@@ -169,14 +171,17 @@ export async function activateForOrder(orderId: string, findMember: (email: stri
       if (c.orderId !== orderId) continue;
       if (!(c.state === "awaiting" || (c.state === "void" && c.voidReason === "cancelled"))) continue;
       const wasAwaiting = c.state === "awaiting";
+      const unfreeze = !wasAwaiting && (c.frozen || 0) > 0 ? cents(c.frozen!) : 0;
       out[i] = {
         ...c,
         state: "active",
+        balance: unfreeze ? cents(c.balance + unfreeze) : c.balance,
+        frozen: undefined,
         deliveredAt: c.deliveredAt || now,
         ownerId: c.ownerId || owners.get(c.id),
         voidedAt: undefined,
         voidReason: undefined,
-        entries: wasAwaiting ? [...c.entries, { at: now, amount: c.amount, ref: "issue", orderId, note: c.kind === "bonus" ? "Bonus credit" : `Paid gift card` }] : [...c.entries, { at: now, amount: 0, ref: "restore", orderId, note: "Order set back from cancelled" }],
+        entries: wasAwaiting ? [...c.entries, { at: now, amount: c.amount, ref: "issue", orderId, note: c.kind === "bonus" ? "Bonus credit" : `Paid gift card` }] : [...c.entries, { at: now, amount: unfreeze, ref: "restore", orderId, note: "Order set back from cancelled" }],
       };
       done.push(out[i]);
       // The buyer's bonus, once per gift card.
@@ -220,22 +225,42 @@ export async function markEmailed(ids: string[]): Promise<void> {
   });
 }
 
+/** What's been spent from a card at checkout so far (net of anything put back). Staff edits don't count. */
+export function spentFrom(c: GiftCard): number {
+  return cents(-c.entries.filter((e) => !["issue", "staff", "restore", "cancel"].includes(e.ref)).reduce((n, e) => n + e.amount, 0));
+}
+
 /**
- * The gift card order was cancelled: void its cards (and the bonus) that
- * haven't been spent. Spent ones stay active and are reported back.
+ * The gift card order was cancelled: void its cards (and the bonus).
+ * A card that was already partly spent is voided too, and what's left on it
+ * is frozen (Cam, 2026-11-18): it can't be spent, it's kept on the card, and
+ * it comes back if the order is restored. Those cards are reported back with
+ * how much was spent, so staff know what to refund.
  */
-export async function voidForOrder(orderId: string): Promise<{ voided: number; spent: GiftCard[] }> {
+export async function voidForOrder(orderId: string): Promise<{ voided: number; spent: Array<{ card: GiftCard; spent: number; frozen: number }> }> {
   return store.mutate((cards) => {
     let voided = 0;
-    const spent: GiftCard[] = [];
+    const now = Date.now();
+    const spent: Array<{ card: GiftCard; spent: number; frozen: number }> = [];
     const out = cards.map((c) => {
       if (c.orderId !== orderId || c.state === "void") return c;
-      if (c.state === "active" && c.balance < c.amount) {
-        spent.push(c);
-        return c;
-      }
       voided++;
-      return { ...c, state: "void" as const, voidedAt: Date.now(), voidReason: "cancelled" as const };
+      const used = c.state === "active" ? spentFrom(c) : 0;
+      if (used > 0) {
+        const left = cents(c.balance);
+        const frozenCard: GiftCard = {
+          ...c,
+          state: "void",
+          voidedAt: now,
+          voidReason: "cancelled",
+          balance: 0,
+          frozen: left,
+          entries: [...c.entries, { at: now, amount: -left, ref: "cancel", orderId, note: "Frozen: order cancelled" }],
+        };
+        spent.push({ card: frozenCard, spent: used, frozen: left });
+        return frozenCard;
+      }
+      return { ...c, state: "void" as const, voidedAt: now, voidReason: "cancelled" as const };
     });
     return { data: voided ? out : null, result: { voided, spent } };
   });
@@ -249,6 +274,31 @@ export async function voidCard(id: string): Promise<GiftCard | null> {
     const out = cards.slice();
     out[i] = { ...cards[i], state: "void", voidedAt: Date.now(), voidReason: "staff" };
     return { data: out, result: out[i] };
+  });
+}
+
+/** Most a staff edit can set one card's balance to. */
+export const GIFT_ADJUST_MAX = 5000;
+
+/**
+ * Staff: set an active card's balance (Settings → Gift cards → Edit balance).
+ * Never below $0. The change is kept on the card as a "staff" entry with the reason.
+ */
+export async function adjustBalance(id: string, newBalance: number, reason: string): Promise<{ ok: true; before: number; card: GiftCard } | { ok: false; error: string }> {
+  const target = cents(Number(newBalance));
+  if (!Number.isFinite(target) || target < 0) return { ok: false, error: "The balance can't go below $0." };
+  if (target > GIFT_ADJUST_MAX) return { ok: false, error: `The balance can be at most ${giftMoney(GIFT_ADJUST_MAX)}.` };
+  const why = String(reason || "").trim().slice(0, 200);
+  type R = { ok: true; before: number; card: GiftCard } | { ok: false; error: string };
+  return store.mutate<R>((cards) => {
+    const i = cards.findIndex((c) => c.id === id);
+    const c = cards[i];
+    if (!c || c.state !== "active") return { data: null, result: { ok: false, error: "Only an active card's balance can be changed." } };
+    const delta = cents(target - c.balance);
+    if (delta === 0) return { data: null, result: { ok: false, error: `It's already ${giftMoney(target)}.` } };
+    const out = cards.slice();
+    out[i] = { ...c, balance: target, entries: [...c.entries, { at: Date.now(), amount: delta, ref: "staff", note: why ? `Changed by staff: ${why}` : "Changed by staff" }] };
+    return { data: out, result: { ok: true, before: c.balance, card: out[i] } };
   });
 }
 
