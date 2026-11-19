@@ -64,7 +64,8 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
   .sidebar a.nav-link.active{background:rgba(133,186,69,.19);color:#fff;border-left-color:var(--green)}
   .nav-ico{width:1.1rem;text-align:center;flex-shrink:0;opacity:.85}
 
-  main{flex:1;min-width:0;padding:2.4rem clamp(1.1rem,4vw,3.2rem) 6rem;max-width:920px}
+  main{flex:1;min-width:0;padding:2.4rem clamp(1.1rem,4vw,3.2rem) 6rem;max-width:920px;margin:0 auto}
+  @media (min-width:1700px){ main{max-width:1040px} }
 
   /* ---------- Typography ---------- */
   h2.sec{
@@ -181,7 +182,7 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
       color-scheme:dark;
     }
   }
-  body{background:var(--bg)}
+  html,body{background:var(--bg)}
   .sidebar{background:var(--side)}
   .code-block{font-family:monospace;font-size:.85rem;white-space:pre-wrap;background:var(--code-bg);padding:.9rem 1rem;border-radius:8px;line-height:1.6;border:1px solid var(--rule-soft)}
 
@@ -197,8 +198,8 @@ export const COURSE_HTML_RAW = String.raw`<!DOCTYPE html>
   .kbd-hint{font-size:.66rem;color:rgba(234,247,201,.4);padding:.3rem 1rem 0}
 
   /* Concierge pieces only show once the dashboard says the Concierge is live. */
-  .ask-only{display:none!important}
-  html.has-concierge .ask-only{display:revert!important}
+  /* Hide Concierge-only bits until it's live; otherwise each keeps its own display (flex rows stay flex). */
+  html:not(.has-concierge) .ask-only{display:none!important}
   html.has-concierge .side-tools .ask-only,html.has-concierge .tb-ask.ask-only{display:inline-flex!important}
 
   /* ---------- Welcome panel ---------- */

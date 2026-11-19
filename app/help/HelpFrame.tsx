@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import AssistantWidget from "@/app/components/assistant/AssistantWidget";
 import { openAssistant } from "@/app/components/assistant/AskAssistant";
+import { useAdminTheme } from "@/app/admin/useAdminTheme";
 
 // The staff guide page: the guide in its sandboxed frame, plus the staff
 // Concierge beside it. The frame has no access to this page, so the two talk
@@ -11,6 +12,8 @@ import { openAssistant } from "@/app/components/assistant/AskAssistant";
 //   guide → page  {type:"fp-guide-ready"} · {type:"fp-guide-ask", question} · {type:"fp-guide-at", id}
 export default function HelpFrame({ html, title }: { html: string; title: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  // Same dark/light as the dashboard, so the Concierge chat here follows it too.
+  useAdminTheme();
 
   const theme = useCallback((): "dark" | "light" => {
     try {
@@ -20,16 +23,27 @@ export default function HelpFrame({ html, title }: { html: string; title: string
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }, []);
 
+  // The frame's own background and colour scheme match the guide's theme, so
+  // nothing light shows through while the guide repaints during a scroll.
+  const paint = useCallback(() => {
+    const f = frame.current;
+    if (!f) return;
+    const dark = theme() === "dark";
+    f.style.background = dark ? "#121810" : "#f2f4ef";
+    f.style.colorScheme = dark ? "dark" : "light";
+  }, [theme]);
+
   const post = useCallback(
     (type: "fp-guide-init" | "fp-guide-go") => {
       const w = frame.current?.contentWindow;
       if (!w) return;
+      paint();
       w.postMessage(
         { type, theme: theme(), concierge: document.body.classList.contains("has-assistant"), hash: window.location.hash.slice(1) },
         "*"
       );
     },
-    [theme]
+    [theme, paint]
   );
 
   useEffect(() => {
@@ -52,7 +66,10 @@ export default function HelpFrame({ html, title }: { html: string; title: string
     });
     obs.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
-    const onScheme = () => frame.current?.contentWindow?.postMessage({ type: "fp-guide-go", theme: theme() }, "*");
+    const onScheme = () => {
+      paint();
+      frame.current?.contentWindow?.postMessage({ type: "fp-guide-go", theme: theme() }, "*");
+    };
     window.addEventListener("message", onMsg);
     window.addEventListener("hashchange", onHash);
     // The frame can finish loading before this page hydrates, so its "ready"
@@ -65,7 +82,7 @@ export default function HelpFrame({ html, title }: { html: string; title: string
       mq?.removeEventListener?.("change", onScheme);
       obs.disconnect();
     };
-  }, [post, theme]);
+  }, [post, theme, paint]);
 
   return (
     <>
