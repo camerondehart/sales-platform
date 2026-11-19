@@ -4,6 +4,7 @@ import { audited, auditDetail } from "@/lib/audit";
 import { addPayout, deleteAmbassador, getAmbassadors, removePayout, saveAmbassador } from "@/lib/ambassadors";
 import { ambassadorStatsFor } from "@/lib/ambassadorData";
 import { getUsers } from "@/lib/users";
+import { inviteAmbassador } from "@/lib/ambassadorInvite";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,12 @@ export async function GET() {
   const overview = { live: live.length, total: ambassadors.length, visits: sum("visits"), orders: sum("orders"), sales: sum("sales"), earned: sum("earnedAllTime"), paidOut: sum("paidOut"), owed: sum("owed") };
   // Ambassador panel: whether each linked sign-in email is a member account that can sign in.
   const users = ambassadors.some((a) => a.account) ? await getUsers().catch(() => []) : [];
-  const accounts: Record<string, "approved" | "pending" | "rejected" | "none"> = {};
+  // "invited" = approved, but they haven't chosen a password yet.
+  const accounts: Record<string, "approved" | "invited" | "pending" | "rejected" | "none"> = {};
   for (const a of ambassadors) {
     if (!a.account) continue;
     const u = users.find((x) => x.email.toLowerCase() === a.account);
-    accounts[a.id] = u ? (u.status as "approved" | "pending" | "rejected") : "none";
+    accounts[a.id] = !u ? "none" : u.status === "approved" && u.needsPassword ? "invited" : (u.status as "approved" | "pending" | "rejected");
   }
   return NextResponse.json({ ambassadors, stats, overview, accounts }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -63,6 +65,14 @@ async function PUT_handler(req: Request) {
     if (!p.ok) return NextResponse.json({ error: p.error }, { status: p.status });
     auditDetail({ targetId: id, action: "ambassador.payout", after: { name: p.ambassador.name, amount: p.payout.amount, note: p.payout.note || null } });
     return NextResponse.json({ ok: true, ambassador: p.ambassador });
+  }
+  // Invite them to their panel ({ id, invite: true, email? }): makes their member account if needed and emails a link.
+  if (body.invite === true) {
+    const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || new URL(req.url).origin;
+    const r = await inviteAmbassador(id, body.email, site);
+    if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+    auditDetail({ targetId: id, action: "ambassador.invite", after: { name: r.ambassador.name, panelSignIn: r.user.email, accountCreated: r.created, emailed: r.emailed }, note: r.note });
+    return NextResponse.json({ ok: true, ambassador: r.ambassador, created: r.created, emailed: r.emailed, note: r.note });
   }
   if (typeof body.removePayout === "string") {
     const p = await removePayout(id, body.removePayout);

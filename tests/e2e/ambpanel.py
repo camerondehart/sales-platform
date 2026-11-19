@@ -168,4 +168,59 @@ s,x=req("/api/admin/ambassadors", {**a,"active":True,"account":""}, method="PUT"
 s2,_=req("/api/ambassador", cookie=MIA)
 check("staff: clearing the sign-in email closes the panel", s==200 and not x["ambassador"].get("account") and s2==401, (s,s2))
 
+# ---- inviting an ambassador who has no member account yet
+s,x=req("/api/admin/ambassadors", {"name":"Toni Nagy","slug":"toninagy","email":"toni@example.com"})
+toni=x.get("ambassador") or {}
+s,x=req("/api/admin/ambassadors", {"id":toni["id"],"invite":True}, cookie=None, method="PUT")
+check("invite: staff only", s==401, s)
+req("/api/admin/flags", {"key":"ambassador_panel","on":False})
+s,x=req("/api/admin/ambassadors", {"id":toni["id"],"invite":True}, method="PUT")
+check("invite: needs the Ambassador panel switch on", s==400 and "Ambassador panel" in x.get("error",""), (s,x))
+req("/api/admin/flags", {"key":"ambassador_panel","on":True})
+n=len(mail())
+s,x=req("/api/admin/ambassadors", {"id":toni["id"],"invite":True}, method="PUT")
+users=json.load(open(D+"users.json"))
+tu=[u for u in users if u["email"]=="toni@example.com"]
+check("invite: makes an approved member account with no usable password yet", s==200 and x.get("created") is True and tu and tu[0]["status"]=="approved" and tu[0].get("needsPassword") is True and tu[0]["name"]=="Toni Nagy" and tu[0].get("welcomeEmailSentAt"), (s,x,tu))
+check("invite: links the email as their panel sign-in", x.get("ambassador",{}).get("account")=="toni@example.com", x.get("ambassador",{}).get("account"))
+m=[e for e in mail()[n:] if "toni@example.com" in json.dumps(e.get("to"))]
+link=re.search(r'/welcome\?t=([A-Za-z0-9_.-]+)', m[0]["html"]) if m else None
+check("invite: emails one set-password link, replies to support", len(m)==1 and "ambassador panel is ready" in m[0]["subject"] and link and "support@example.com" in str(m[0].get("reply_to")), [e.get("subject") for e in m])
+check("invite: they join the mailing list like every new member", any(x2["email"]=="toni@example.com" for x2 in json.load(open(D+"subscribers.json"))))
+s,x=req("/api/admin/ambassadors")
+check("invite: the tab shows them as invited until they set a password", x.get("accounts",{}).get(toni["id"])=="invited", x.get("accounts"))
+check("invite: in the Activity log", any(a.get("action")=="ambassador.invite" and (a.get("after") or {}).get("accountCreated") is True for a in audit()), [a.get("action") for a in audit()][-5:])
+s,h=req("/welcome?t="+link.group(1), cookie=None, raw=True)
+check("invite: the link's page says their panel is ready", s==200 and "Your ambassador panel is ready" in h, s)
+s,x=req("/api/set-password", {"t":link.group(1),"password":"toni-secret-123"}, cookie=None)
+check("invite: choosing a password signs them in and sends them to their panel", s==200 and x.get("to")=="/ambassador", (s,x))
+s,x=req("/api/set-password", {"t":link.group(1),"password":"another-pass-1"}, cookie=None)
+check("invite: the link works only once", s==400, (s,x))
+s,x=req("/api/admin/ambassadors")
+check("invite: then they show as a member", x.get("accounts",{}).get(toni["id"])=="approved", x.get("accounts"))
+n=len(mail())
+s,x=req("/api/admin/ambassadors", {"id":toni["id"],"invite":True}, method="PUT")
+m=[e for e in mail()[n:] if "toni@example.com" in json.dumps(e.get("to"))]
+check("invite again: a member with a password gets a sign-in link, never a password link", s==200 and x.get("created") is False and len(m)==1 and "/welcome?t=" not in m[0]["html"] and "next=/ambassador" in m[0]["html"], (s,x,[e.get("subject") for e in m]))
+check("invite again: no second account", len([u for u in json.load(open(D+"users.json")) if u["email"]=="toni@example.com"])==1)
+# an existing member (Amy) linked by invite: account untouched
+s,x=req("/api/admin/ambassadors", {"name":"Amy Amb","slug":"amyamb"})
+amy=x.get("ambassador") or {}
+before=[u for u in json.load(open(D+"users.json")) if u["email"]=="amy@example.com"][0]
+s,x=req("/api/admin/ambassadors", {"id":amy["id"],"invite":True,"email":"AMY@example.com"}, method="PUT")
+after=[u for u in json.load(open(D+"users.json")) if u["email"]=="amy@example.com"][0]
+check("invite: an existing member is linked and their account isn't changed", s==200 and x.get("created") is False and x["ambassador"].get("account")=="amy@example.com" and before["passwordHash"]==after["passwordHash"] and "needsPassword" not in after, (s,x))
+s,x=req("/api/ambassador", cookie=AMY)
+check("invite: that member now opens the panel", s==200 and x["ambassador"]["slug"]=="amyamb", s)
+s,x=req("/api/admin/ambassadors", {"id":toni["id"],"invite":True,"email":"amy@example.com"}, method="PUT")
+check("invite: an email that already opens another ambassador's panel is refused", s==409 and "already opens" in x.get("error",""), (s,x))
+# a pending membership request is left for staff to decide
+s,x=req("/api/admin/ambassadors", {"name":"Pat Pending","slug":"patpending"})
+pp=x.get("ambassador") or {}
+s,x=req("/api/admin/ambassadors", {"id":pp["id"],"invite":True,"email":"pend@example.com"}, method="PUT")
+st=[u for u in json.load(open(D+"users.json")) if u["email"]=="pend@example.com"][0]["status"]
+check("invite: a pending request isn't approved behind staff's back", s==409 and "Approve it in Members" in x.get("error","") and st=="pending", (s,x,st))
+s,x=req("/api/admin/ambassadors", {"id":pp["id"],"invite":True,"email":"not-an-email"}, method="PUT")
+check("invite: a bad email is refused", s==400, (s,x))
+
 print(f"\n{sum(res)}/{len(res)} passed")

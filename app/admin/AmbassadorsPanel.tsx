@@ -90,7 +90,9 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
   const [switchOn, setSwitchOn] = useState<boolean | null>(null);
   const [panelOn, setPanelOn] = useState<boolean | null>(null);
   // Ambassador panel: is each linked sign-in email a member account (approved / waiting / none)?
-  const [accounts, setAccounts] = useState<Record<string, "approved" | "pending" | "rejected" | "none">>({});
+  const [accounts, setAccounts] = useState<Record<string, "approved" | "invited" | "pending" | "rejected" | "none">>({});
+  // Invite to their panel: the email to use when they have no panel sign-in yet.
+  const [inviteTo, setInviteTo] = useState("");
   const [form, setForm] = useState<Form | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -184,6 +186,27 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
     };
     const saved = await call(form.id ? "PUT" : "POST", body, form.id ? "Saved." : `Created. Their page is ${shown}/${form.slug}`);
     if (saved) { setForm(null); setOpenId(saved.id); top(); }
+  }
+
+  async function invite(a: Ambassador) {
+    const to = (a.account || inviteTo.trim() || a.email || "").toLowerCase();
+    if (!to) { setMsg({ ok: false, text: "Type their email first." }); return; }
+    const isNew = !a.account || accounts[a.id] === "none";
+    if (!confirm(isNew ? `Make ${to} an approved member (if they aren't one) and email them a link to their ambassador panel?` : `Email ${to} a link to their ambassador panel?`)) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch("/api/admin/ambassadors", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: a.id, invite: true, email: to }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Couldn't send the invite.");
+      setMsg({ ok: d.emailed !== false, text: d.note || "Invite sent." });
+      setInviteTo("");
+      load();
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof Error ? err.message : "Couldn't send the invite." });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function remove(a: Ambassador) {
@@ -395,7 +418,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           <label htmlFor="amb-account">Panel sign-in (their member email)</label>
           <input id="amb-account" type="email" value={form.account} maxLength={200} onChange={(e) => set({ account: e.target.value })} placeholder={form.email || "toni@example.com"} />
           <div className="field-hint">
-            They sign in as this member (password, emailed code or Face ID) and land on their own Ambassador panel: their link, code, terms, numbers, orders (no customer names) and their picks. They can still shop.
+            They sign in as this member (password, emailed code or Face ID) and land on their own Ambassador panel: their link, code, terms, numbers, orders (no customer names) and their picks. They can still shop. No member account yet? Save, then press <strong>Invite to their panel</strong> on their page here.
             {form.email && !form.account && <> <button type="button" className="ap-linkbtn" onClick={() => set({ account: form.email })}>Use {form.email}</button></>}
             {panelOn === false && <> Turn on <strong>Ambassador panel</strong> in Settings → Feature switches first.</>}
           </div>
@@ -498,13 +521,29 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
             {open.account ? (
               <>Panel sign-in: <strong>{open.account}</strong>{" "}
                 {accounts[open.id] === "approved" ? <span className="dc-chip">Member ✓</span>
+                  : accounts[open.id] === "invited" ? <span className="dc-chip">Invited: hasn&rsquo;t set a password yet</span>
                   : accounts[open.id] === "pending" ? <span className="dc-chip inactive">Membership waiting for approval</span>
                   : accounts[open.id] === "rejected" ? <span className="dc-chip inactive">Member account not active</span>
-                  : <span className="dc-chip inactive">No member account yet: ask them to request membership with this email</span>}
+                  : <span className="dc-chip inactive">No member account yet</span>}
                 {panelOn === false && <> · Ambassador panel switch is off</>}
               </>
-            ) : <>No panel sign-in yet (Edit → Panel sign-in).</>}
+            ) : <>No panel sign-in yet.</>}
           </div>
+          {panelOn !== false && open.active && accounts[open.id] !== "pending" && accounts[open.id] !== "rejected" && (
+            <div className="amb-invite">
+              {!open.account && (
+                <input type="email" value={inviteTo} onChange={(e) => setInviteTo(e.target.value)} placeholder={open.email || "their email"} aria-label="Email to invite" maxLength={200} />
+              )}
+              <button type="button" className="esc-btn" disabled={busy} onClick={() => invite(open)}>
+                {!open.account || accounts[open.id] === "none" ? "✉ Invite to their panel" : accounts[open.id] === "invited" ? "✉ Resend invite" : "✉ Email their panel link"}
+              </button>
+              <span className="field-hint">
+                {!open.account || accounts[open.id] === "none"
+                  ? "Links the member with this email if there is one (their account isn't changed). If there isn't, makes them an approved member account and emails a link to choose a password. Either way they land on their panel."
+                  : accounts[open.id] === "invited" ? "Emails a fresh set-password link." : "They already sign in as a member: this emails them a link to their panel."}
+              </span>
+            </div>
+          )}
         </div>
         <div className="amb-detail-actions">
           <button className="esc-btn primary" onClick={() => { setReport({ period: "this-month", note: "", signoff: "", testTo: "" }); setPreview(null); }} disabled={busy}>✉ Email a progress report</button>

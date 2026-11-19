@@ -1,4 +1,5 @@
 import { checkSetupToken } from "@/lib/passwordSetup";
+import { landingFor } from "@/lib/ambassadorPanel";
 import WelcomeForm, { LinkRequest } from "./WelcomeForm";
 import { brand } from "@/lib/brand";
 
@@ -11,6 +12,8 @@ export default async function WelcomePage({ searchParams }: { searchParams: { t?
   const preview = t === "preview";
   const check = preview ? null : await checkSetupToken(t);
   const first = check?.ok ? check.user.name.split(" ")[0] || check.user.name : "";
+  // Invited from the Ambassadors tab: their panel is waiting, not an account from the old shop.
+  const ambassador = check?.ok ? (await landingFor(check.user.email)) === "/ambassador" : false;
 
   return (
     <div className="pay-shell">
@@ -27,7 +30,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: { t?
         ) : check?.ok ? (
           <>
             <h1 className="pay-title">Welcome, {first}</h1>
-            <p className="pay-muted">Your account moved over from our old shop. Choose a password and you're in.</p>
+            <p className="pay-muted">{ambassador ? "Your ambassador panel is ready. Choose a password and you'll go straight to it." : "Your account moved over from our old shop. Choose a password and you're in."}</p>
             <WelcomeForm t={t} email={check.user.email} />
           </>
         ) : (

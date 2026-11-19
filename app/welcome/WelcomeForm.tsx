@@ -23,7 +23,8 @@ export default function WelcomeForm({ t, email }: { t: string; email: string }) 
     if (!r.ok) return setError(d.error || "Something went wrong — please try again.");
     setDone(true);
     markSignedIn("link");
-    setTimeout(() => window.location.assign("/gallery"), 1200);
+    // A linked ambassador goes to their panel (switch ambassador_panel).
+    setTimeout(() => window.location.assign(d.to === "/ambassador" ? "/ambassador" : "/gallery"), 1200);
   }
 
   if (done)

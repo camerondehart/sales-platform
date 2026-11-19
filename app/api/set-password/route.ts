@@ -6,6 +6,7 @@ import { setUserPassword } from "@/lib/users";
 import { tooMany } from "@/lib/publicLimits";
 import { auditSystem } from "@/lib/audit";
 import { clientIp } from "@/lib/assistant/limits";
+import { landingFor } from "@/lib/ambassadorPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,5 +46,7 @@ export async function POST(req: Request) {
     note: "Chose a password with their set-password link",
     ip: clientIp(req),
   }).catch(() => {});
-  return NextResponse.json({ ok: true, name: check.user.name });
+  // A linked ambassador lands on their panel.
+  const to = await landingFor(check.user.email);
+  return NextResponse.json({ ok: true, name: check.user.name, ...(to ? { to } : {}) });
 }

@@ -10120,3 +10120,6 @@ html[data-admin-theme="dark"] .dc-chip.members { background: rgba(166, 213, 95, 
 @media (max-width: 720px) {
   .gallery-masthead .masthead-nav .nav-amb { display: none; }
 }
+.amb-invite { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.45rem; }
+.amb-invite input { flex: 1 1 14rem; max-width: 20rem; }
+.amb-invite .field-hint { flex-basis: 100%; margin: 0; }

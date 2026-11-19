@@ -18,7 +18,7 @@ const STEPS: Array<{ icon: string; title: string; body: string }> = [
   { icon: "✨", title: "Choose your picks", body: "Under Your picks, add up to 24 products for your page and put them in order with ↑ ↓, then press Save my picks. Members-only picks show locked to visitors who aren't members. Pick nothing and your page shows the whole shop." },
   { icon: "🧾", title: "Your orders", body: "Each order's number, date, status, products and what you earn. We never show who bought." },
   { icon: "📄", title: "Your terms", body: "Your commission rate, any growth rate and its goal, how long a visit counts, your start date and any trial. Only the team can change them: email us with any questions." },
-  { icon: "🔑", title: "Getting back here", body: "Sign in the usual way (password, emailed code or Face ID) and you land here. You can still shop as a member any time: the panel link is in the Account menu on phones and the top bar on computers." },
+  { icon: "🔑", title: "Getting back here", body: "If we invited you by email, use its link to set your password first (it works once, for 30 days). After that, sign in the usual way (password, emailed code or Face ID) and you land here. You can still shop as a member any time: the panel link is in the Account menu on phones and the top bar on computers." },
 ];
 
 export default function AmbassadorGuide({ onClose }: { onClose: () => void }) {
