@@ -11,7 +11,7 @@ import { getSettings } from "../settings";
 import { getBanner } from "../banner";
 import { computeInsights } from "./insights";
 import { addDays, lastNDaysStart, pacificDay, pacificMidnight } from "../periods";
-import { auditSystem } from "../audit";
+import { auditSystem, readAuditRange } from "../audit";
 import { canResendInvoice, resendInvoice } from "../invoiceResend";
 import { chatInsights } from "./chatInsights";
 import { recentTranscripts } from "./transcripts";
@@ -294,6 +294,29 @@ const DEFS: ToolDef[] = [
       description:
         "What customers talk to the Concierge about (last 30 days): conversations by audience, topics, anything flagged as concerning, and recent customer questions to spot themes. Use for 'what are people asking', 'any concerning chats', 'what should we add to the FAQ'.",
       parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    audiences: ["admin"],
+    type: "function",
+    function: {
+      name: "read_activity_log",
+      description:
+        `Read the staff Activity log (read only) — every recorded admin change since the log began, no age limit: who did what, when, to which record, with before/after details. Search by member (name, email or id), action (prefix, e.g. 'shipping', 'order.', 'giftcard'), any word, and a date range (${brand.timezoneLabel}). Use for history questions like 'which Shippo labels did we buy for Jane', 'who changed this order', 'what happened on Nov 3'. Results are newest first; page with offset when total_matches is larger.`,
+      parameters: {
+        type: "object",
+        properties: {
+          member: str("Member name, email or id to find in the entries"),
+          action: str("Action name or prefix, e.g. 'shipping', 'order.status', 'giftcard'"),
+          query: str("Any other word to match anywhere in the entry"),
+          from: str(`Start date YYYY-MM-DD (${brand.timezoneLabel}), inclusive; default the start of the log`),
+          to: str(`End date YYYY-MM-DD (${brand.timezoneLabel}), inclusive; default today`),
+          failed_only: { type: "boolean", description: "Only failed attempts" },
+          oldest_first: { type: "boolean", description: "Oldest first instead of newest first" },
+          limit: { type: "number", description: "Entries to return (default 40, max 100)" },
+          offset: { type: "number", description: "Skip this many matches (for paging)" },
+        },
+      },
     },
   },
   {
@@ -1254,6 +1277,44 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         customer: s(args.customer, 120) || undefined,
         prevFrom,
       }, TZ);
+    }
+    case "read_activity_log": {
+      const ymd = /^\d{4}-\d{2}-\d{2}$/;
+      const fromS = s(args.from, 10), toS = s(args.to, 10);
+      const from = ymd.test(fromS) ? pacificMidnight(fromS) : 0;
+      const to = ymd.test(toS) ? pacificMidnight(addDays(toS, 1)) - 1 : Date.now();
+      const member = s(args.member, 100).toLowerCase();
+      const action = s(args.action, 60).toLowerCase();
+      const word = s(args.query, 100).toLowerCase();
+      const all = await readAuditRange(from, to);
+      const hits = all.filter((e) => {
+        if (args.failed_only === true && e.ok) return false;
+        if (action && !e.action.toLowerCase().startsWith(action) && !e.action.toLowerCase().includes(action)) return false;
+        if (!member && !word) return true;
+        const text = JSON.stringify(e).toLowerCase();
+        return (!member || text.includes(member)) && (!word || text.includes(word));
+      });
+      if (args.oldest_first === true) hits.reverse();
+      const limit = Math.min(Math.max(Math.floor(Number(args.limit) || 40), 1), 100);
+      const offset = Math.max(Math.floor(Number(args.offset) || 0), 0);
+      const fmt = (t: number) => new Date(t).toLocaleString("en-US", { timeZone: TZ, dateStyle: "medium", timeStyle: "short" });
+      return {
+        total_entries_in_range: all.length,
+        total_matches: hits.length,
+        showing: `${Math.min(offset + 1, hits.length)}-${Math.min(offset + limit, hits.length)}`,
+        oldest_entry: all.length ? fmt(all[all.length - 1].at) : undefined,
+        entries: hits.slice(offset, offset + limit).map((e) => ({
+          when: fmt(e.at),
+          action: e.action,
+          who: e.actor,
+          by: e.source === "ai" ? "Concierge card, confirmed by staff" : e.source,
+          target: e.targetType ? `${e.targetType}${e.targetId ? " " + e.targetId : ""}` : undefined,
+          ok: e.ok,
+          note: e.note,
+          before: e.before,
+          after: e.after,
+        })),
+      };
     }
     case "chat_insights": {
       const [ins, recent] = await Promise.all([chatInsights(), recentTranscripts({ limit: 40 })]);

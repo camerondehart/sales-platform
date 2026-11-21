@@ -147,6 +147,23 @@ check("label: force:true goes past the guard (fails later only for the missing S
 s,r=req("/api/admin/orders/shipping-label", {"orderId":"ord_1_abc4k9"}, cookie=None)
 check("label: admin only", s==401, s)
 
+# ---------- One-off Shippo labels show in the member's History (lib/oneOffLabels.ts)
+json.dump([
+  {"id":"lbl_a","userId":"u_member","productName":"Sample pack","quantity":2,"weightOz":9,"service":"USPS Ground Advantage","amount":5.4,"trackingNumber":"9400ONEOFF1","labelUrl":"https://shippo.test/one1.pdf","transactionId":"tx1","createdBy":"staff@example.com","createdAt":NOW-2*DAYMS},
+  {"id":"lbl_b","userId":"u_member","productName":"Replacement","quantity":1,"weightOz":8,"service":"USPS Priority Mail","amount":9.1,"labelUrl":"https://shippo.test/one2.pdf","transactionId":"tx2","createdBy":"admin","createdAt":NOW-1*DAYMS},
+  {"id":"lbl_c","userId":"u_someone_else","productName":"Other","quantity":1,"weightOz":8,"service":"USPS Ground Advantage","labelUrl":"https://shippo.test/one3.pdf","transactionId":"tx3","createdBy":"admin","createdAt":NOW},
+], open(D+"one-off-labels.json","w"))
+s,r=req("/api/admin/shipping-label?userId=u_member")
+ls=r.get("labels") or []
+check("one-off labels: only that member's labels, newest first", s==200 and [l["id"] for l in ls]==["lbl_b","lbl_a"], (s,r))
+check("one-off labels: keep tracking, cost and who made it", ls and ls[1]["trackingNumber"]=="9400ONEOFF1" and ls[1]["amount"]==5.4 and ls[1]["createdBy"]=="staff@example.com", ls)
+s,r=req("/api/admin/shipping-label?userId=u_member", cookie=None)
+check("one-off labels: admin only", s==401, s)
+s,r=req("/api/admin/shipping-label")
+check("one-off labels: member id needed", s==400, (s,r))
+s,r=req("/api/admin/shipping-label", {"userId":"u_member","productName":"Sample pack","quantity":1})
+check("one-off label purchase without a Shippo key saves nothing", s>=400 and len(json.load(open(D+"one-off-labels.json")))==3, (s,r))
+
 # ---------- Rate limits on public forms (per IP)
 codes=[req("/api/forgot-password", {"email":f"nobody{i}@example.com"}, cookie=None, ip="8.8.8.8")[0] for i in range(7)]
 check("forgot-password: 6 tries allowed, the 7th gets 429", codes[:6]==[200]*6 and codes[6]==429, codes)

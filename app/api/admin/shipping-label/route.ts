@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, adminActor } from "@/lib/auth";
 import { getUsers } from "@/lib/users";
 import { audited } from "@/lib/audit";
+import { labelsForMember, recordOneOffLabel } from "@/lib/oneOffLabels";
 
 // Map service tokens to partial name matches for validation
 const serviceNameMap: Record<string, string> = {
@@ -201,6 +202,21 @@ async function POST_handler(req: Request) {
       );
     }
 
+    // Keep it for the member's History (never fails the purchase).
+    const amount = parseFloat(selectedRate.amount);
+    await recordOneOffLabel({
+      userId: user.id,
+      productName: String(productName).slice(0, 200),
+      quantity: Number(quantity) || 1,
+      weightOz: Number(weightOz) || 8,
+      service: selectedRate.servicelevel?.name || service,
+      amount: Number.isFinite(amount) ? amount : undefined,
+      trackingNumber: transaction.tracking_number || undefined,
+      labelUrl: transaction.label_url,
+      transactionId: transaction.object_id,
+      createdBy: await adminActor(),
+    });
+
     return NextResponse.json({
       labelUrl: transaction.label_url,
       transactionId: transaction.object_id,
@@ -215,6 +231,16 @@ async function POST_handler(req: Request) {
       { status: 500 }
     );
   }
+}
+
+// One-off labels bought for a member (Members → History).
+export async function GET(req: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const userId = new URL(req.url).searchParams.get("userId");
+  if (!userId) return NextResponse.json({ error: "missing userId" }, { status: 400 });
+  return NextResponse.json({ labels: await labelsForMember(userId) });
 }
 
 // One audit-log entry per request (see lib/audit.ts).

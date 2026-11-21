@@ -200,6 +200,7 @@ export default function AdminDashboard({
   const [historyUser, setHistoryUser] = useState<PublicUser | null>(null);
   const [historyInquiries, setHistoryInquiries] = useState<Inquiry[]>([]);
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
+  const [historyLabels, setHistoryLabels] = useState<OneOffLabelRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Member password reset modal
@@ -1332,11 +1333,17 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setHistoryUser(user);
     setHistoryInquiries([]);
     setHistoryOrders([]);
+    setHistoryLabels([]);
     setHistoryLoading(true);
-    const [inqRes, ordRes] = await Promise.all([
+    const [inqRes, ordRes, lblRes] = await Promise.all([
       adminFetch(`/api/admin/inquiries?userId=${encodeURIComponent(user.id)}`),
       adminFetch(`/api/admin/orders?userId=${encodeURIComponent(user.id)}`),
+      adminFetch(`/api/admin/shipping-label?userId=${encodeURIComponent(user.id)}`),
     ]);
+    if (lblRes.ok) {
+      const data = await lblRes.json().catch(() => ({}));
+      setHistoryLabels(Array.isArray(data.labels) ? data.labels : []);
+    }
     if (inqRes.ok) {
       const data = await inqRes.json();
       setHistoryInquiries(data.inquiries);
@@ -1352,6 +1359,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     setHistoryUser(null);
     setHistoryInquiries([]);
     setHistoryOrders([]);
+    setHistoryLabels([]);
   }
 
   async function handleLogout() {
@@ -4229,6 +4237,31 @@ We just finished a new run and wanted you to hear it first.
                     </div>
                   )}
 
+                  {/* One-off Shippo labels (Members → Ship to Shippo) */}
+                  {historyLabels.length > 0 && (
+                    <>
+                      <div className="history-count" style={{ marginBottom: "0.75rem" }}>
+                        {historyLabels.length} one-off shipping {historyLabels.length === 1 ? "label" : "labels"}
+                      </div>
+                      <div className="history-list" style={{ marginBottom: "1.5rem" }}>
+                        {historyLabels.map((l) => (
+                          <div key={l.id} className="history-item">
+                            <div className="history-product">
+                              {l.productName} ×{l.quantity}{typeof l.amount === "number" ? ` · $${l.amount.toFixed(2)}` : ""}
+                            </div>
+                            <div className="history-date">{formatDateTime(l.createdAt)}</div>
+                            <div style={{ fontSize: "0.85rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                              {l.service} · {l.weightOz} oz{l.trackingNumber && <> · Tracking <TrackingLink n={l.trackingNumber} /></>}
+                            </div>
+                            <div style={{ fontSize: "0.8rem", color: "var(--ink-soft)", marginTop: "0.25rem" }}>
+                              By {l.createdBy === "admin" ? "staff (shared password)" : l.createdBy} · <a href={l.labelUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-strong)", textDecoration: "underline" }}>Label PDF</a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
                   {historyInquiries.length === 0 ? null : (
                 <>
                   <div className="history-count">{historyInquiries.length} legacy {historyInquiries.length === 1 ? "inquiry" : "inquiries"}</div>
@@ -5310,6 +5343,20 @@ function OrderDetailModal({
 // Dashboard dates are always local (the business's time), whatever the
 // viewer's computer is set to — otherwise someone travelling sees order times
 // a day off from what the Concierge (and everyone else) says.
+/** A one-off Shippo label as Members → History shows it (lib/oneOffLabels.ts). */
+type OneOffLabelRow = {
+  id: string;
+  productName: string;
+  quantity: number;
+  weightOz: number;
+  service: string;
+  amount?: number;
+  trackingNumber?: string;
+  labelUrl: string;
+  createdBy: string;
+  createdAt: number;
+};
+
 function formatDateTime(ts: number): string {
   return new Date(ts).toLocaleString("en-US", {
     timeZone: brand.timezone,

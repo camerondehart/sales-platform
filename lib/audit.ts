@@ -326,3 +326,47 @@ export async function readAudit(q: AuditQuery = {}): Promise<AuditEntry[]> {
     .sort((a, b) => b.at - a.at)
     .slice(0, limit);
 }
+
+/**
+ * Every entry in a time range, oldest log month onward — no per-month cap.
+ * Used by the staff Concierge (read only). File names start with the time, so
+ * only files inside [from, to] are fetched. Newest first.
+ */
+export async function readAuditRange(from = 0, to = Date.now()): Promise<AuditEntry[]> {
+  const inRange = (e: AuditEntry) => e.at >= from && e.at <= to;
+  if (!useBlob) {
+    try {
+      const lines = (await fs.readFile(LOCAL_FILE, "utf8")).trim().split("\n").filter(Boolean);
+      return lines.map((l) => JSON.parse(l) as AuditEntry).filter(inRange).sort((a, b) => b.at - a.at);
+    } catch {
+      return [];
+    }
+  }
+  const { list } = await import("@vercel/blob");
+  const files: { pathname: string; url: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const page: Awaited<ReturnType<typeof list>> = await list({ prefix: PREFIX, limit: 1000, cursor });
+    for (const b of page.blobs) {
+      const t = Number(b.pathname.split("/").pop()?.split("_")[0]);
+      if (t >= from && t <= to) files.push(b);
+    }
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  files.sort((a, b) => (a.pathname < b.pathname ? 1 : -1));
+  const out: AuditEntry[] = [];
+  for (let i = 0; i < files.length; i += 50) {
+    const batch = await Promise.all(
+      files.slice(i, i + 50).map(async (f) => {
+        try {
+          const r = await fetch(f.url, { cache: "force-cache" });
+          return r.ok ? ((await r.json()) as AuditEntry) : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    out.push(...(batch.filter(Boolean) as AuditEntry[]));
+  }
+  return out.filter(inRange).sort((a, b) => b.at - a.at);
+}
