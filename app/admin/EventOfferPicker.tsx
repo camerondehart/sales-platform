@@ -133,7 +133,7 @@ export default function EventOfferPicker({
         {!key
           ? "Type the event name first, then pick a code."
           : current && !current.live
-            ? `⚠ ${current.code || "That code"} is switched off, expired or used up, so sign-ups get no code right now. Pick another or fix it under Discount codes.`
+            ? `⚠\uFE0E ${current.code || "That code"} is switched off, expired or used up, so sign-ups get no code right now. Pick another or fix it under Discount codes.`
             : current
               ? `People who sign up at “${event.trim()}” get ${current.code} (${current.text}) in their welcome email, and the page mentions it. The code's own limits still apply at checkout.`
               : "Pick one of your discount codes, or make a new one just for this event. It's emailed to new sign-ups only."}

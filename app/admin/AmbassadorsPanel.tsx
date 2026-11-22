@@ -11,6 +11,7 @@ import { offerText } from "@/lib/discountText";
 import { useAdminRefresh } from "./useAdminRefresh";
 import type { AdminRefreshKey } from "@/lib/assistant/shared";
 import { brand, isOwnHost, TEAM } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // Dashboard → Ambassadors. Make each ambassador's page (<site>/<address>,
 // shared only by link or QR code), set their terms, see how they're doing,
@@ -39,7 +40,7 @@ type Form = {
 const todayPacific = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 const blankTerms = (): TermsForm => ({
   commissionPct: "10", growthPct: "", growthGoal: "", growthOn: false, discountPct: "10",
-  trialDays: "90", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
+  trialDays: "0", startDate: todayPacific(), trialReviewed: false, windowDays: "30", repeatPurchases: true, payoutSchedule: "monthly", notes: "",
 });
 const blank = (): Form => ({ name: "", slug: "", slugTouched: false, email: "", account: "", headline: "", bio: "", photo: "", look: "auto", emoji: "", showEmoji: true, welcome: true, productIds: [], socials: [{ url: "", label: "" }], discountCode: "", active: true, terms: blankTerms() });
 
@@ -316,7 +317,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
               ))}
             </select>
             {form.id && form.slug && form.welcome && (
-              <a className="esc-btn" href={`/${form.slug}?welcome=1`} target="_blank" rel="noopener noreferrer">Preview welcome ↗</a>
+              <a className="esc-btn" href={`/${form.slug}?welcome=1`} target="_blank" rel="noopener noreferrer">Preview welcome <Glyph name="external" /></a>
             )}
           </div>
           <label className="amb-emoji-toggle" style={{ marginTop: "0.5rem" }}>
@@ -512,10 +513,10 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           <div className="amb-link-row">
             <a href={`/${open.slug}`} target="_blank" rel="noopener">{shown}/{open.slug}</a>
             <button type="button" className="ap-linkbtn" onClick={() => copy(`${site}/${open.slug}`)}>{copied ? "Copied ✓" : "Copy link"}</button>
-            <button type="button" className="ap-linkbtn" onClick={() => qrFile(open, "download")}>QR code ⬇</button>
+            <button type="button" className="ap-linkbtn" onClick={() => qrFile(open, "download")}>QR code <Glyph name="download" /></button>
             <button type="button" className="ap-linkbtn" onClick={() => qrFile(open, "print")}>Print QR</button>
           </div>
-          {!isLive && <div className="field-hint">⚠ You&rsquo;re not on the live site, so links and QR codes point here. Share them from the live dashboard.</div>}
+          {!isLive && <div className="field-hint"><Glyph name="alert" /> You&rsquo;re not on the live site, so links and QR codes point here. Share them from the live dashboard.</div>}
           <div className="user-meta">{rateOf(open)}% commission{open.discountCode ? ` · code ${open.discountCode}` : ""}{open.email ? ` · ${open.email}` : " · no email yet"}{open.lastReportAt ? ` · last report ${day(open.lastReportAt)}` : ""}</div>
           <div className="user-meta amb-panel-line">
             {open.account ? (
@@ -535,7 +536,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
                 <input type="email" value={inviteTo} onChange={(e) => setInviteTo(e.target.value)} placeholder={open.email || "their email"} aria-label="Email to invite" maxLength={200} />
               )}
               <button type="button" className="esc-btn" disabled={busy} onClick={() => invite(open)}>
-                {!open.account || accounts[open.id] === "none" ? "✉ Invite to their panel" : accounts[open.id] === "invited" ? "✉ Resend invite" : "✉ Email their panel link"}
+                <Glyph name="mail" /> {!open.account || accounts[open.id] === "none" ? "Invite to their panel" : accounts[open.id] === "invited" ? "Resend invite" : "Email their panel link"}
               </button>
               <span className="field-hint">
                 {!open.account || accounts[open.id] === "none"
@@ -546,7 +547,7 @@ export default function AmbassadorsPanel({ products }: { products: Product[] }) 
           )}
         </div>
         <div className="amb-detail-actions">
-          <button className="esc-btn primary" onClick={() => { setReport({ period: "this-month", note: "", signoff: "", testTo: "" }); setPreview(null); }} disabled={busy}>✉ Email a progress report</button>
+          <button className="esc-btn primary" onClick={() => { setReport({ period: "this-month", note: "", signoff: "", testTo: "" }); setPreview(null); }} disabled={busy}><Glyph name="mail" /> Email a progress report</button>
           <button className="esc-btn" onClick={() => { setForm(toForm(open)); setMsg(null); setPq(""); top(); }}>Edit</button>
           <button className="esc-btn" onClick={() => call("PUT", { ...open, active: !open.active }, open.active ? `${open.name}'s page is off.` : `${open.name}'s page is live.`)} disabled={busy}>{open.active ? "Turn off" : "Turn on"}</button>
           <button className="esc-btn danger" onClick={() => remove(open)} disabled={busy}>Delete</button>

@@ -17,7 +17,7 @@ export const metadata = {
  * §14; bump EFFECTIVE when it changes. The 12-month / 7-year retention
  * periods come from the lawyer's draft; the business confirms them.
  */
-const EFFECTIVE = "November 18, 2026";
+const EFFECTIVE = "November 22, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const HOST = brand.siteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -62,9 +62,24 @@ const KEEP: Array<[string, string]> = [
   ["Retail store accounts and stock requests", "While the store's account is open, then as part of our ordinary business records"],
 ];
 
+// With the sign-in map on (switch login_map), the rough town of each sign-in is
+// kept as daily totals per town, not linked to anyone (lib/loginPlaces.ts).
+const AREA_COLLECT: [string, string, string] = [
+  "Approximate area when you sign in",
+  "The rough area (about city level) that your internet (IP) address points to",
+  "When you sign in. Used to decide whether to tell you about our events near you, and added to a daily count of sign-ins per town so we can see where our community signs in from. The count isn't linked to you: we don't keep your internet address, email or account with it",
+];
+const AREA_KEEP: [string, string] = [
+  "Approximate area when you sign in",
+  "Daily counts of sign-ins per town, which don't identify you, for about 13 months. We also keep the date you were shown the events note",
+];
+
 export default async function PrivacyPage() {
   const stores = await isEnabled("store_locator").catch(() => false);
   const gifts = await isEnabled("gift_cards").catch(() => false);
+  const signInMap = await isEnabled("login_map").catch(() => false);
+  const collect = signInMap ? COLLECT.map((r) => (r[0] === AREA_COLLECT[0] ? AREA_COLLECT : r)) : COLLECT;
+  const keep = signInMap ? KEEP.map((r) => (r[0] === AREA_KEEP[0] ? AREA_KEEP : r)) : KEEP;
   return (
     <div className="shell">
       <header className="masthead">
@@ -98,7 +113,7 @@ export default async function PrivacyPage() {
             <table className="legal-table">
               <thead><tr><th>What</th><th>Examples</th><th>When</th></tr></thead>
               <tbody>
-                {COLLECT.filter(([a]) => gifts || a !== "Gift cards").map(([a, b, c]) => (
+                {collect.filter(([a]) => gifts || a !== "Gift cards").map(([a, b, c]) => (
                   <tr key={a}><td>{a}</td><td>{b}</td><td>{c}</td></tr>
                 ))}
               </tbody>
@@ -156,7 +171,7 @@ export default async function PrivacyPage() {
             <table className="legal-table">
               <thead><tr><th>Information</th><th>How long</th></tr></thead>
               <tbody>
-                {KEEP.filter(([a]) => gifts || a !== "Gift cards").map(([a, b]) => (
+                {keep.filter(([a]) => gifts || a !== "Gift cards").map(([a, b]) => (
                   <tr key={a}><td>{a}</td><td>{b}</td></tr>
                 ))}
               </tbody>

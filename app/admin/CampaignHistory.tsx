@@ -47,8 +47,14 @@ export default function CampaignHistory({
   onDuplicate,
   onEdit,
   editingId,
+  bare,
+  emptyText,
 }: {
   refreshKey: number;
+  /** Leave out the small "Campaigns" heading (the section above names it). */
+  bare?: boolean;
+  /** Shown when there are no campaigns (otherwise nothing is shown). */
+  emptyText?: string;
   onDuplicate: (subject: string, body: string) => void;
   onEdit?: (c: Row) => void;
   editingId?: string | null;
@@ -86,10 +92,11 @@ export default function CampaignHistory({
     setBusy(null);
   }
 
-  if (!rows || rows.length === 0) return null;
+  if (!rows) return emptyText ? <div className="empty" style={{ padding: "1.5rem 0" }}>Loading campaigns…</div> : null;
+  if (rows.length === 0) return emptyText ? <div className="empty" style={{ padding: "1.5rem 0" }}>{emptyText}</div> : null;
   return (
-    <div className="ch">
-      <h3 className="ch-title">Campaigns</h3>
+    <div className={`ch${bare ? " ch-bare" : ""}`}>
+      {!bare && <h3 className="ch-title">Campaigns</h3>}
       <div className="ch-list">
         {rows.map((r) => (
           <div key={r.id} className={`ch-row ${r.status}${editingId === r.id ? " is-editing" : ""}`}>

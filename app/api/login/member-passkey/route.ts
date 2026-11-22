@@ -8,6 +8,7 @@ import { getUsers } from "@/lib/users";
 import { checkRateLimit, recordFailedAttempt } from "@/lib/rateLimit";
 import { CHALLENGE_COOKIE, packChallenge, relyingParty, unpackChallenge } from "@/lib/passkeys";
 import { getMemberPasskeys, touchMemberPasskey } from "@/lib/memberPasskeys";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
+    await recordSignInPlace(req, "member", user.email);
     // A linked ambassador lands on their panel (switch ambassador_panel).
     const to = await landingFor(user.email);
     return NextResponse.json({ ok: true, name: user.name, ...(to ? { to } : {}) });

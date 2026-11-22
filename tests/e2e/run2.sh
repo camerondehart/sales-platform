@@ -24,7 +24,7 @@ node /tmp/harness/mockgw.cjs > /tmp/harness/mock.log 2>&1 &
 MOCK=$!
 cd /tmp/final
 TZ=UTC AUTH_SECRET="test-secret-at-least-32-characters-long!!" AI_GATEWAY_API_KEY=test-key AI_GATEWAY_BASE_URL=http://127.0.0.1:4555/v1 RESEND_API_KEY=re_test RESEND_BASE_URL=http://127.0.0.1:4555 INQUIRY_TO_EMAIL=team@example.com npx next start -p 3470 > /tmp/harness/app2.log 2>&1 &
-for i in $(seq 1 40); do curl -s -o /dev/null localhost:3470/api/assistant/status && break; sleep 0.5; done
+for i in $(seq 1 200); do curl -s -o /dev/null localhost:3470/api/assistant/status && break; sleep 0.1; done
 python3 /tmp/harness/reliability.py
 kill $MOCK $APP 2>/dev/null; free_ports
 rm -f /tmp/final/data/settings.json

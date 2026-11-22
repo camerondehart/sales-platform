@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BarList, num } from "./charts";
 import { brand } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // Assistant tab → Conversations: every Concierge chat from the last 30 days,
 // by audience, with topic insights and anything flagged as concerning.
@@ -139,7 +140,7 @@ export default function ConversationsPanel() {
           <div className="cv-flags">
             <div className="cv-sub">Flagged</div>
             {insights.flags.length === 0 ? (
-              <div className="an-empty" style={{ padding: "0.6rem 0" }}>Nothing concerning. 🌿</div>
+              <div className="an-empty" style={{ padding: "0.6rem 0" }}>Nothing concerning. <Glyph name="leaf" /></div>
             ) : (
               <ul>
                 {insights.flags.map((f) => (

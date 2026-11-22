@@ -167,7 +167,7 @@ export default function TemplateLibrary({
   return (
     <div className="tpl">
       <button type="button" className="tpl-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-        {open ? "▼" : "▶"} Templates ({items.filter((t) => !t.archived).length})
+        {open ? "▼" : "▶\uFE0E"} Templates ({items.filter((t) => !t.archived).length})
       </button>
       {open && (
         <>

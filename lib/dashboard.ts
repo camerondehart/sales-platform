@@ -9,6 +9,7 @@ import { readTraffic, flushTraffic, type DayRow } from "./traffic";
 import { addDays, pacificDay, pacificMidnight } from "./periods";
 import { brand } from "@/lib/brand";
 import { offsiteSales } from "./venmoInbox";
+import { listCampaigns } from "./campaignSchedule";
 
 /**
  * Everything the Analytics tab shows, computed in one pass.
@@ -229,8 +230,10 @@ export async function computeDashboard(daysRequested: number) {
   const campaignVisits = sumPrefix(traffic, "c:");
   const campaignOrders = sumPrefix(traffic, "co:");
   const campaignValue = sumPrefix(traffic, "cv:");
+  // Show each campaign's subject instead of its id (the id is what email links carry).
+  const campaignNames = new Map((await listCampaigns().catch(() => [])).map((c) => [c.id.toLowerCase(), c.subject]));
   const campaigns = Array.from(new Set([...campaignVisits.keys(), ...campaignOrders.keys()]))
-    .map((c) => ({ id: c, visits: campaignVisits.get(c) || 0, orders: campaignOrders.get(c) || 0, revenue: r2((campaignValue.get(c) || 0) / 100) }))
+    .map((c) => ({ id: c, name: campaignNames.get(c.toLowerCase()) || c, visits: campaignVisits.get(c) || 0, orders: campaignOrders.get(c) || 0, revenue: r2((campaignValue.get(c) || 0) / 100) }))
     .sort((a, b) => b.visits - a.visits || b.revenue - a.revenue)
     .slice(0, 8);
   const askTopics = top(sumPrefix(traffic, "at:"), 9).filter((x) => x.key !== "staff").slice(0, 6);

@@ -229,6 +229,7 @@ http.createServer((req, res) => {
         "act:remind": [call("propose_order_message", { order_id: "ord_2_zzzzzz", subject: "A gentle reminder about your order", message: "Just a friendly note that order ZZZZZZ ($80.00) is still waiting for payment.\n\n<script>x</script> Thanks!\n— The Northwind team" })],
         "act:remind-paid": [call("propose_order_message", { order_id: "ord_1_abc4k9", subject: "Your order is on its way", message: "It shipped today." })],
         "act:code-dupe": [call("propose_discount_code", { code: "DUPE10", type: "percentage", value: 10, expires_in_days: 14 }), call("propose_discount_code", { code: "dupe10", type: "percentage", value: 10, expires_in_days: 14 })],
+        "act:code-change": [call("propose_discount_code", { code: "CHG20", type: "percentage", value: 20 }), call("propose_discount_code", { code: "CHG20", type: "percentage", value: 20, uses_per_customer: 1, last_day: "2030-11-30" })],
         "act:code-dupe-auto": [call("propose_discount_code", { type: "percentage", value: 15 }), call("propose_discount_code", { type: "percentage", value: 15 })],
         "act:remind-dupe": [call("propose_order_message", { order_id: "ord_2_zzzzzz", subject: "A", message: "B" }), call("propose_order_message", { order_id: "ord_2_zzzzzz", subject: "A", message: "B" })],
         "act:remind-bad": [call("propose_order_message", { order_id: "ord_nope", subject: "A", message: "B" })],

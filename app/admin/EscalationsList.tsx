@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EVT_ESCALATIONS } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // "Handed to the team": customer requests the assistant passed on.
 // Staff can read the chat, reply by email, and mark each one resolved.
@@ -175,7 +176,7 @@ export default function EscalationsList({ initial }: { initial: EscalationItem[]
                 </header>
 
                 <p className="esc-summary">{e.summary}</p>
-                {!e.emailed && <div className="esc-warn">⚠ The alert email to your inbox didn’t send — this page is the only copy.</div>}
+                {!e.emailed && <div className="esc-warn"><Glyph name="alert" /> The alert email to your inbox didn’t send — this page is the only copy.</div>}
 
                 {e.transcript.length > 0 && (
                   <>

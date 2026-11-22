@@ -54,7 +54,7 @@ export async function getStoreSession(): Promise<{ account: RetailAccount; login
   const token = cookies().get(STORE_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET());
+    const { payload } = await jwtVerify(token, SECRET(), { algorithms: ["HS256"] });
     if (payload.role !== "store" || typeof payload.loginId !== "string") return null;
     const hit = await findLoginById(payload.loginId);
     if (!hit || hit.account.id !== payload.accountId || !canSignIn(hit)) return null;

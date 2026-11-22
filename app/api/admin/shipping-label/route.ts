@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { isAdmin, adminActor } from "@/lib/auth";
 import { getUsers } from "@/lib/users";
-import { audited } from "@/lib/audit";
+import { audited, auditDetail } from "@/lib/audit";
 import { labelsForMember, recordOneOffLabel } from "@/lib/oneOffLabels";
+import { labelLogFields } from "@/lib/labelLog";
 
 // Map service tokens to partial name matches for validation
 const serviceNameMap: Record<string, string> = {
@@ -216,6 +217,9 @@ async function POST_handler(req: Request) {
       transactionId: transaction.object_id,
       createdBy: await adminActor(),
     });
+
+    // Put the shipping numbers in the Activity log entry too.
+    auditDetail({ after: { ...body, ...labelLogFields(selectedRate, transaction, service) } });
 
     return NextResponse.json({
       labelUrl: transaction.label_url,

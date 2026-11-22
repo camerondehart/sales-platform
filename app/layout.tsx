@@ -6,6 +6,7 @@ import Tracker from "./components/Tracker";
 import SiteFooter from "./SiteFooter";
 import { getBanner } from "@/lib/banner";
 import { brand } from "@/lib/brand";
+import { safeBannerHtml, safeHref } from "@/lib/safeHtml";
 import { currentSiteSeason } from "@/lib/entrance";
 import { SITE_LOOKS, siteLookVars } from "@/lib/seasonLooks";
 import { cookies } from "next/headers";
@@ -76,7 +77,7 @@ export default async function RootLayout({
         )}
       </head>
       <body data-season={season || undefined} style={seasonVars || undefined}>
-        <SiteBanner initial={banner} />
+        <SiteBanner initial={{ ...banner, message: safeBannerHtml(banner.message), linkUrl: (banner.linkUrl && safeHref(banner.linkUrl)) || undefined }} />
         {children}
         {/* After the page so it drifts over the valley but behind the content (z-index 1). */}
         {season && SITE_LOOKS[season]?.drift && <SeasonDrift {...SITE_LOOKS[season]!.drift!} />}

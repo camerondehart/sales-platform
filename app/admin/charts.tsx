@@ -81,17 +81,24 @@ export function smoothPath(pts: Array<[number, number]>): string {
   return d;
 }
 
-function pathFor(values: number[], w: number, h: number, max: number, pad = 2) {
+function pathFor(values: number[], w: number, h: number, max: number, pad = 2, min = 0) {
   if (values.length === 0) return "";
   const step = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
-  return smoothPath(values.map((v, i) => [pad + i * step, h - pad - (max > 0 ? (v / max) * (h - pad * 2) : 0)]));
+  const span = max - min;
+  return smoothPath(values.map((v, i) => [pad + i * step, h - pad - (span > 0 ? ((v - min) / span) * (h - pad * 2) : 0)]));
 }
 
-export function Sparkline({ values, color = "#85ba45", height = 34 }: { values: number[]; color?: string; height?: number }) {
+/**
+ * `fit` scales the line between the lowest and highest value instead of from 0,
+ * so running totals (2,280 members) show their growth instead of a flat line.
+ */
+export function Sparkline({ values, color = "#85ba45", height = 34, fit = false }: { values: number[]; color?: string; height?: number; fit?: boolean }) {
   const id = useId().replace(/:/g, "");
   const w = 120;
   const max = Math.max(...values, 0);
-  const line = pathFor(values, w, height, max);
+  const lo = fit && values.length ? Math.min(...values) : 0;
+  // A total that didn't move sits in the middle rather than on the floor.
+  const line = fit && lo === max && max > 0 ? `M2,${height / 2} L${w - 2},${height / 2}` : pathFor(values, w, height, max, 2, lo);
   if (!line || max === 0) return <svg className="spark" viewBox={`0 0 ${w} ${height}`} aria-hidden="true"><line x1="0" y1={height - 2} x2={w} y2={height - 2} stroke="currentColor" strokeOpacity="0.15" /></svg>;
   return (
     <svg className="spark" viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" aria-hidden="true">

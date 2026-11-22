@@ -10,9 +10,16 @@ import EscalationsList, { type EscalationItem } from "./EscalationsList";
 import ConversationsPanel from "./ConversationsPanel";
 import SourcesPanel from "./SourcesPanel";
 import { brand } from "@/lib/brand";
+import VoiceSettings from "./VoiceSettings";
+import SectionNav, { useSection } from "./SectionNav";
+import { EVT_ESCALATIONS } from "@/lib/assistant/shared";
 
 // Admin → Assistant tab: switch it on/off per audience, pick the model,
 // set the monthly ceiling, teach it about the business, and see usage.
+// Split into sections (cards at the top); one shows at a time.
+
+const SECTIONS = ["usage", "handed", "chats", "model", "knowledge", "notes"] as const;
+type Section = (typeof SECTIONS)[number];
 
 type Config = {
   enabledPublic: boolean;
@@ -126,6 +133,17 @@ export default function AssistantPanel() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [testing, setTesting] = useState(false);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
+  const [section, setSection] = useSection<Section>("fp_assistant_section", SECTIONS, "usage");
+  // Closing a request in Handed to the team updates the card's count straight away.
+  const [openLive, setOpenLive] = useState<number | null>(null);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const n = (e as CustomEvent<number>).detail;
+      if (typeof n === "number") setOpenLive(n);
+    };
+    window.addEventListener(EVT_ESCALATIONS, on);
+    return () => window.removeEventListener(EVT_ESCALATIONS, on);
+  }, []);
 
   async function load() {
     setLoadError("");
@@ -134,6 +152,7 @@ export default function AssistantPanel() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = (await res.json()) as Overview;
       setData(d);
+      setOpenLive(null);
       setDraft((cur) => cur ?? d.config);
     } catch (err) {
       setLoadError("Couldn't load the assistant settings. Refresh to try again.");
@@ -226,10 +245,51 @@ export default function AssistantPanel() {
 
   const RECOMMENDED = recommendedFrom(models);
 
+  // Unsaved edits, per settings section (one Save button saves both).
+  const changed = (keys: Array<keyof Config>) => keys.some((k) => JSON.stringify(data.config[k]) !== JSON.stringify(draft[k]));
+  const dirtyModel = changed(["enabledPublic", "enabledMembers", "enabledStaff", "model", "fallbackModel", "monthlyCapUsd"]);
+  const dirtyKnow = changed(["assistantName", "persona", "knowledge", "escalationEmail"]);
+  const openCount = openLive ?? data.escalationsOpen;
+  const onFor = ([["enabledPublic", "Visitors"], ["enabledMembers", "Members"], ["enabledStaff", "Staff"]] as const).filter(([k]) => data.config[k]).map(([, l]) => l);
+  const modelName = (id: string) => priceOf(id)?.name || id.split("/").pop() || id;
+  const unsaved = <span className="secnav-dirty">Unsaved changes</span>;
+
+  const saveBar = (
+    <div className="full" style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+      <button type="button" className="submit" onClick={save} disabled={saving || !dirty} style={{ width: "auto", padding: "0.7rem 1.4rem" }}>
+        {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
+      </button>
+      {dirty && !saving && (
+        <button type="button" className="ap-linkbtn" onClick={() => setDraft(data.config)}>Discard changes</button>
+      )}
+      {!saving && (section === "model" ? dirtyKnow : dirtyModel) && (
+        <span className="field-hint" style={{ margin: 0 }}>
+          This also saves your unsaved changes under {section === "model" ? "Tone & knowledge" : "Model & access"}.
+        </span>
+      )}
+      {msg && <span className={msg.ok ? "ap-ok" : "ap-bad"}>{msg.text}</span>}
+    </div>
+  );
+
   return (
     <>
+      <SectionNav
+        label="Assistant sections"
+        value={section}
+        onChange={setSection}
+        items={[
+          { key: "usage", icon: "chart", label: "Usage & spend", alert: !data.keyConfigured, status: !data.keyConfigured ? "Not connected yet" : cap > 0 ? `${usd(spent)} of ${usd(cap)} this month` : `${usd(spent)} this month` },
+          { key: "handed", icon: "hand", label: "Handed to the team", badge: openCount, alert: openCount > 0, status: openCount > 0 ? `${openCount} waiting for a reply` : `${num(data.escalationsThisMonth)} this month, none waiting` },
+          { key: "chats", icon: "chat", label: "Conversations", status: "Every chat, last 30 days" },
+          { key: "model", icon: "settings", label: "Model & access", status: dirtyModel ? unsaved : onFor.length ? `${modelName(data.config.model)} · on for ${onFor.join(", ")}` : "Off for everyone" },
+          { key: "knowledge", icon: "book", label: "Tone & knowledge", status: dirtyKnow ? unsaved : `${draft.knowledge.length.toLocaleString()} characters of notes` },
+          { key: "notes", icon: "pencil", label: "Concierge notes", status: "What it has learned" },
+        ]}
+      />
+
       {/* ---------------- status + usage ---------------- */}
-      <section className="admin-section">
+      {section === "usage" && (
+      <section className="admin-section secnav-pane">
         <h2>AI assistant</h2>
         {!data.keyConfigured ? (
           <div className="notice ap-warn">
@@ -266,10 +326,10 @@ export default function AssistantPanel() {
             <div className="ap-kpi-value">{num(data.escalationsThisMonth)}</div>
             <div className="ap-kpi-sub">
               this month
-              {data.escalationsOpen > 0 && (
+              {openCount > 0 && (
                 <>
                   {" · "}
-                  <a href="#handed-to-team" className="ap-kpi-link">{data.escalationsOpen} waiting for a reply</a>
+                  <button type="button" className="ap-kpi-link ap-linkbtn" onClick={() => setSection("handed")}>{openCount} waiting for a reply</button>
                 </>
               )}
             </div>
@@ -299,10 +359,14 @@ export default function AssistantPanel() {
           few messages. Your AI Gateway balance in Vercel is the exact bill.
         </p>
       </section>
+      )}
 
-      {/* ---------------- settings ---------------- */}
-      <section className="admin-section">
-        <h2>Settings</h2>
+      {/* ---------------- model & access ---------------- */}
+      {section === "model" && (
+      <>
+      <section className="admin-section secnav-pane">
+        <h2>Model &amp; access</h2>
+        <div className="field-hint" style={{ marginTop: "-0.6rem", marginBottom: "0.8rem" }}>Who sees the chat bubble</div>
 
         <div className="ap-toggles">
           {([
@@ -362,7 +426,7 @@ export default function AssistantPanel() {
             <div className="field-hint">
               Answers only when the main model fails. Pick one from a different family (e.g. a Sonnet behind an Opus) so one
               outage doesn’t take out both.
-              {draft.fallbackModel && draft.fallbackModel === draft.model ? " ⚠ This is the same as the main model, so it can’t help." : ""}
+              {draft.fallbackModel && draft.fallbackModel === draft.model ? " ⚠\uFE0E This is the same as the main model, so it can’t help." : ""}
             </div>
           </div>
 
@@ -377,6 +441,19 @@ export default function AssistantPanel() {
             />
             <div className="field-hint">At the limit the chat goes offline until the 1st and you get an email. 0 = no limit.</div>
           </div>
+
+          {saveBar}
+        </div>
+      </section>
+      <VoiceSettings />
+      </>
+      )}
+
+      {/* ---------------- tone & knowledge ---------------- */}
+      {section === "knowledge" && (
+      <section className="admin-section secnav-pane">
+        <h2>Tone &amp; knowledge</h2>
+        <div className="admin-form">
 
           <div className="field">
             <label>Assistant name</label>
@@ -421,26 +498,19 @@ We don't ship outside the US.`}
 
           <SourcesPanel />
 
-          <div className="full" style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-            <button type="button" className="submit" onClick={save} disabled={saving || !dirty} style={{ width: "auto", padding: "0.7rem 1.4rem" }}>
-              {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
-            </button>
-            {dirty && !saving && (
-              <button type="button" className="ap-linkbtn" onClick={() => setDraft(data.config)}>Discard changes</button>
-            )}
-            {msg && <span className={msg.ok ? "ap-ok" : "ap-bad"}>{msg.text}</span>}
-          </div>
+          {saveBar}
         </div>
       </section>
+      )}
 
       {/* ---------------- escalations ---------------- */}
-      <EscalationsList initial={data.escalations} />
+      {section === "handed" && <EscalationsList initial={data.escalations} />}
 
       {/* ---------------- conversations ---------------- */}
-      <ConversationsPanel />
+      {section === "chats" && <ConversationsPanel />}
 
       {/* ---------------- what the Concierge has learned ---------------- */}
-      <ConciergeNotes />
+      {section === "notes" && <ConciergeNotes />}
     </>
   );
 }

@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Dashboard } from "@/lib/dashboard";
+import LoginMap from "./LoginMap";
 import { AreaChart, BarList, CountUp, Donut, Funnel, Heatmap, Sparkline, money, num } from "./charts";
 import { brand } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // Admin → Analytics. Sales from real orders; visitors from the cookie-free
 // counters (lib/traffic.ts). Everything is computed server-side in
@@ -167,7 +169,7 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
         <div className="an-highlights">
           {data.highlights.map((h, i) => (
             <div key={i} className={`an-hl ${h.tone}`} style={{ animationDelay: `${i * 70}ms` }}>
-              <span className="an-hl-icon" aria-hidden="true">{h.tone === "good" ? "↗" : h.tone === "watch" ? "!" : "✦"}</span>
+              <span className="an-hl-icon" aria-hidden="true">{h.tone === "good" ? "↗\uFE0E" : h.tone === "watch" ? "!" : "✦"}</span>
               {h.text}
             </div>
           ))}
@@ -282,6 +284,9 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
         )}
       </div>
 
+      {/* ------------------------------------------------ sign-in map (switch login_map) */}
+      <LoginMap days={data.range.days} rangeLabel={rangeLabel} />
+
       {/* ------------------------------------------------ audience */}
       <div className="an-row three">
         <div className="an-card">
@@ -351,12 +356,12 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
             <div>
               <span className="an-muted">Members</span>
               <strong><CountUp value={data.customers.members} /></strong>
-              <Sparkline values={data.customers.memberTotals} color="#8a6fb8" height={40} />
+              <Sparkline values={data.customers.memberTotals} color="#8a6fb8" height={40} fit />
             </div>
             <div>
               <span className="an-muted">Mailing list</span>
               <strong><CountUp value={data.customers.subscribers} /></strong>
-              <Sparkline values={data.customers.subscriberTotals} color="#d08b3a" height={40} />
+              <Sparkline values={data.customers.subscriberTotals} color="#d08b3a" height={40} fit />
             </div>
           </div>
         </div>
@@ -366,7 +371,7 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
             <div className="an-empty">Campaign visits and sales show here once a campaign goes out.</div>
           ) : (
             <BarList
-              rows={data.sources.campaigns.map((c) => ({ label: c.id, value: c.visits, sub: `${c.orders} order${c.orders === 1 ? "" : "s"} · ${money(c.revenue)} in sales` }))}
+              rows={data.sources.campaigns.map((c) => ({ label: c.name || c.id, value: c.visits, sub: `${c.orders} order${c.orders === 1 ? "" : "s"} · ${money(c.revenue)} in sales` }))}
               format={(n) => `${num(n)} visits`}
             />
           )}
@@ -393,7 +398,7 @@ export default function AnalyticsDashboard({ initialData }: { initialData?: Dash
           )}
           {k.assistantChats.seriousFlags > 0 && (
             <div className="an-foot" style={{ color: "#9b2f1d" }}>
-              ⚠ {k.assistantChats.seriousFlags} chat{k.assistantChats.seriousFlags === 1 ? "" : "s"} flagged as serious — see Assistant → Conversations.
+              <Glyph name="alert" /> {k.assistantChats.seriousFlags} chat{k.assistantChats.seriousFlags === 1 ? "" : "s"} flagged as serious — see Assistant → Conversations.
             </div>
           )}
           {data.events.upcoming.map((e) => (

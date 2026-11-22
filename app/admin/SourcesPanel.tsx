@@ -82,7 +82,7 @@ export default function SourcesPanel() {
                 <strong>{r.title}</strong>
                 <a href={r.url} target="_blank" rel="noreferrer">{r.url}</a>
                 <span className="src-meta">
-                  {r.ok ? `${r.chars.toLocaleString()} characters · refreshed ${ago(r.fetchedAt)}` : `⚠ ${r.error || "Couldn't read it"} · last try ${ago(r.fetchedAt)}`}
+                  {r.ok ? `${r.chars.toLocaleString()} characters · refreshed ${ago(r.fetchedAt)}` : `⚠\uFE0E ${r.error || "Couldn't read it"} · last try ${ago(r.fetchedAt)}`}
                 </span>
               </div>
               <button type="button" className="ap-linkbtn esc-quiet" disabled={busy} onClick={() => post({ action: "remove", id: r.id }, () => "Removed.")}>Remove</button>

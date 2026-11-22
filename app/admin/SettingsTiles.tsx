@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Glyph, { type GlyphName } from "./Glyph";
 
 // Settings → compact tiles. Each setting is a small card; clicking one grows it
 // into a full-width panel in place (the other tiles flow around it), and ✕
@@ -8,7 +9,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export type SettingsTile = {
   key: string;
-  icon: string;
+  icon: GlyphName;
   title: string;
   summary: string;
   /** Small count shown on the tile, e.g. expired orders. */
@@ -67,7 +68,7 @@ export default function SettingsTiles({ tiles }: { tiles: SettingsTile[] }) {
           </div>
         ) : (
           <button key={t.key} type="button" className="settings-tile" onClick={() => show(t.key)} aria-expanded={false}>
-            <span className="settings-tile-icon" aria-hidden="true">{t.icon}</span>
+            <span className="settings-tile-icon" aria-hidden="true"><Glyph name={t.icon} /></span>
             <span className="settings-tile-text">
               <strong>
                 {t.title}
@@ -75,7 +76,7 @@ export default function SettingsTiles({ tiles }: { tiles: SettingsTile[] }) {
               </strong>
               <small>{t.summary}</small>
             </span>
-            <span className="settings-tile-go" aria-hidden="true">Open ↗</span>
+            <span className="settings-tile-go" aria-hidden="true">Open <Glyph name="external" /></span>
           </button>
         )
       )}

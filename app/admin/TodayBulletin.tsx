@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { EVT_ASK, type AdminRefreshKey } from "@/lib/assistant/shared";
 import { pacificDay } from "@/lib/periods";
 import { useAdminRefresh } from "./useAdminRefresh";
 import { brand } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // Overview → "Today": a stand-in site manager. The day's to-do list plus
 // proactive suggestions, refreshed on its own. Each button asks the staff
@@ -44,16 +45,28 @@ const GROUPS: Array<[Priority, string]> = [
   ["idea", "Ideas to grow"],
 ];
 const POLL_MS = 3 * 60_000;
+// The last list this browser saw today, shown at once on arrival so the
+// panel and its welcome don't wait on the server; the fresh list replaces
+// it in place a moment later (marked "updating…" until then).
+const CACHE_KEY = "fp_today_last";
+// Before the first paint in the browser (plain effect on the server, where it never runs).
+const useBeforePaint = typeof window === "undefined" ? useEffect : useLayoutEffect;
+// When the folded chips start dropping in, counted from the panel's arrival.
+const CHIPS_AT_MS = 800;
 
 function greeting(): string {
   const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: brand.timezone, hourCycle: "h23", hour: "2-digit" }).format(new Date())) % 24;
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderFilter?: string) => void }) {
+export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderFilter?: string, key?: string) => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Showing this browser's last copy while the fresh list loads.
+  const [stale, setStale] = useState(false);
+  const arrivedAt = useRef(0);
+  const chipsDelay = useRef<number | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
@@ -75,6 +88,10 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !Array.isArray(d.tasks)) throw new Error(d.error || "Couldn't load today's list.");
       setData(d);
+      setStale(false);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ day: pacificDay(), data: d }));
+      } catch {}
       // Ticks are shared (saved on the server), so every device sees the same.
       if (Array.isArray(d.done)) setDone(new Set(d.done));
       setError("");
@@ -82,6 +99,19 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
       setError(err instanceof Error ? err.message : "Couldn't load today's list.");
     }
     setLoading(false);
+  }, []);
+
+  // Show today's last copy straight away (same Pacific day only), then load fresh below.
+  useBeforePaint(() => {
+    arrivedAt.current = Date.now();
+    try {
+      const c = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+      if (c && c.day === pacificDay() && c.data && Array.isArray(c.data.tasks)) {
+        setData(c.data);
+        if (Array.isArray(c.data.done)) setDone(new Set(c.data.done));
+        setStale(true);
+      } else localStorage.removeItem(CACHE_KEY);
+    } catch {}
   }, []);
 
   // First load, then every few minutes while this tab is visible, and on return to it.
@@ -106,7 +136,7 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
   );
 
   // Ticks are saved on the server (shared, reset each local day); open/closed stays per device.
-  useEffect(() => {
+  useBeforePaint(() => {
     try {
       setCollapsed(localStorage.getItem("fp_today_collapsed") === "1");
       setGroupOpen(JSON.parse(localStorage.getItem("fp_today_groups2") || "{}"));
@@ -114,7 +144,7 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
   }, [storeKey]);
 
   // The welcome: just signed in, or first look today on this browser.
-  useEffect(() => {
+  useBeforePaint(() => {
     setHello(greeting());
     try {
       const justIn = sessionStorage.getItem("fp_just_signed_in") === "1";
@@ -231,9 +261,16 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
     });
   };
 
+  // If the list arrives after the welcome has started, the chips come in right away
+  // rather than waiting their full turn. Worked out once, so later refreshes never shift it.
+  const chipsStart = () => {
+    if (chipsDelay.current === null) chipsDelay.current = Math.max(0, CHIPS_AT_MS - (Date.now() - arrivedAt.current));
+    return chipsDelay.current;
+  };
+
   const act = (t: Task) => {
     if (t.ask) window.dispatchEvent(new CustomEvent(EVT_ASK, { detail: { question: t.ask } }));
-    else onOpen(t.tab, t.orderFilter);
+    else onOpen(t.tab, t.orderFilter, t.id);
   };
 
   return (
@@ -256,7 +293,7 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
               <div className="tb-hello" aria-label={hello}>
                 {typed === null ? (
                   <>
-                    {hello} <span className="tb-leaf" aria-hidden="true">🌿</span>
+                    {hello} <span className="tb-leaf" aria-hidden="true"><Glyph name="leaf" /></span>
                   </>
                 ) : (
                   <span aria-hidden="true">
@@ -281,7 +318,9 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
                 ) : (
                   <>
                     {urgent > 0 ? <strong className="tb-urgent">{urgent} to do now</strong> : "Nothing urgent"} · {tasks.length} item{tasks.length === 1 ? "" : "s"}
-                    {data.asOf ? <span className="tb-asof"> · as of {data.asOf}</span> : ""}
+                    {/* While this browser's last copy shows, the time breathes softly (and ↻ spins) until the fresh list lands; no extra text, so nothing shifts. */}
+                    {data.asOf ? <span className={`tb-asof${stale && !error ? " tb-updating" : ""}`} title={stale && !error ? "Updating…" : undefined}> · as of {data.asOf}</span> : ""}
+                    {stale && error && <span className="tb-asof"> · couldn&apos;t refresh, tap ↻</span>}
                   </>
                 )
               ) : error ? (
@@ -314,7 +353,7 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
 
       {/* Folded: one tappable chip per group. */}
       {collapsed && tasks.length > 0 && (
-        <div className="tb-chips">
+        <div className="tb-chips" style={{ ["--c0" as string]: `${chipsStart()}ms` }}>
           {GROUPS.filter(([p]) => tasks.some((t) => t.priority === p)).map(([p, label], gi) => {
             const left = tasks.filter((t) => t.priority === p && !done.has(t.id)).length;
             // Uneven gaps between chips, like a hand setting them down (ms after the first).

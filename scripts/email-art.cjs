@@ -5,6 +5,8 @@
 //   lib/emailArtData.ts                   (the same files as base64, so the
 //                                          server can copy them to Blob)
 // Run (needs Playwright's Chromium): node scripts/email-art.cjs
+// Redraw only some themes (the rest stay byte-for-byte as they are):
+//   node scripts/email-art.cjs blackfriday
 const fs = require("fs");
 const path = require("path");
 
@@ -63,6 +65,35 @@ const wheat = (x, base, h, c) => {
 const confetti = (x, y, r, c) => `<rect x="${x}" y="${y}" width="10" height="5" rx="1.5" fill="${c}" transform="rotate(${r} ${x} ${y})"/>`;
 const tag = (x, y, s, r, c) =>
   `<g transform="translate(${x} ${y}) rotate(${r}) scale(${s})"><path d="M-30,-16 L18,-16 L34,0 L18,16 L-30,16 Z" fill="${c}"/><circle cx="20" cy="0" r="4" fill="#1b1b22"/><text x="-14" y="6" font-family="Arial Black,Arial" font-weight="900" font-size="15" fill="#1b1b22">%</text></g>`;
+
+// A cute toadstool: cream stem (with a little face), spotted cap, and an
+// optional sale tag hanging from the cap on a string. (x, base) is where it
+// stands; at scale 1 it is about 120 tall.
+const shroom = (x, base, s, cap, o = {}) => {
+  const spot = o.spot || "#fff6e6";
+  let g = `<g transform="translate(${x} ${base}) rotate(${o.r || 0}) scale(${s})">`;
+  g += `<ellipse cx="0" cy="2" rx="40" ry="7" fill="rgba(0,0,0,0.3)"/>`;
+  g += `<path d="M-19,0 C-24,-24 -17,-46 -15,-60 L15,-60 C17,-46 24,-24 19,0 C8,4 -8,4 -19,0 Z" fill="#f6ead2"/>`;
+  g += `<path d="M5,-60 C10,-42 15,-20 19,0 C15,2 12,2 10,2 C8,-20 6,-42 1,-60 Z" fill="rgba(150,110,70,0.16)"/>`;
+  if (o.face) {
+    g += `<ellipse cx="-12" cy="-24" rx="5" ry="3" fill="#f39aa6" opacity="0.75"/><ellipse cx="12" cy="-24" rx="5" ry="3" fill="#f39aa6" opacity="0.75"/>`;
+    g += `<ellipse cx="-7" cy="-31" rx="3" ry="3.6" fill="#2a1d1a"/><ellipse cx="7" cy="-31" rx="3" ry="3.6" fill="#2a1d1a"/>`;
+    g += `<circle cx="-6" cy="-32.4" r="1.1" fill="#fff"/><circle cx="8" cy="-32.4" r="1.1" fill="#fff"/>`;
+    g += `<path d="M-4.5,-24.5 Q0,-19.5 4.5,-24.5" stroke="#2a1d1a" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+  }
+  g += `<ellipse cx="0" cy="-59" rx="46" ry="9" fill="#e9d6b4"/>`;
+  g += `<path d="M-58,-57 C-60,-100 -26,-122 0,-122 C26,-122 60,-100 58,-57 C38,-50 -38,-50 -58,-57 Z" fill="${cap}"/>`;
+  g += `<path d="M-58,-57 C-38,-50 38,-50 58,-57 C56,-64 54,-68 52,-70 C30,-62 -30,-62 -52,-70 C-54,-68 -56,-64 -58,-57 Z" fill="rgba(0,0,0,0.12)"/>`;
+  g += `<path d="M-40,-86 C-33,-104 -17,-113 -4,-114" stroke="rgba(255,255,255,0.4)" stroke-width="6" stroke-linecap="round" fill="none"/>`;
+  for (const [sx, sy, sr] of [[-26, -82, 8], [6, -102, 9], [32, -80, 7], [-6, -72, 5], [44, -66, 4], [-46, -66, 4]]) g += `<ellipse cx="${sx}" cy="${sy}" rx="${sr}" ry="${sr * 0.85}" fill="${spot}"/>`;
+  if (o.tag) {
+    g += `<path d="M46,-58 C50,-54 53,-50 54,-44" stroke="#e8dcc0" stroke-width="1.8" fill="none"/>`;
+    g += `<g transform="translate(54 -44) rotate(-6)"><path d="M-12,4 L-12,30 C-12,34 -9,36 -6,36 L6,36 C9,36 12,34 12,30 L12,4 L0,-6 Z" fill="${o.tag}"/><circle cx="0" cy="2" r="2.6" fill="#2a1d1a"/><text x="0" y="27" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="14" fill="#2a1d1a">%</text></g>`;
+  }
+  return g + "</g>";
+};
+const grass = (x, base, s, c) =>
+  `<g transform="translate(${x} ${base}) scale(${s})"><path d="M-6,0 C-8,-8 -10,-12 -14,-16 C-8,-14 -4,-8 -2,0 Z M-2,0 C-2,-10 0,-16 2,-22 C4,-14 4,-8 3,0 Z M2,0 C6,-8 10,-12 15,-14 C10,-10 8,-6 7,0 Z" fill="${c}"/></g>`;
 
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -225,15 +256,34 @@ const THEMES = {
     divider: () => `<circle cx="600" cy="28" r="12" fill="#ffd24d"/>` + [-1, 1].map((d) => `<path d="M${600 + d * 30},28 L${600 + d * 60},28" stroke="#5fb3d9" stroke-width="4" stroke-linecap="round"/>`).join(""),
   },
   blackfriday: {
-    sky: ["#16161d", "#2a2a36"],
+    sky: ["#17152b", "#2f2a4d"],
     draw: (R) => {
       let g = "";
-      const cols = ["#f4cf6a", "#ffffff", "#85ba45"];
-      for (let i = 0; i < 30; i++) g += star(R() * W, R() * H, 0.4 + R() * 1, cols[i % 3]);
-      g += tag(260, 160, 2.2, -14, "#f4cf6a") + tag(940, 150, 2, 12, "#85ba45") + tag(600, 230, 1.4, -4, "#ffffff");
+      // Starry night with a soft crescent moon
+      for (let i = 0; i < 46; i++) g += `<circle cx="${R() * W}" cy="${R() * 230}" r="${0.8 + R() * 1.8}" fill="#fff6d6" opacity="${0.35 + R() * 0.6}"/>`;
+      g += `<mask id="moon"><rect width="${W}" height="${H}" fill="#fff"/><circle cx="1058" cy="66" r="36" fill="#000"/></mask><circle cx="1040" cy="78" r="40" fill="#f7e6ad" mask="url(#moon)"/>`;
+      const spark = ["#f4cf6a", "#ffffff", "#b9e38a"];
+      for (let i = 0; i < 14; i++) g += star(60 + R() * 1080, 24 + R() * 150, 0.45 + R() * 0.7, spark[i % 3]);
+      // Mossy ground
+      g += `<path d="M0,${H - 70} C180,${H - 96} 360,${H - 58} 600,${H - 76} C820,${H - 94} 1000,${H - 60} 1200,${H - 82} L1200,${H} L0,${H} Z" fill="#2c4a33"/>`;
+      g += `<path d="M0,${H - 40} C220,${H - 58} 420,${H - 26} 640,${H - 44} C860,${H - 60} 1040,${H - 30} 1200,${H - 46} L1200,${H} L0,${H} Z" fill="#3b6540"/>`;
+      for (let i = 0; i < 34; i++) g += grass(R() * W, H - 34 + R() * 24, 0.7 + R() * 0.6, i % 2 ? "#4f8a4c" : "#5f9e52");
+      // Tiny background mushrooms
+      for (const [x, s, c] of [[90, 0.32, "#d9a6e8"], [330, 0.28, "#f4cf6a"], [655, 0.3, "#e5584d"], [890, 0.3, "#d9a6e8"], [1150, 0.34, "#f4cf6a"]]) g += shroom(x, H - 58, s, c);
+      // Glowing fireflies
+      for (let i = 0; i < 18; i++) {
+        const x = 40 + R() * 1120, y = 120 + R() * 170;
+        g += `<circle cx="${x}" cy="${y}" r="7" fill="#f6e58a" opacity="0.18"/><circle cx="${x}" cy="${y}" r="2.4" fill="#fff4b8"/>`;
+      }
+      // The cute crew, each with a sale tag
+      g += shroom(200, H - 22, 0.95, "#b98be3", { face: true, r: -4, tag: "#f4cf6a" });
+      g += shroom(430, H - 14, 1.45, "#e5584d", { face: true, tag: "#f4cf6a" });
+      g += shroom(590, H - 24, 0.7, "#f2a0b6", { face: true, r: 6 });
+      g += shroom(770, H - 18, 1.15, "#f4cf6a", { face: true, r: 3, tag: "#ffffff", spot: "#fff9ea" });
+      g += shroom(1010, H - 20, 0.9, "#e5584d", { face: true, r: 5, tag: "#b9e38a" });
       return g;
     },
-    divider: () => tag(600, 28, 0.6, 0, "#f4cf6a"),
+    divider: () => star(556, 26, 0.55, "#f4cf6a") + shroom(600, 52, 0.36, "#e5584d", { face: true }) + star(644, 26, 0.55, "#f4cf6a"),
   },
 };
 
@@ -253,8 +303,14 @@ function dividerSvg(key) {
   fs.mkdirSync(OUT, { recursive: true });
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: W, height: H } });
-  const data = {};
-  for (const key of Object.keys(THEMES)) {
+  const only = process.argv.slice(2);
+  for (const k of only) if (!THEMES[k]) throw new Error(`Unknown theme: ${k}`);
+  let data = {};
+  if (only.length) {
+    const cur = fs.readFileSync(path.join(ROOT, "lib", "emailArtData.ts"), "utf8");
+    data = JSON.parse(cur.slice(cur.indexOf("= {") + 2, cur.lastIndexOf("}") + 1));
+  }
+  for (const key of only.length ? only : Object.keys(THEMES)) {
     await p.setViewportSize({ width: W, height: H });
     await p.setContent(`<html><body style="margin:0">${headerSvg(key)}</body></html>`);
     const hdr = await p.screenshot({ type: "jpeg", quality: 82, clip: { x: 0, y: 0, width: W, height: H } });

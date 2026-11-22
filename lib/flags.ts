@@ -50,6 +50,7 @@ export const FLAG_KEYS = [
   "local_events_note",
   "gift_cards",
   "ambassador_panel",
+  "login_map",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -242,6 +243,12 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
   ambassador_panel: {
     label: "Ambassador panel",
     description: "Ambassadors sign in with the member email linked to them in the Ambassadors tab (Edit → Panel sign-in) and land on their own panel at /ambassador: their link and QR code, their code, their terms, visits, product views, membership requests, orders, sales and commission over a date range with a chart, their recent orders (order number, date, products and amounts, never who bought) and their payouts. They can choose and reorder the products on their page; everything else stays staff-only. They can still shop as members. Off = sign-in goes to the shop as usual and /ambassador is closed (links stay saved).",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  login_map: {
+    label: "Sign-in map",
+    description: "Analytics → Where people sign in: a map and town list of where member, staff and store sign-ins come from (staff only under Staff, never in Everyone), for the period picked at the top. Each sign-in notes only the rough town worked out from the internet address (city-level, from Vercel), saved as daily totals per town (kept about 13 months). The internet address and who signed in are never saved with it. Off = nothing is noted and the map is hidden.",
     defaults: { production: false, preview: true, development: true },
     built: true,
   },

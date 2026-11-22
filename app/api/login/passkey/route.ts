@@ -7,6 +7,7 @@ import { findAdmin } from "@/lib/admins";
 import { auditSystem } from "@/lib/audit";
 import { checkSharedLimit, recordSharedFailure } from "@/lib/rateLimit";
 import { CHALLENGE_COOKIE, getPasskeys, packChallenge, relyingParty, touchPasskey, unpackChallenge } from "@/lib/passkeys";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 12,
     });
+    await recordSignInPlace(req, "staff");
     await auditSystem({ action: "admin.signin", actor: admin.email, actorType: "admin", source: "human", targetType: "admin", targetId: admin.email, ok: true, note: `Signed in with Face ID / passkey (${pk.device})`, ...meta });
     return NextResponse.json({ ok: true });
   }

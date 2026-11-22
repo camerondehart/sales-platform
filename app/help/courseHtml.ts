@@ -859,6 +859,7 @@ Deleting an event throws away everyone who signed up. If a date moves or a price
 <h2 class="sec">Marketing</h2>
 <span class="where">Dashboard → Marketing</span>
 <p class="lede">Discount codes, mix &amp; match bundles, the site banner, and email campaigns.</p>
+<p>The tab opens with a row of cards: <strong>Write a campaign</strong>, <strong>Sent &amp; scheduled</strong>, <strong>Discount codes</strong>, <strong>Bundles</strong>, <strong>Site banner</strong> and <strong>Subscribers &amp; QR</strong>. Each card shows a quick status (live codes, whether the banner is showing, how many subscribers). Tap one to open it; the dashboard remembers the last one you used on this device.</p>
 
 <h3>Mix &amp; match bundles</h3>
 <p>A set discount: buy every product in the set, save automatically. For example Sacred Immunity + Revive + Thrive + Harmony capsules, 20% off.</p>
@@ -996,7 +997,7 @@ There is no recall. Send the test, read it properly, check every link, then send
 <h3>Collecting sign-ups at an event</h3>
 <p class="lede">A QR code people scan at your table. They type a name and email, and they are on the mailing list. That is all it does: no account, no password, nothing for you to approve.</p>
 <ol class="steps">
-<li>In the Marketing tab, find <strong>Event sign-up QR code</strong>.</li>
+<li>In the Marketing tab, open the <strong>Subscribers &amp; QR</strong> card and find <strong>Event sign-up QR code</strong>.</li>
 <li>Type the event name if you want one, for example <em>Farmers Market, Sept 2026</em>. This is optional, but it means you can see later who signed up at which event.</li>
 <li>Optional: pick an <strong>Offer for this event</strong>, one of your discount codes, or tap <strong>+ Make a new code for this event</strong> to create one right there (it suggests a code like <em>FARMERS15</em>, 15% off, once per person, working for 30 days; change anything, then <strong>Create &amp; use it</strong>). Everyone new who signs up at that event gets the code in their welcome email, the sign-up page says "Join today and we'll email you 15% off your order", and the printed page mentions it too. The code's own limits still apply at checkout. If the code is switched off or expires, nobody gets it and the page stops mentioning it. <strong>Event offers</strong> underneath lists every event with an offer; <strong>Use</strong> loads it, <strong>Remove</strong> takes the offer off.</li>
 <li>Click <strong>Print</strong> for a ready-to-print page with the code, or <strong>Download SVG</strong> for a file you can put on a flyer. It prints sharp at any size.</li>
@@ -1072,7 +1073,7 @@ If you upload an old copy of your subscriber list, anyone who had opted out is l
   <li><strong>Commission %</strong>: starts at 10 unless you change it.</li>
   <li><strong>Their community&rsquo;s discount</strong> isn&rsquo;t typed in: it&rsquo;s always whatever their code gives (shown under the code, e.g. <em>20% off with TONI3</em>). To change it, <kbd>Edit</kbd> the code under Marketing → Discount codes, and their page, terms and reports follow.</li>
   <li><strong>Room to grow</strong>: optional. The higher rate (e.g. 20) and the goals that earn it; leave the rate blank if there isn&rsquo;t one. Tick <em>Goals met</em> when they get there. New orders then earn the higher rate, and earlier orders keep the rate they were placed at.</li>
-  <li><strong>Started on</strong> and <strong>trial</strong> length (e.g. 90 days; 0 = none).</li>
+  <li><strong>Started on</strong> and <strong>trial</strong> length (off by default; e.g. 90 days; 0 = none).</li>
   <li><strong>Attribution window</strong>: how many days after visiting their page an order still counts (e.g. 30). Untick <em>Repeat purchases count</em> if only each customer’s first order should.</li>
   <li><strong>Payouts</strong>: monthly, quarterly or on request.</li>
   <li><strong>Other terms &amp; notes</strong>: complimentary products sent, content permissions, exclusivity… (staff only).</li>
@@ -1277,6 +1278,7 @@ Visits are counted without cookies or storing anyone's address, and visitors who
 <h2 class="sec">The AI assistant</h2>
 <span class="where">Dashboard → Assistant, and the round button in the corner</span>
 <p class="lede">A chat helper that lives in the bottom corner of the site. Customers use it for product questions, orders and passwords. You use it inside the dashboard to look things up, draft emails and prepare changes.</p>
+<p>The Assistant tab opens with a row of cards: <strong>Usage &amp; spend</strong>, <strong>Handed to the team</strong> (with a count when someone is waiting), <strong>Conversations</strong>, <strong>Model &amp; access</strong>, <strong>Tone &amp; knowledge</strong> and <strong>Concierge notes</strong>. Tap one to open it. Settings changes in Model &amp; access and Tone &amp; knowledge are saved together with one <kbd>Save changes</kbd> button, and a card says <em>Unsaved changes</em> until you save.</p>
 
 <h3>What customers can do with it</h3>
 <ul>

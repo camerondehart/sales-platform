@@ -1,6 +1,6 @@
 # Launch hardening: Resend rejections, Shippo double-label guard, form rate
 # limits, payment token out of the export, safe storage switch, model privacy.
-import json, urllib.request, threading, base64, os, glob, time
+import json, urllib.request, urllib.parse, threading, base64, os, glob, time
 BASE="http://127.0.0.1:3470"; GW="http://127.0.0.1:4555"; D="/tmp/final/data/"
 T=json.load(open("/tmp/harness/tokens.json"))
 ADMIN=f"gallery_admin={T['admin']}"; MEMBER=f"gallery_visitor={T['member']}"
@@ -334,6 +334,32 @@ time.sleep(0.3)
 check("suspicious: switch off hides the list and notes nothing", S4.get("on") is False and s2_==200 and len(json.load(open(D+"risk-log.json")))==_n, (S4, s2_))
 req("/api/admin/flags",{"key":"suspicious_activity","on":True})
 s_,_h=None,urllib.request.urlopen(BASE+"/privacy").read().decode()
-check("privacy page says what the fraud check keeps, and for how long", "Fraud checks" in _h and "180 days" in _h and "November 18, 2026" in _h, _h[:200])
+check("privacy page says what the fraud check keeps, and for how long", "Fraud checks" in _h and "180 days" in _h and "November 22, 2026" in _h, _h[:200])
 check("privacy page says the events note uses a rough area that isn't stored", "Approximate area when you sign in" in _h and "about our events near you" in _h, _h[:200])
+check("privacy page says sign-in towns are kept as daily counts not linked to anyone", "daily count of sign-ins per town" in _h and "about 13 months" in _h, _h[:200])
+# ---------- Security pass (2026-11-22)
+_r=urllib.request.urlopen(BASE+"/"); _h=dict((k.lower(),v) for k,v in _r.headers.items())
+check("headers: other sites can't frame the site", _h.get("x-frame-options")=="SAMEORIGIN" and "frame-ancestors 'self'" in _h.get("content-security-policy",""), _h)
+check("headers: nosniff + referrer policy + permissions", _h.get("x-content-type-options")=="nosniff" and _h.get("referrer-policy")=="strict-origin-when-cross-origin" and "microphone=(self)" in _h.get("permissions-policy",""), _h)
+check("headers: no x-powered-by", "x-powered-by" not in _h, _h)
+_r=urllib.request.Request(BASE+"/api/assistant/status"); _h=dict((k.lower(),v) for k,v in urllib.request.urlopen(_r).headers.items())
+check("headers: on API answers too", _h.get("x-content-type-options")=="nosniff", _h)
+try:
+    _code=urllib.request.urlopen(BASE+"/_next/image?url="+urllib.parse.quote("https://example.com/a.jpg")+"&w=64&q=75").status
+except urllib.error.HTTPError as e: _code=e.code
+check("image optimizer refuses images from other sites", _code==400, _code)
+n=len(mailbox())
+s,r=req("/api/admin/export-email?email=attacker@evil.test", cookie=ADMIN, method="GET")
+m=mailbox()[n:]
+check("export: a clicked link (GET) can't send the export to the address in it", s==200 and m and not any("evil" in json.dumps(x["to"]) for x in m) and all(x["to"] in ("team@example.com",["team@example.com"]) for x in m), (s,[x["to"] for x in m]))
+s,r=req("/api/admin/banner", {"enabled":True,"message":'Sale <b>today</b><script>alert(1)</script><img src=x onerror="alert(2)">','linkUrl':"javascript:alert(3)","linkLabel":"Tap"})
+_page=urllib.request.urlopen(BASE+"/about").read().decode()
+check("banner: saved as typed", s==200 and "<script>" in r.get("banner",{}).get("message",""), (s,r))
+check("banner: formatting shows, scripts and handlers don't", "site-banner" in _page and "<b>today</b>" in _page and "alert(1)" not in _page and "onerror" not in _page, _page[_page.find("site-banner"):_page.find("site-banner")+400])
+check("banner: a javascript: button link isn't shown", "javascript:alert(3)" not in _page, _page[_page.find("site-banner"):_page.find("site-banner")+600])
+req("/api/admin/banner", {"enabled":False,"message":""})
+n=len(mailbox())
+_codes=[req("/api/forgot-password", {"email":"mem@example.com"}, cookie=None, ip=f"198.51.100.{i+10}")[0] for i in range(5)]
+_resets=[x for x in mailbox()[n:] if x["to"] in ("mem@example.com",["mem@example.com"])]
+check("forgot-password: same answer every time, but at most 3 resets an hour per member", _codes==[200]*5 and len(_resets)==3, (_codes, len(_resets)))
 print(f"{sum(results)}/{len(results)} passed")

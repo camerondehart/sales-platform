@@ -132,6 +132,16 @@ st={x["id"]:x["status"] for x in json.loads(tool("list_events_admin",{"event_id"
 check("cancel registration → first waitlisted moves in", s==200 and st[regs[0]["id"]]=="cancelled" and st[regs[1]["id"]]=="registered", st)
 c=card(tool("propose_registration_action",{"registration_id":regs[2]["id"],"action":"promote"})); s,o=confirm(c)
 check("promote off the waitlist", s==200, (s,o))
+# Events popup per event (Settings → Events popup)
+c=card(tool("propose_event_popup",{"event_id":ev["id"],"show":False}))
+check("event popup card: hide this event", c and c["kind"]=="event_note" and c["request"]["body"]=={"id":ev["id"],"notePopup":False} and any("never shown" in l for l in c["lines"]), c)
+s,o=confirm(c)
+check("event popup: hidden after confirm", s==200 and [e for e in J("events.json",[]) if e["id"]==ev["id"]][0].get("notePopup") is False, (s,o))
+c=card(tool("propose_event_popup",{"event_id":ev["id"],"show":True,"place":"Chico, CA","miles":40})); s,o=confirm(c)
+_e=[e for e in J("events.json",[]) if e["id"]==ev["id"]][0]
+check("event popup: shown again, own area 40 miles around Chico", s==200 and _e.get("notePopup") is not False and (_e.get("noteArea") or {}).get("miles")==40, (s,o,_e))
+_le=json.loads(tool("list_events_admin",{})["reply"].split("TOOLRESULT::",1)[1])["events"]
+check("list events shows each event's popup setting", any(x["id"]==ev["id"] and "40 miles" in x.get("popup","") for x in _le), _le)
 c=card(tool("propose_delete_event",{"event_id":ev["id"]}))
 check("delete event: warns people are signed up", c and c["danger"] and any("signed up" in l for l in c["lines"]), c)
 s,o=confirm(c)
@@ -143,6 +153,64 @@ c=card(tool("propose_discount_toggle",{"code":"teaparty","active":False})); s,o=
 check("switch a code off", s==200 and [d for d in J("discounts.json") if d["code"]=="TEAPARTY"][0]["active"] is False, (s,o))
 c=card(tool("propose_delete_discount",{"code":"TEAPARTY"})); s,o=confirm(c)
 check("delete a code", s==200 and not any(d["code"]=="TEAPARTY" for d in J("discounts.json",[])), (s,o))
+# Every field of the dashboard's form ("one use per person, expires Nov 30")
+import datetime as _dt
+_end=int(_dt.datetime(2030,12,1,7,59,59,999000,tzinfo=_dt.timezone.utc).timestamp()*1000)  # 11:59:59.999pm PST, Nov 30 2030
+c=card(tool("propose_discount_code",{"code":"bf30","type":"percentage","value":20,"uses_per_customer":1,"last_day":"2030-11-30","min_order":40,"public_shop":True}))
+check("new code card: uses per customer, last day, minimum order, public shop", c and c["request"]["body"].get("perCustomerLimit")==1 and c["request"]["body"].get("expiresAt")==_end and c["request"]["body"].get("minOrderAmount")==40 and c["request"]["body"].get("publicShop") is True and "One use per customer" in c["lines"] and c.get("replaces")=="discount:BF30", c)
+r=tool("propose_discount_code",{"code":"OLD1","type":"percentage","value":20,"last_day":"2020-01-31"})
+check("new code card: a last day in the past is refused", not r.get("actions") and "already passed" in r["reply"], r)
+s,o=confirm(c)
+_d=[d for d in J("discounts.json",[]) if d["code"]=="BF30"]
+check("new code saved with every field", s==200 and _d and _d[0].get("perCustomerLimit")==1 and _d[0].get("expiresAt")==_end and _d[0].get("publicShop") is True, (s,o,_d))
+r=tool("propose_discount_code",{"code":"BF30","type":"percentage","value":20})
+check("existing code: points the Concierge to propose_edit_discount", not r.get("actions") and "propose_edit_discount" in r["reply"], r)
+c=card(tool("propose_edit_discount",{"code":"bf30","uses_per_customer":2,"last_day":"","max_uses":100}))
+check("edit code card: PUT with only the changed settings, the rest kept", c and c["request"]["method"]=="PUT" and c["request"]["body"].get("perCustomerLimit")==2 and c["request"]["body"].get("expiresAt") is None and c["request"]["body"].get("maxUses")==100 and c["request"]["body"].get("value")==20 and c["request"]["body"].get("minOrderAmount")==40 and any("Uses per customer: 1 → 2" in l for l in c["lines"]), c)
+s,o=confirm(c)
+_d=[d for d in J("discounts.json",[]) if d["code"]=="BF30"]
+check("edit code saved; uses and public shop kept", s==200 and _d and _d[0].get("perCustomerLimit")==2 and not _d[0].get("expiresAt") and _d[0].get("maxUses")==100 and _d[0].get("publicShop") is True, (s,o,_d))
+# Offer for an event (sign-up QR code)
+c=card(tool("propose_event_offer",{"event":"Farmers Market","code":"bf30"}))
+check("event offer card: code + its terms", c and c["kind"]=="event_offer" and c["request"]["method"]=="PUT" and c["request"]["body"]["event"]=="Farmers Market" and "20% off" in c["lines"][0], c)
+s,o=confirm(c)
+check("event offer saved", s==200 and any(x.get("code")=="BF30" for x in o.get("offers",[])), (s,o))
+r=tool("propose_event_offer",{"event":"Farmers Market","code":"NOPE99"})
+check("event offer: unknown code = no card", not r.get("actions") and "propose_discount_code" in r["reply"], r)
+c=card(tool("propose_event_offer",{"event":"farmers  market","code":""})); s,o=confirm(c)
+check("event offer removed", s==200 and not any(x.get("event","").lower()=="farmers market" for x in o.get("offers",[])), (s,o))
+r=tool("propose_edit_discount",{"code":"BF30","uses_per_customer":2})
+check("edit code: nothing to change = no card", not r.get("actions") and "Nothing would change" in r["reply"], r)
+
+# ================= member discount limit
+c=card(tool("propose_member_discount_limit",{"member_id":"u_member","limit":250}))
+check("discount limit card: default → $250", c and c["kind"]=="member_discount_limit" and c["request"]["body"]=={"id":"u_member","percentCap":250} and any("default ($100) → $250" in l for l in c["lines"]), c)
+s,o=confirm(c)
+check("discount limit saved", s==200 and [u for u in J("users.json",[]) if u["id"]=="u_member"][0].get("percentCap")==250, (s,o))
+_fm=json.loads(tool("find_members",{"query":"mia m. member"})["reply"].split("TOOLRESULT::",1)[1])
+check("find_members shows the discount limit", _fm["members"] and _fm["members"][0].get("discount_limit")=="$250.00", _fm)
+c=card(tool("propose_member_discount_limit",{"member_id":"u_member","reset":True})); s,o=confirm(c)
+check("discount limit back to the default", s==200 and "percentCap" not in [u for u in J("users.json",[]) if u["id"]=="u_member"][0], (s,o))
+r=tool("propose_member_discount_limit",{"member_id":"u_member","limit":-5})
+check("discount limit: below $0 refused", not r.get("actions") and "limit must" in r["reply"], r)
+
+# ================= gift card balance
+_gc=J("gift-cards.json",[]) or []
+_gc.append({"id":"gc_concierge","code":"GIFT-TEST-CONC","token":"tok_conc","kind":"gift","amount":50,"balance":50,"occasion":"birthday","toName":"Gia Gift","toEmail":"gia@example.com","fromName":"Mia","fromEmail":"mem@example.com","fromUserId":"u_member","orderId":"ord_giftconc","state":"active","createdAt":int(time.time()*1000),"entries":[]})
+_gc.append({"id":"gc_waiting","code":"GIFT-TEST-WAIT","token":"tok_wait","kind":"gift","amount":25,"balance":25,"occasion":"birthday","toName":"Wes","toEmail":"wes@example.com","fromName":"Mia","fromEmail":"mem@example.com","fromUserId":"u_member","orderId":"ord_giftwait","state":"awaiting","createdAt":int(time.time()*1000),"entries":[]})
+json.dump(_gc, open(D+"gift-cards.json","w"))
+_lg=json.loads(tool("list_gift_cards",{"query":"gia@"})["reply"].split("TOOLRESULT::",1)[1])
+check("list gift cards: search by email", _lg["total_matches"]==1 and _lg["cards"][0]["code"]=="GIFT-TEST-CONC" and _lg["cards"][0]["balance"]=="$50", _lg)
+c=card(tool("propose_gift_card_balance",{"card":"gift-test-conc","balance":30,"reason":"Refunded $20 by Venmo"}))
+check("gift card balance card: shows before → after and the change, red when lowering", c and c["kind"]=="gift_card_balance" and c["danger"] and any("$50 → $30" in l and "−$20" in l for l in c["lines"]) and c["request"]["body"]=={"action":"balance","id":"gc_concierge","balance":30,"reason":"Refunded $20 by Venmo"}, c)
+s,o=confirm(c)
+check("gift card balance saved", s==200 and [x for x in J("gift-cards.json",[]) if x["id"]=="gc_concierge"][0]["balance"]==30, (s,o))
+_au=[json.loads(l) for l in open(D+"audit.jsonl")]
+check("gift card balance: in the Activity log as Concierge, with the reason", any(a.get("action")=="giftcard.balance" and a.get("targetId")=="gc_concierge" and a.get("source")=="ai" and "Refunded" in json.dumps(a) for a in _au), [a for a in _au if a.get("targetId")=="gc_concierge"])
+r=tool("propose_gift_card_balance",{"card":"GIFT-TEST-CONC","balance":-1})
+check("gift card balance: below $0 refused", not r.get("actions") and "below $0" in r["reply"], r)
+r=tool("propose_gift_card_balance",{"card":"GIFT-TEST-WAIT","balance":10})
+check("gift card balance: only active cards", not r.get("actions") and "awaiting payment" in r["reply"], r)
 
 # ================= mailing list, campaigns, templates
 for e in ["s1@example.com","s2@example.com"]:
@@ -263,7 +331,7 @@ check("every confirmed card is in the Activity log as Concierge", len(ai)>=len(e
 expected={("/api/admin/users","POST"),("/api/admin/users","PATCH"),("/api/admin/users","DELETE"),("/api/admin/users/profile","PATCH"),("/api/admin/users/password","POST"),
  ("/api/admin/send-invoice","POST"),("/api/admin/orders/shipping-label","POST"),("/api/admin/reminders","POST"),("/api/admin/reminders","PUT"),
  ("/api/admin/products","POST"),("/api/admin/products","PUT"),("/api/admin/products","PATCH"),("/api/admin/products","DELETE"),
- ("/api/admin/events","POST"),("/api/admin/events","PATCH"),("/api/admin/events","DELETE"),("/api/admin/discounts","PATCH"),("/api/admin/discounts","DELETE"),
+ ("/api/admin/events","POST"),("/api/admin/events","PATCH"),("/api/admin/events","DELETE"),("/api/admin/discounts","PATCH"),("/api/admin/discounts","PUT"),("/api/admin/events-note","PATCH"),("/api/admin/event-offers","PUT"),("/api/admin/gift-cards","POST"),("/api/admin/discounts","DELETE"),
  ("/api/admin/bundles","POST"),("/api/admin/bundles","PATCH"),("/api/admin/bundles","DELETE"),("/api/admin/campaigns","POST"),("/api/admin/campaigns","PATCH"),
  ("/api/admin/templates","POST"),("/api/admin/subscribers","POST"),("/api/admin/subscribers","DELETE"),("/api/admin/settings","POST"),("/api/admin/flags","POST"),
  ("/api/admin/admins","PUT"),("/api/admin/export-email","POST"),("/api/admin/assistant","PUT"),("/api/admin/assistant/sources","POST")}
@@ -277,6 +345,16 @@ _t=json.loads(tool("list_templates",{"template_id":"Fall ritual"})["reply"].spli
 check("templates: the Concierge can read a template's subject and body (by name)", _t.get("template",{}).get("subject") and len(_t["template"].get("body",""))>20, _t)
 _c=json.loads(tool("propose_discount_code",{"code":"ECHO5","type":"percentage","value":5,"max_uses":0})["reply"].split("TOOLRESULT::",1)[1])
 check("cards: the model is told exactly what the card says (max_uses 0 = unlimited)", _c.get("card_shown") and "Unlimited uses" in _c["card_shown"][0]["details"], _c)
+# Customer emails never quote internal sales numbers
+_bad="Our top seller, Gold Standard Chocolates, was our best-selling product by units over the last 30 days, with 63 boxes sold."
+r=tool("prepare_campaign_draft",{"subject":"Black Friday magic","body":_bad})
+check("campaign draft with sales figures is refused, asks for a rewrite", not r.get("draft") and "internal numbers" in r["reply"] and "rewrite" in r["reply"].lower(), r)
+r=tool("propose_campaign",{"subject":"Black Friday magic","body":"Hi!\n\nWe sold 63 boxes this month."})
+check("campaign send card with sales figures is refused", not r.get("actions") and "internal numbers" in r["reply"], r)
+r=tool("propose_template",{"name":"BF","subject":"Black Friday","body":"Revenue is up, so 20% off!"})
+check("template with sales figures is refused", not r.get("actions") and "internal numbers" in r["reply"], r)
+r=tool("prepare_campaign_draft",{"subject":"A little Black Friday magic","body":"Hi lovely,\n\nThe forest is glowing: take 20% off with code **BF26** through November 30, $35 minimum.\n\n## A customer favorite\n\nGold Standard Chocolates, a little treasure our members adore.\n\n[Shop the magic](/retail)"})
+check("friendly draft with prices, code and dates goes through", (r.get("draft") or {}).get("subject")=="A little Black Friday magic", r)
 # ---------- campaigns to a customer group (segments)
 _now=int(time.time()*1000)
 _o=json.load(open(D+"orders.json"))

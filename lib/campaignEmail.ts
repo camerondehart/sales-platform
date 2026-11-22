@@ -2,6 +2,7 @@ import { escapeHtml, hrefSafe } from "./invoiceEmail";
 import { brand } from "@/lib/brand";
 import type { Theme } from "./campaignThemes";
 import { previewLine } from "./campaignPreview";
+import { separateHeadings } from "./emailBody";
 
 // Campaign email template, shared by "Send now" and scheduled sends.
 // Moved here unchanged from app/api/admin/campaigns/route.ts.
@@ -50,7 +51,8 @@ function formatPlainBody(raw: string, look: Look = PLAIN_LOOK, siteUrl = ""): st
       .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g,
         `$1<a href="$2" style="color:${look === PLAIN_LOOK ? "#6fa336" : look.accent};">$2</a>`);
 
-  const blocks = raw.replace(/\r\n/g, "\n").split(/\n{2,}/);
+  // A heading typed right above its paragraph still gets a block of its own.
+  const blocks = separateHeadings(raw).replace(/\r\n/g, "\n").split(/\n{2,}/);
   const out: string[] = [];
 
   for (const block of blocks) {

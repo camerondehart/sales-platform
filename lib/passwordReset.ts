@@ -1,7 +1,9 @@
+import crypto from "crypto";
 import { Resend } from "resend";
 import { customerReplyTo } from "@/lib/replyTo";
 import { findUserByEmail, setUserPassword } from "@/lib/users";
 import { brand } from "@/lib/brand";
+import { overLimit } from "@/lib/assistant/limits";
 
 // The "Forgot password?" flow, shared by the sign-in form and the site
 // assistant so both behave identically.
@@ -19,9 +21,10 @@ function generateRandomPassword(): string {
     "Wolf", "Cabin", "Trail", "Stone", "Bloom", "Path", "Fern",
     "Acorn", "Brook", "Ridge", "Glade", "Lantern", "Falcon", "Heron",
   ];
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-  const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  const num = Math.floor(1000 + Math.random() * 9000);
+  // Same look as before, from the secure random source (Math.random can be predicted).
+  const adj = adjectives[crypto.randomInt(adjectives.length)];
+  const noun = nouns[crypto.randomInt(nouns.length)];
+  const num = crypto.randomInt(1000, 10000);
   return `${adj}${noun}-${num}`;
 }
 
@@ -36,6 +39,11 @@ function escapeHtml(s: string): string {
 
 export async function requestPasswordReset(email: string): Promise<void> {
   if (!email || typeof email !== "string") return;
+
+  // Each reset replaces the password, so anyone could keep a member locked
+  // out by asking again and again from different devices. At most 3 resets
+  // per address per hour; extra requests are quietly ignored (same answer).
+  if (overLimit(`pwreset:${email.trim().toLowerCase()}`, 3, 3600_000)) return;
 
   // Find user (case‑insensitive)
   const user = await findUserByEmail(email);

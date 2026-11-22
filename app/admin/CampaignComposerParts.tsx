@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { THEME_KEYS, THEMES, type ThemeChoice } from "@/lib/campaignThemes";
 import { brand } from "@/lib/brand";
 import MediaUpload from "./MediaUpload";
 import { previewLine } from "@/lib/campaignPreview";
+import Glyph from "./Glyph";
 
 // Marketing → Email campaigns: the theme picker, the "Arrange" block editor
 // (move photos, text and buttons around) and the live preview. The message
@@ -18,7 +19,7 @@ export function ThemePicker({ value, onChange, resolved }: { value: ThemeChoice;
   return (
     <div className="cc-themes" role="radiogroup" aria-label="Look">
       <button type="button" role="radio" aria-checked={value === "auto"} className={`cc-theme cc-theme-auto${value === "auto" ? " is-on" : ""}`} onClick={() => onChange("auto")}>
-        <span className="cc-theme-art" aria-hidden="true">✨</span>
+        <span className="cc-theme-art" aria-hidden="true"><Glyph name="sparkles" /></span>
         <span className="cc-theme-name">Auto{value === "auto" && autoLabel ? ` · ${autoLabel}` : ""}</span>
       </button>
       {THEME_KEYS.map((k) => (
@@ -55,7 +56,7 @@ function kindOf(text: string): Kind {
   return "text";
 }
 const KIND_LABEL: Record<Kind, string> = { image: "Photo", button: "Button", heading: "Heading", divider: "Divider", list: "List", "photo-slot": "Photo from chat", text: "Text" };
-const KIND_ICON: Record<Kind, string> = { image: "🖼", button: "🔘", heading: "H", divider: "—", list: "•", "photo-slot": "📷", text: "¶" };
+const KIND_ICON: Record<Kind, ReactNode> = { image: <Glyph name="image" />, button: <Glyph name="button" />, heading: "H", divider: "—", list: "•", "photo-slot": <Glyph name="camera" />, text: "¶" };
 
 let nextId = 1;
 const split = (body: string): Block[] =>

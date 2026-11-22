@@ -18,13 +18,14 @@ export const maxDuration = 60;
  * independent and safe to repeat — nothing is ever sent twice.
  *
  * Who may call it: Vercel's scheduler (CRON_SECRET bearer when set, else the
- * cron header), or a signed-in admin ("Run now"). A faked call can only make
+ * cron header, off Vercel only), or a signed-in admin ("Run now"). A faked call can only make
  * due work happen a little early; it can't choose recipients or content.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get("authorization") || "";
-  const fromCron = secret ? auth === `Bearer ${secret}` : !!req.headers.get("x-vercel-cron") || /vercel-cron/i.test(req.headers.get("user-agent") || "");
+  // Without CRON_SECRET the faked-able header is accepted only off Vercel (local runs, tests).
+  const fromCron = secret ? auth === `Bearer ${secret}` : !process.env.VERCEL && (!!req.headers.get("x-vercel-cron") || /vercel-cron/i.test(req.headers.get("user-agent") || ""));
   if (!fromCron && !(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || new URL(req.url).origin;

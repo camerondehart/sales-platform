@@ -103,12 +103,30 @@ async function fetchPage(u: URL): Promise<{ ok: true; title: string; text: strin
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 12_000);
   try {
-    const r = await fetch(u.toString(), {
-      signal: ctrl.signal,
-      redirect: "follow",
-      headers: { "User-Agent": `${brand.shortName.replace(/\W+/g, "")}Concierge/1.0 (+${brand.siteUrl})`, Accept: "text/html,application/xml;q=0.9,*/*;q=0.5" },
-      cache: "no-store",
-    });
+    // Redirects are followed by hand so every hop gets the same "public web
+    // address" check (a public page could otherwise redirect to an internal one).
+    let at: URL | null = u;
+    let r: Response | null = null;
+    for (let hop = 0; hop < 5 && at; hop++) {
+      r = await fetch(at.toString(), {
+        signal: ctrl.signal,
+        redirect: "manual",
+        headers: { "User-Agent": `${brand.shortName.replace(/\W+/g, "")}Concierge/1.0 (+${brand.siteUrl})`, Accept: "text/html,application/xml;q=0.9,*/*;q=0.5" },
+        cache: "no-store",
+      });
+      const loc = r.status >= 300 && r.status < 400 ? r.headers.get("location") : null;
+      if (!loc) break;
+      let next: URL | null = null;
+      try {
+        next = checkUrl(new URL(loc, at).toString());
+      } catch {
+        next = null;
+      }
+      if (!next) return { ok: false, error: "That page redirects somewhere we can't read." };
+      at = next;
+      r = null;
+    }
+    if (!r) return { ok: false, error: "That page redirects too many times." };
     if (!r.ok) return { ok: false, error: `The page answered HTTP ${r.status}.` };
     const body = (await r.text()).slice(0, 1_500_000);
     const { title, text } = htmlToText(body);

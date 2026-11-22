@@ -14,6 +14,8 @@ import { enforceSize, listRequests, siteRequestsReady } from "../siteRequests";
 import { ENTRANCE_KEYS, ENTRANCE_THEMES, autoSchedule, cleanEntranceChoice, isEntranceKey, resolveEntrance } from "../entranceThemes";
 import { THEME_KEYS, cleanThemeChoice, resolveTheme, themeForCategory } from "../campaignThemes";
 import { previewLine } from "../campaignPreview";
+import { separateHeadings } from "../emailBody";
+import { internalStatsIn, statsRewrite } from "./customerCopy";
 import { resolveSegment, SEGMENTS, SEGMENT_KEYS } from "../segments";
 import { FLAGS, FLAG_KEYS, getFlags, isEnabled, type FlagKey } from "../flags";
 import { getAdmins } from "../admins";
@@ -24,6 +26,10 @@ import { listSources } from "./sources";
 import { recentEscalations, escalationStatus } from "./usage";
 import { effectivePrice, formatMoney, lineDiscount, parsePrice } from "../pricing";
 import { parseVideo } from "../video";
+import { endOfPacificDay } from "../periods";
+import { eventKey, getEventOffers, offerText, usable } from "../eventOffers";
+import { getNoteSettings } from "../localEventsNote";
+import { allGiftCards, GIFT_ADJUST_MAX } from "../giftCards";
 import type { GatewayTool } from "./gateway";
 import type { ToolContext } from "./tools";
 import type { ActionProposal, Audience } from "./shared";
@@ -83,6 +89,9 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
   admin("propose_delete_member", "Prepare deleting a member account (red card). Their past orders stay.", obj({ member_id: str("Member id from find_members") }, ["member_id"])),
   admin("propose_member_name", "Prepare correcting a member's name.", obj({ member_id: str("Member id"), name: str("New full name") }, ["member_id", "name"])),
   admin("propose_member_address", "Prepare changing a member's shipping address and/or phone (find_members shows the current one). Send only the parts that change; an empty string clears a line (e.g. address_line2).", obj({ member_id: str("Member id from find_members"), address_line1: str("Street address"), address_line2: str("Apt / suite (\"\" to clear)"), city: str("City"), state: str("State, e.g. OR"), postal_code: str("ZIP code"), phone: str("Phone (\"\" to clear)") }, ["member_id"])),
+  admin("propose_member_discount_limit", "Prepare setting a member's own discount limit (Members → Edit → Discount limit): the most a percentage CODE can take off one of their orders in the members' shop. Blank/default is $100. Doesn't change sales, BOGO, bundles or the public shop.", obj({
+    member_id: str("Member id from find_members"), limit: num("Dollars, e.g. 250; omit or use reset=true for the default $100"), reset: bool("true = back to the default $100"),
+  }, ["member_id"])),
   admin("propose_member_password_reset", "Prepare emailing a member a fresh random password (you never see it). Never ask for or accept a password in chat.", obj({ member_id: str("Member id") }, ["member_id"])),
 
   // ------------------------------------------------------------ orders
@@ -121,11 +130,25 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
     event_id: str("Event id"), title: str("Title"), description: str("Description"), start: str("YYYY-MM-DD HH:MM"), end: str("YYYY-MM-DD HH:MM"), location: str("Location"),
     price: str("Display price (\"\" to clear)"), capacity: num("Spots"), waitlist: num("Waitlist size"), type: str("class | workshop | vendor | other"), image_url: str("Photo link (\"\" to clear)"), published: bool("Published"),
   }, ["event_id"])),
+  admin("propose_event_popup", "Prepare changing one event's 'events near you' popup (Settings → Events popup): show it or not, and the town + miles it shows around (\"\" place = the main area). Members signing in nearby see one small corner card about the next event.", obj({
+    event_id: str("Event id from list_events_admin"), show: bool("true = this event can appear in the popup; false = never"),
+    place: str("Town for this event's popup area, e.g. \"Redding, CA\"; \"\" = use the main area"), miles: num("Miles around that town (1-500); omit = the main area's miles"),
+  }, ["event_id"])),
+  admin("propose_event_offer", "Prepare the 'Offer for this event' (Marketing → Event sign-up QR code): people who sign up at that event get this discount code in their welcome email. Pass an existing code (make one first with propose_discount_code if needed), or code \"\" to remove the offer.", obj({
+    event: str("Event id from list_events_admin, or the event name used on the sign-up QR code"), code: str("Discount code to offer, or \"\" to remove"),
+  }, ["event", "code"])),
   admin("propose_delete_event", "Prepare deleting an event (red card).", obj({ event_id: str("Event id") }, ["event_id"])),
   admin("propose_registration_action", "Cancel a registration (the first waitlisted person moves in automatically) or promote someone off the waitlist.", obj({ registration_id: str("Registration id from list_events_admin"), action: str("cancel | promote") }, ["registration_id", "action"])),
 
   // ------------------------------------------------------------ discounts & bundles
   admin("propose_discount_toggle", "Prepare switching a discount code on or off.", obj({ code: str("The code or its id"), active: bool("true = on, false = off") }, ["code", "active"])),
+  admin("propose_edit_discount", "Prepare changing an existing discount code's settings, like the dashboard's Edit button: amount, type, note, last day, total uses, uses per customer, minimum order, public shop. Pass only what changes; everything else stays. The code text itself can't change.", obj({
+    code: str("The code or its id"),
+    type: str("percentage | fixed"), value: num("Percent (1-100) or dollars"), label: str("Internal note; \"\" clears it"),
+    last_day: str("Last day it works, YYYY-MM-DD (until 11:59pm local); \"\" = no end"),
+    max_uses: num("Total uses allowed; 0 = unlimited"), uses_per_customer: num("Uses per customer (1 = once per person); 0 = unlimited"),
+    min_order: num("Minimum order in dollars; 0 = none"), public_shop: bool("true = also works in the public shop; false = members only"),
+  }, ["code"])),
   admin("propose_delete_discount", "Prepare deleting a discount code (red card).", obj({ code: str("The code or its id") }, ["code"])),
   admin("propose_mix_bundle", "Prepare a mix-and-match bundle discount (e.g. these 4 products, 20% off the set). type percent or price (set price in dollars).", obj({
     name: str("Bundle name"), products: { type: "array", items: obj({ product: str("Product id or exact name"), qty: num("How many in the set (default 1)") }, ["product"]) },
@@ -140,7 +163,7 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
   // ------------------------------------------------------------ marketing
   admin("propose_campaign", "Prepare SENDING an email campaign (red card) — now, or scheduled (sends 9am–6pm local). Body format like prepare_campaign_draft. To use a template, call list_templates and pass its id as template_id. For a draft to edit, use prepare_campaign_draft instead. To reach a group of customers (e.g. lapsed members) pass segment — the server works out who's in it; never collect emails yourself.", obj({
     template_id: str("Optional: template id or exact name from list_templates; subject, body and theme override it"),
-    subject: str("Subject (optional with template_id)"), body: str("Body (plain text; # heading, - bullets, **bold**, [Button](url); optional with template_id)"), audience: str("subscribers (the mailing list — default) | all (subscribers + every member) | members | nonmembers | custom"),
+    subject: str("Subject (optional with template_id)"), body: str("Body (plain text; blank line between blocks; \"# Heading\" or \"## Heading\" on its own line with blank lines around it, - bullets, **bold**, [Button](url) on its own line; optional with template_id)"), audience: str("subscribers (the mailing list — default) | all (subscribers + every member) | members | nonmembers | custom"),
     custom_list: str("For custom: emails separated by commas (only subscribed people get it)"), send_at: str("Optional YYYY-MM-DD HH:MM local; blank = now"),
     theme: str(`Optional look: auto (default, or the template's category) | none (plain) | ${THEME_KEYS.join(" | ")}`),
     preview_line: str("Optional inbox preview line (grey text after the subject); blank = the first sentence of the message"),
@@ -157,6 +180,10 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
   admin("propose_subscriber_remove", "Prepare removing someone from the mailing list (red card).", obj({ email: str("Email (or subscriber id)") }, ["email"])),
 
   // ------------------------------------------------------------ settings
+  admin("list_gift_cards", "Gift cards (Settings → Gift cards): code, who it's to/from, amount, balance, state (awaiting payment / active / void), with ids. Search by code, name or email.", obj({ query: str("Optional: code, name or email") })),
+  admin("propose_gift_card_balance", "Prepare setting an ACTIVE gift card's balance (Settings → Gift cards → Edit balance), e.g. to correct a mistake or after a refund. Never below $0. The site never moves money; the change and reason go in the Activity log.", obj({
+    card: str("Gift card id or code from list_gift_cards"), balance: num("The new balance in dollars (not the change)"), reason: str("Why (kept on the card and in the Activity log)"),
+  }, ["card", "balance"])),
   admin("propose_loyalty_settings", "Prepare changing loyalty points settings.", obj({ enabled: bool("Loyalty on/off"), points_per_dollar: num("Points earned per $1"), points_per_dollar_redeemed: num("Points that equal $1 off"), min_points_to_redeem: num("Minimum points before redeeming") })),
   admin("propose_site_request", "Prepare filing a change request for the website itself (wording, colours, layout, a new section or feature, a bug) when staff ask for the SITE to change, not for content you can change with other cards (products, prices, banner, campaigns, FAQ…). Size it honestly: small = wording/copy, colours, spacing, images, reordering or hiding existing things on a page; medium = a new section, panel or behaviour on one page; large = new features, anything across many pages, or anything touching money, sign-in, customer data, emails or legal text. Small requests go straight to the developer's build queue and appear on stage at the next build run; medium/large wait for the developer's approval. Write the details as a clear, complete description of what should change and where.", obj({ title: str("Short title, e.g. 'Make the shop heading bigger'"), details: str("What should change, where, and why — specific enough to build"), size: str("small | medium | large"), page: str("Optional: which page or part of the site") }, ["title", "details", "size"])),
   admin("list_site_requests", "The site change requests staff have filed: status (waiting for the developer's approval, queued, being built, on stage, needs attention, declined, done), size and who asked.", obj({}, [])),
@@ -268,6 +295,12 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         };
       }
       const now = Date.now();
+      const [offers, codes] = await Promise.all([getEventOffers(), getDiscounts()]);
+      const offerFor = (title: string) => {
+        const o = offers.find((x) => x.id === eventKey(title));
+        const d = o && codes.find((x) => x.id === o.discountId);
+        return o ? (d ? `${d.code} (${offerText(d)})` : "a deleted code") : undefined;
+      };
       return {
         events: events
           .filter((e) => args.include_past === true || (e.endDate || e.date) >= now - 86_400_000)
@@ -279,6 +312,8 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
             capacity: e.capacity || "unlimited",
             registered: regs.filter((r) => r.eventId === e.id && r.status === "registered").length,
             waitlisted: regs.filter((r) => r.eventId === e.id && r.status === "waitlisted").length,
+            popup: e.notePopup === false ? "never shown" : e.noteArea ? `${e.noteArea.miles} miles around ${e.noteArea.place}` : "main area",
+            sign_up_offer: offerFor(e.title),
           })),
       };
     }
@@ -430,6 +465,28 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         lines,
         confirmLabel: "Save address",
         request: { method: "PATCH", url: "/api/admin/users/profile", body: { id: u.id, address } },
+        refresh: ["users"],
+      });
+      return READY;
+    }
+    case "propose_member_discount_limit": {
+      const u = (await getUsers()).find((x) => x.id === s(args.member_id, 80));
+      if (!u) return { error: "No member with that id. Use find_members." };
+      const reset = args.reset === true || !has(args, "limit");
+      const limit = reset ? null : Math.round(Number(args.limit) * 100) / 100;
+      if (limit !== null && (!Number.isFinite(limit) || limit < 0 || limit > 100000)) return { error: "limit must be a dollar amount from 0 to 100000 (or reset=true for the default $100)." };
+      const show = (c: number | null | undefined) => (c === null || c === undefined ? "default ($100)" : formatMoney(c));
+      if ((u.percentCap ?? null) === limit) return { note: `${u.name}'s discount limit is already ${show(limit)}.` };
+      push(ctx, {
+        kind: "member_discount_limit",
+        title: `Set ${u.name.split(/\s+/)[0]}'s discount limit`,
+        lines: [
+          `${u.name} · ${u.email}`,
+          `Discount limit: ${show(u.percentCap)} → ${show(limit)} per order`,
+          "Only percentage codes in the members' shop; sales, BOGO, bundles and the public shop keep the $100 cap",
+        ],
+        confirmLabel: "Save limit",
+        request: { method: "PATCH", url: "/api/admin/users/profile", body: { id: u.id, percentCap: limit } },
         refresh: ["users"],
       });
       return READY;
@@ -830,6 +887,168 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       }
       return READY;
     }
+    case "propose_edit_discount": {
+      const q = s(args.code, 60);
+      const d = (await getDiscounts()).find((x) => x.id === q || x.code === normalizeCode(q));
+      if (!d) return { error: "No discount code like that. Use list_discount_codes." };
+      const type = has(args, "type") ? (s(args.type, 12) === "fixed" ? "fixed" : "percentage") : d.type;
+      const value = has(args, "value") ? Number(args.value) : d.value;
+      if (!Number.isFinite(value) || value <= 0 || (type === "percentage" && value > 100)) return { error: "value must be above 0 (and at most 100 for a percentage)." };
+      let expiresAt = d.expiresAt;
+      if (has(args, "last_day")) {
+        const day = s(args.last_day, 10);
+        if (!day) expiresAt = undefined;
+        else {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(endOfPacificDay(day))) return { error: "last_day must be a date like 2026-11-30, or \"\" for no end." };
+          expiresAt = endOfPacificDay(day);
+        }
+      }
+      const count = (k: string, cur: number | undefined) => (has(args, k) ? (Number(args[k]) > 0 ? Math.floor(Number(args[k])) : undefined) : cur);
+      const maxUses = count("max_uses", d.maxUses);
+      const perCustomerLimit = count("uses_per_customer", d.perCustomerLimit);
+      const minOrderAmount = has(args, "min_order") ? (Number(args.min_order) > 0 ? Number(args.min_order) : undefined) : d.minOrderAmount;
+      const publicShop = has(args, "public_shop") ? args.public_shop === true : !!d.publicShop;
+      const label = has(args, "label") ? s(args.label, 80) : d.label || "";
+      const body = { id: d.id, type, value, label, expiresAt, maxUses, perCustomerLimit, minOrderAmount, publicShop };
+      const show = (t: string, v: number) => (t === "percentage" ? `${v}% off` : `${formatMoney(v)} off`);
+      const lines: string[] = [];
+      const diff = (what: string, before: string, after: string) => { if (before !== after) lines.push(`${what}: ${before} → ${after}`); };
+      diff("Discount", show(d.type, d.value), show(type, value));
+      diff("Last day it works", d.expiresAt ? fmtDay(d.expiresAt) : "no end", expiresAt ? fmtDay(expiresAt) : "no end");
+      diff("Total uses", d.maxUses ? String(d.maxUses) : "unlimited", maxUses ? String(maxUses) : "unlimited");
+      diff("Uses per customer", d.perCustomerLimit ? String(d.perCustomerLimit) : "unlimited", perCustomerLimit ? String(perCustomerLimit) : "unlimited");
+      diff("Minimum order", d.minOrderAmount ? formatMoney(d.minOrderAmount) : "none", minOrderAmount ? formatMoney(minOrderAmount) : "none");
+      diff("Where it works", d.publicShop ? "members + public shop" : "members only", publicShop ? "members + public shop" : "members only");
+      diff("Note", d.label || "none", label || "none");
+      if (!lines.length) return { note: `Nothing would change: ${d.code} already has those settings.` };
+      lines.push(`Used ${d.uses}× so far (kept)`);
+      push(ctx, {
+        kind: "discount_update",
+        title: `Change code ${d.code}`,
+        lines,
+        confirmLabel: "Save changes",
+        request: { method: "PUT", url: "/api/admin/discounts", body },
+        refresh: ["discounts"],
+        replaces: `discount:${d.code}`,
+      });
+      return READY;
+    }
+    case "propose_event_popup": {
+      const e = (await getEvents()).find((x) => x.id === s(args.event_id, 80));
+      if (!e) return { error: "No event with that id. Use list_events_admin." };
+      const main = (await getNoteSettings()).area;
+      const body: Record<string, unknown> = { id: e.id };
+      const lines = [`${e.title} · ${fmt(e.date)}`];
+      if (typeof args.show === "boolean") {
+        const was = e.notePopup !== false;
+        if (was !== args.show) lines.push(`Popup: ${was ? "shown" : "never shown"} → ${args.show ? "shown" : "never shown"}`);
+        body.notePopup = args.show;
+      }
+      if (typeof args.place === "string") {
+        const place = s(args.place, 80);
+        const miles = has(args, "miles") ? Math.round(Number(args.miles)) : undefined;
+        if (miles !== undefined && !(miles >= 1 && miles <= 500)) return { error: "miles must be a whole number from 1 to 500." };
+        const was = e.noteArea ? `${e.noteArea.miles} miles around ${e.noteArea.place}` : `main area (${main.miles} miles around ${main.place})`;
+        const now = place ? `${miles ?? main.miles} miles around ${place} (looked up when you confirm)` : `main area (${main.miles} miles around ${main.place})`;
+        if (was !== now) lines.push(`Area: ${was} → ${now}`);
+        body.notePlace = place;
+        body.noteMiles = miles ?? "";
+      }
+      if (lines.length === 1) return { note: "Nothing would change. Pass show and/or place." };
+      if (!e.published) lines.push("This event is a draft, so it won't show until it's published");
+      push(ctx, {
+        kind: "event_note",
+        title: `Events popup for ${e.title}`,
+        lines,
+        confirmLabel: "Save popup",
+        request: { method: "PATCH", url: "/api/admin/events-note", body },
+        refresh: ["events"],
+      });
+      return READY;
+    }
+    case "propose_event_offer": {
+      const q = s(args.event, 120);
+      const ev = (await getEvents()).find((x) => x.id === q);
+      const name = (ev?.title || q).trim();
+      if (!eventKey(name)) return { error: "Say which event (its id from list_events_admin, or its name)." };
+      const offers = await getEventOffers();
+      const all = await getDiscounts();
+      const current = offers.find((o) => o.id === eventKey(name));
+      const curCode = current ? all.find((d) => d.id === current.discountId) : undefined;
+      const codeText = s(args.code, 60);
+      if (!codeText) {
+        if (!current) return { note: `There's no offer set for ${name}.` };
+        push(ctx, {
+          kind: "event_offer",
+          title: `Remove the offer for ${name}`,
+          lines: [`Now: ${curCode ? `${curCode.code} (${offerText(curCode)})` : "a deleted code"}`, "New sign-ups at this event won't get a code in their welcome email", "The code itself isn't changed"],
+          confirmLabel: "Remove offer",
+          request: { method: "PUT", url: "/api/admin/event-offers", body: { event: name, discountId: null } },
+          refresh: ["discounts"],
+        });
+        return READY;
+      }
+      const d = all.find((x) => x.id === codeText || x.code === normalizeCode(codeText));
+      if (!d) return { error: `No code ${normalizeCode(codeText)}. Prepare it first with propose_discount_code, then offer it.` };
+      const dCode = d.code;
+      if (!usable(d)) return { error: `${dCode} is switched off, expired or used up. Fix it (propose_edit_discount / propose_discount_toggle) or pick another.` };
+      if (curCode?.id === d.id) return { note: `${name} already offers ${d.code}.` };
+      push(ctx, {
+        kind: "event_offer",
+        title: `Offer ${d.code} at ${name}`,
+        lines: [
+          `${offerText(d)}${d.perCustomerLimit === 1 ? " · once per person" : ""}${d.expiresAt ? ` · last day ${fmtDay(d.expiresAt)}` : ""}${d.minOrderAmount ? ` · min order ${formatMoney(d.minOrderAmount)}` : ""}`,
+          current ? `Replaces: ${curCode ? curCode.code : "a deleted code"}` : "",
+          "People who sign up at this event get the code in their welcome email",
+        ].filter(Boolean),
+        confirmLabel: "Set offer",
+        request: { method: "PUT", url: "/api/admin/event-offers", body: { event: name, discountId: d.id } },
+        refresh: ["discounts"],
+      });
+      return READY;
+    }
+    case "list_gift_cards": {
+      const q = s(args.query, 80).toLowerCase();
+      const cards = (await allGiftCards())
+        .filter((c) => !q || [c.code, c.toName, c.toEmail, c.fromName, c.fromEmail].some((v) => String(v || "").toLowerCase().includes(q)))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      return {
+        total_matches: cards.length,
+        cards: cards.slice(0, 25).map((c) => ({
+          id: c.id, code: c.code, kind: c.kind, to: `${c.toName} <${c.toEmail}>`, from: c.fromName,
+          amount: formatMoney(c.amount), balance: formatMoney(c.balance),
+          state: c.state === "awaiting" ? "awaiting payment" : c.state, frozen: c.frozen ? formatMoney(c.frozen) : undefined,
+          bought: fmtDay(c.createdAt), order_ref: c.orderId.slice(-6).toUpperCase(),
+        })),
+      };
+    }
+    case "propose_gift_card_balance": {
+      const q = s(args.card, 60);
+      const c = (await allGiftCards()).find((x) => x.id === q || x.code.toUpperCase() === q.toUpperCase());
+      if (!c) return { error: "No gift card like that. Use list_gift_cards." };
+      if (c.state !== "active") return { error: `${c.code} isn't active (${c.state === "awaiting" ? "still awaiting payment" : "void"}), so its balance can't be edited.` };
+      const balance = Math.round(Number(args.balance) * 100) / 100;
+      if (!Number.isFinite(balance) || balance < 0) return { error: "The balance can't go below $0." };
+      if (balance > GIFT_ADJUST_MAX) return { error: `The balance can be at most ${formatMoney(GIFT_ADJUST_MAX)}.` };
+      if (balance === c.balance) return { note: `${c.code} already has ${formatMoney(balance)}.` };
+      const reason = s(args.reason, 200);
+      push(ctx, {
+        kind: "gift_card_balance",
+        title: `Set gift card ${c.code} to ${formatMoney(balance)}`,
+        lines: [
+          `To ${c.toName} (${c.toEmail})`,
+          `Balance: ${formatMoney(c.balance)} → ${formatMoney(balance)} (${balance > c.balance ? "+" : "−"}${formatMoney(Math.abs(balance - c.balance))})`,
+          reason ? `Reason: ${reason}` : "No reason given",
+          "No money moves; this only changes what the card can still pay for. Recorded in the Activity log",
+        ],
+        confirmLabel: "Save balance",
+        danger: balance < c.balance,
+        request: { method: "POST", url: "/api/admin/gift-cards", body: { action: "balance", id: c.id, balance, reason } },
+        refresh: [],
+        replaces: `giftcard:${c.id}`,
+      });
+      return READY;
+    }
     case "propose_mix_bundle":
     case "propose_mix_bundle_update": {
       const products = await getProducts();
@@ -1004,8 +1223,10 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
       if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
       const subject = s(args.subject, 200) || template?.subject || "";
-      const body = s(args.body, 50_000) || template?.body || "";
+      const body = separateHeadings(s(args.body, 50_000) || template?.body || "");
       if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
+      const stats = internalStatsIn(s(args.subject, 200), s(args.body, 50_000), s(args.preview_line, 200));
+      if (stats) return statsRewrite(stats);
       let audience = (["subscribers", "all", "members", "nonmembers", "custom"].includes(s(args.audience, 12)) ? s(args.audience, 12) : "subscribers") as "subscribers" | "all" | "members" | "nonmembers" | "custom";
       let customList = s(args.custom_list, 20_000);
       let groupLabel = "";
@@ -1061,8 +1282,10 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
       const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
       if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
       const subject = s(args.subject, 200) || template?.subject || "";
-      const body = s(args.body, 50_000) || template?.body || "";
+      const body = separateHeadings(s(args.body, 50_000) || template?.body || "");
       if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
+      const stats = internalStatsIn(s(args.subject, 200), s(args.body, 50_000), s(args.preview_line, 200));
+      if (stats) return statsRewrite(stats);
       const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
       const look = resolveTheme(theme, subject, body);
       push(ctx, {
@@ -1098,8 +1321,10 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
     case "propose_template": {
       const id = s(args.template_id, 80);
       const tname = s(args.name, 80);
-      const body = s(args.body, 20_000);
+      const body = separateHeadings(s(args.body, 20_000));
       if (!tname || !body) return { error: "Need a name and a body." };
+      const stats = internalStatsIn(s(args.subject, 200), body);
+      if (stats) return statsRewrite(stats);
       if (id && !(await listTemplates()).some((t) => t.id === id)) return { error: "No template with that id." };
       const cat = (TEMPLATE_CATEGORIES as readonly string[]).includes(s(args.category, 20)) ? s(args.category, 20) : "custom";
       push(ctx, {

@@ -8,6 +8,7 @@ import { tooMany } from "@/lib/publicLimits";
 import { overLimit, clientIp } from "@/lib/assistant/limits";
 import { auditSystem } from "@/lib/audit";
 import { portalOn, siteUrlOf } from "@/lib/retailPortal";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "That email and password don't match a store login." }, { status: 401 });
     }
     await startStoreSession(hit.login, hit.account);
+    await recordSignInPlace(req, "store", hit.login.email);
     return NextResponse.json({ ok: true, name: hit.login.name });
   }
 
@@ -77,6 +79,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "That code didn't work. Check it, or ask for a new one." }, { status: 401 });
     }
     await startStoreSession(hit!.login, hit!.account);
+    await recordSignInPlace(req, "store", hit!.login.email);
     return NextResponse.json({ ok: true, name: hit!.login.name });
   }
 
@@ -107,6 +110,7 @@ export async function POST(req: Request) {
     const r = await setLoginPassword(check.login.id, password);
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 });
     await startStoreSession(check.login, check.account);
+    await recordSignInPlace(req, "store", check.login.email);
     await auditSystem({
       action: "retail.set_password",
       actor: check.login.email,

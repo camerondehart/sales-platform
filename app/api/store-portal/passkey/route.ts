@@ -16,6 +16,7 @@ import { CHALLENGE_COOKIE, deviceName, packChallenge, relyingParty, unpackChalle
 import { addStorePasskey, getStorePasskeys, removeStorePasskey, storePasskeyView, storeUserIdFor, touchStorePasskey } from "@/lib/storePasskeys";
 import { portalOn } from "@/lib/retailPortal";
 import { brand } from "@/lib/brand";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,7 @@ export async function POST(req: Request) {
     if (!ok) return fail("the device's answer didn't check out");
     await touchStorePasskey(pk.id, newCounter);
     await startStoreSession(hit!.login, hit!.account);
+    await recordSignInPlace(req, "store", hit!.login.email);
     return NextResponse.json({ ok: true, name: hit!.login.name });
   }
 

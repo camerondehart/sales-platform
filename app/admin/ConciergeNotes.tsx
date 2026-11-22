@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { brand } from "@/lib/brand";
+import Glyph from "./Glyph";
 
 // Assistant tab → Concierge notes: the lessons the Concierge writes for itself
 // from past chats (nightly review), plus any staff add. Edit, pin, delete.
@@ -123,7 +124,7 @@ export default function ConciergeNotes() {
                         </div>
                         <div className="cn-meta">
                           {n.source === "ai" ? "Learned" : "Added by staff"} · {when(n.updatedAt)}
-                          {n.pinned && <span className="cn-pin"> · 📌 pinned</span>}
+                          {n.pinned && <span className="cn-pin"> · <Glyph name="pushpin" /> pinned</span>}
                           <span className="cn-note-actions">
                             <button type="button" className="link-btn" onClick={() => setEditing({ id: n.id, text: n.text })}>Edit</button>
                             <button type="button" className="link-btn" disabled={busy} onClick={() => post({ action: "pin", id: n.id, pinned: !n.pinned }, n.pinned ? "Unpinned." : "Pinned — the review will keep it as is.")}>

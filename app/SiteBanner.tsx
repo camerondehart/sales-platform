@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import type { Banner } from "@/lib/banner";
+import { safeBannerHtml, safeHref } from "@/lib/safeHtml";
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "";
@@ -48,7 +49,7 @@ export default function SiteBanner({ initial }: { initial: Banner }) {
           <div className="site-banner-inner">
             <span
               className="site-banner-msg"
-              dangerouslySetInnerHTML={{ __html: banner.message }}
+              dangerouslySetInnerHTML={{ __html: safeBannerHtml(banner.message) }}
             />
             {banner.countdownTo && remaining && (
               <span className="site-banner-count">
@@ -56,8 +57,8 @@ export default function SiteBanner({ initial }: { initial: Banner }) {
                 <strong>{remaining}</strong>
               </span>
             )}
-            {banner.linkUrl && (
-              <a className="site-banner-link" href={banner.linkUrl} style={{ color: banner.textColor }}>
+            {banner.linkUrl && safeHref(banner.linkUrl) && (
+              <a className="site-banner-link" href={safeHref(banner.linkUrl) || undefined} style={{ color: banner.textColor }}>
                 {banner.linkLabel || "Learn more"} →
               </a>
             )}

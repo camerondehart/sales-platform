@@ -1,3 +1,4 @@
+import { timingSafeEqual, createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
@@ -15,6 +16,13 @@ import { matchesPhrase, oldPasswordStatus } from "@/lib/staffPhrase";
 import { canSignIn, verifyRetailPassword } from "@/lib/retail";
 import { startStoreSession } from "@/lib/retailAuth";
 import { landingFor } from "@/lib/ambassadorPanel";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
+
+/** Compare passwords in constant time (hashing first evens out the lengths). */
+function samePassword(a: unknown, b: string): boolean {
+  const h = (v: string) => createHash("sha256").update(v).digest();
+  return typeof a === "string" && !!b && timingSafeEqual(h(a), h(b));
+}
 
 export async function POST(req: Request) {
   const body = (await req.json()) as {
@@ -55,14 +63,14 @@ export async function POST(req: Request) {
       const old = await oldPasswordStatus();
       if (matchesPhrase(body.password || "")) {
         how = "Signed in with the daily staff password";
-      } else if (old.works && body.password === (await getAdminPassword())) {
+      } else if (old.works && samePassword(body.password, await getAdminPassword())) {
         how = "Signed in with the old fixed password (still allowed for its first 7 days)";
       } else {
         return fail("invalid");
       }
     } else {
       const expected = await getAdminPassword();
-      if (body.password !== expected) {
+      if (!samePassword(body.password, expected)) {
         return fail("invalid");
       }
     }
@@ -74,6 +82,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 12,
     });
+    await recordSignInPlace(req, "staff");
     await auditSystem({ action: "admin.signin", actor: "admin", actorType: "admin", source: "human", targetType: "admin", ok: true, note: how, ip, userAgent: (req.headers.get("user-agent") || "").slice(0, 200) || undefined });
     return NextResponse.json({ ok: true });
   }
@@ -90,6 +99,7 @@ export async function POST(req: Request) {
         const hit = await verifyRetailPassword(emailForRateLimit.trim(), String(body.password || ""));
         if (hit && canSignIn(hit)) {
           await startStoreSession(hit.login, hit.account);
+          await recordSignInPlace(req, "store", hit.login.email);
           return NextResponse.json({ ok: true, name: hit.login.name, to: "/store-portal" });
         }
         recordFailedAttempt(storeKey, ip);
@@ -113,6 +123,7 @@ export async function POST(req: Request) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+  await recordSignInPlace(req, "member", user.email);
 
   // A linked ambassador lands on their panel (switch ambassador_panel).
   const to = await landingFor(user.email);

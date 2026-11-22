@@ -84,7 +84,11 @@ export type ActionProposal = {
     | "report"
     | "assistant_settings"
     | "knowledge_page"
-    | "handoff";
+    | "handoff"
+    | "event_note"
+    | "event_offer"
+    | "member_discount_limit"
+    | "gift_card_balance";
   title: string;
   /** Human-readable facts, built from real records on the server. */
   lines: string[];
@@ -97,6 +101,12 @@ export type ActionProposal = {
   request: { method: "PATCH" | "POST" | "PUT" | "DELETE"; url: string; body: unknown };
   /** Which dashboard data to reload after it succeeds. */
   refresh: Array<AdminRefreshKey>;
+  /**
+   * What the card is about, e.g. "discount:BF26". A newer card with the same
+   * key replaces an earlier one still waiting (staff changed the details), so
+   * only the latest version can be confirmed.
+   */
+  replaces?: string;
 };
 
 /** Parts of the dashboard that reload after a confirmed change. */

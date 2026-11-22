@@ -10,7 +10,7 @@ import { isExternal, isInternal, type Product } from "../storage";
 import { getSettings } from "../settings";
 import { getBanner } from "../banner";
 import { computeInsights } from "./insights";
-import { addDays, lastNDaysStart, pacificDay, pacificMidnight } from "../periods";
+import { addDays, endOfPacificDay, lastNDaysStart, pacificDay, pacificMidnight } from "../periods";
 import { auditSystem, readAuditRange } from "../audit";
 import { canResendInvoice, resendInvoice } from "../invoiceResend";
 import { chatInsights } from "./chatInsights";
@@ -57,6 +57,8 @@ import { cleanStore, getStores } from "@/lib/stores";
 import { geocodeCached, milesBetween } from "../geocode";
 import { bundleOfferLabel } from "../bundles";
 import { brand } from "@/lib/brand";
+import { separateHeadings } from "../emailBody";
+import { internalStatsIn, statsRewrite } from "./customerCopy";
 
 /**
  * Tools the model may call. Which tools exist depends on the audience, and
@@ -302,7 +304,7 @@ const DEFS: ToolDef[] = [
     function: {
       name: "read_activity_log",
       description:
-        `Read the staff Activity log (read only) — every recorded admin change since the log began, no age limit: who did what, when, to which record, with before/after details. Search by member (name, email or id), action (prefix, e.g. 'shipping', 'order.', 'giftcard'), any word, and a date range (${brand.timezoneLabel}). Use for history questions like 'which Shippo labels did we buy for Jane', 'who changed this order', 'what happened on Nov 3'. Results are newest first; page with offset when total_matches is larger.`,
+        `Read the staff Activity log (read only) — every recorded admin change since the log began, no age limit: who did what, when, to which record, with before/after details (bought Shippo labels include trackingNumber, carrier, service, cost and labelUrl in 'after'; labels bought before label logging was added only have weight, product and buyer). Search by member (name, email or id), action (prefix, e.g. 'shipping', 'order.', 'giftcard'), any word, and a date range (${brand.timezoneLabel}). Use for history questions like 'which Shippo labels did we buy for Jane', 'who changed this order', 'what happened on Nov 3'. Results are newest first; page with offset when total_matches is larger.`,
       parameters: {
         type: "object",
         properties: {
@@ -363,7 +365,7 @@ const DEFS: ToolDef[] = [
     type: "function",
     function: {
       name: "list_discount_codes",
-      description: "Existing discount codes with value, usage and status.",
+      description: "Existing discount codes with value, usage, limits (total and per customer), last day, minimum order, public shop and status.",
       parameters: { type: "object", properties: {} },
     },
   },
@@ -507,7 +509,8 @@ const DEFS: ToolDef[] = [
     type: "function",
     function: {
       name: "propose_discount_code",
-      description: "Prepare a new discount code (staff must confirm).",
+      description:
+        "Prepare a new discount code (staff must confirm). Has every field of the dashboard's Discount codes form: max_uses (total), uses_per_customer (e.g. 1 = once per person), last_day, min_order, public_shop. If a card for this code is still waiting and staff ask for changes (e.g. 'one use per person, expires Nov 30'), call this again with ALL the details: the new card replaces the waiting one. To change a code that already exists, use propose_edit_discount.",
       parameters: {
         type: "object",
         properties: {
@@ -515,8 +518,10 @@ const DEFS: ToolDef[] = [
           type: str("percentage or fixed dollars", { enum: ["percentage", "fixed"] }),
           value: { type: "number", description: "Percent (1-100) or dollars" },
           label: str("Internal note, e.g. who it's for"),
-          max_uses: { type: "number", description: "Total uses allowed; omit for unlimited" },
-          expires_in_days: { type: "number", description: "Days until it expires; omit for never" },
+          max_uses: { type: "number", description: "Total uses allowed across everyone; omit for unlimited" },
+          uses_per_customer: { type: "number", description: "Uses allowed per customer (1 = one use per person); omit for unlimited" },
+          last_day: str("Last day it works, YYYY-MM-DD (works until 11:59pm local that day); omit for no end"),
+          expires_in_days: { type: "number", description: "Alternative to last_day: days from now until it expires" },
           min_order: { type: "number", description: "Minimum order in dollars; omit for none" },
           public_shop: { type: "boolean", description: "true = also works in the public shop (no account needed); default members only. Ambassadors' linked codes always work there." },
         },
@@ -1347,6 +1352,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           // Staff-only tool: the address on file (for "change Jess's address").
           address: [u.addressLine1, u.addressLine2, u.city, u.state, u.postalCode].filter(Boolean).join(", ") || undefined,
           phone: u.phone || undefined,
+          discount_limit: u.percentCap !== undefined ? money(u.percentCap) : "default ($100)",
         })),
       };
     }
@@ -1394,7 +1400,10 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
           active: x.active,
           uses: x.uses,
           max_uses: x.maxUses,
-          expires: x.expiresAt ? fmtDate(x.expiresAt) : undefined,
+          uses_per_customer: x.perCustomerLimit,
+          min_order: x.minOrderAmount ? money(x.minOrderAmount) : undefined,
+          public_shop: x.publicShop ? true : undefined,
+          last_day: x.expiresAt ? fmtDate(x.expiresAt) : undefined,
           label: x.label,
         })),
       };
@@ -1658,21 +1667,33 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         return { error: "value must be above 0 (and at most 100 for a percentage)." };
       }
       const code = args.code ? normalizeCode(s(args.code, 30)) : "";
-      if (code && (await getDiscounts()).some((d) => d.code === code)) return { error: `Code ${code} already exists.` };
-      if (code && ctx.actions.some((a) => a.kind === "discount_code" && (a.request?.body as { code?: string } | undefined)?.code === code))
-        return { note: `A card for ${code} is already prepared above — don't prepare it again.` };
-      const days = Number(args.expires_in_days);
-      const expiresAt = Number.isFinite(days) && days > 0 ? Date.now() + Math.round(days) * 86_400_000 : undefined;
+      if (code && (await getDiscounts()).some((d) => d.code === code))
+        return { error: `Code ${code} already exists. To change its settings use propose_edit_discount.` };
+      // A second card for the same code in this reply takes the first one's place.
+      const sameIdx = code ? ctx.actions.findIndex((a) => a.kind === "discount_code" && (a.request?.body as { code?: string } | undefined)?.code === code) : -1;
+      const lastDay = s(args.last_day, 10);
+      let expiresAt: number | undefined;
+      if (lastDay) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(lastDay) || !Number.isFinite(endOfPacificDay(lastDay))) return { error: "last_day must be a date like 2026-11-30." };
+        expiresAt = endOfPacificDay(lastDay);
+        if (expiresAt < Date.now()) return { error: `${lastDay} has already passed. Pick a later last day.` };
+      } else {
+        const days = Number(args.expires_in_days);
+        expiresAt = Number.isFinite(days) && days > 0 ? Date.now() + Math.round(days) * 86_400_000 : undefined;
+      }
       const maxUses = Number(args.max_uses) > 0 ? Math.floor(Number(args.max_uses)) : undefined;
+      const perCustomer = Number(args.uses_per_customer) > 0 ? Math.floor(Number(args.uses_per_customer)) : undefined;
       const minOrder = Number(args.min_order) > 0 ? Number(args.min_order) : undefined;
-      const body = { code, type, value, label: s(args.label, 80) || undefined, maxUses, expiresAt, minOrderAmount: minOrder, publicShop: args.public_shop === true || undefined, active: true };
-      ctx.actions.push({
+      const body = { code, type, value, label: s(args.label, 80) || undefined, maxUses, perCustomerLimit: perCustomer, expiresAt, minOrderAmount: minOrder, publicShop: args.public_shop === true || undefined, active: true };
+      const card: ActionProposal = {
+        ...(code ? { replaces: `discount:${code}` } : {}),
         id: newId(),
         kind: "discount_code",
         title: `New code ${code || "(auto-generated)"}: ${type === "percentage" ? `${value}% off` : `${money(value)} off`}`,
         lines: [
           maxUses ? `Up to ${maxUses} uses` : "Unlimited uses",
-          expiresAt ? `Expires ${new Date(expiresAt).toLocaleDateString("en-US", { timeZone: TZ })}` : "No expiry",
+          perCustomer ? `${perCustomer === 1 ? "One use" : `Up to ${perCustomer} uses`} per customer` : "No per-customer limit",
+          expiresAt ? `Last day it works: ${new Date(expiresAt).toLocaleDateString("en-US", { timeZone: TZ })}` : "No expiry",
           minOrder ? `Minimum order ${money(minOrder)}` : "",
           body.label ? `Note: ${body.label}` : "",
           body.publicShop ? "Works in the public shop too" : "Members only",
@@ -1680,7 +1701,13 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
         confirmLabel: "Create code",
         request: { method: "POST", url: "/api/admin/discounts", body },
         refresh: ["discounts"],
-      });
+      };
+      if (sameIdx >= 0) {
+        // Same code again in this reply (e.g. with changed details): the newer card takes its place.
+        ctx.actions[sameIdx] = card;
+        return { proposed: true, card_shown: [{ title: card.title, details: card.lines }], say: "The earlier card for this code was replaced by this one. Ready to confirm." };
+      }
+      ctx.actions.push(card);
       return { proposed: true, say: "Ready to confirm." };
     }
     case "get_site_settings": {
@@ -2167,7 +2194,7 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const template = templateRef ? (await listTemplates()).find((t) => t.id.toLowerCase() === templateRef || t.name.toLowerCase() === templateRef) : undefined;
       if (templateRef && !template) return { error: `No template called ${templateRef}. Call list_templates without template_id to see them.` };
       const subject = s(args.subject, 150) || template?.subject || "";
-      let body = s(args.body, 8000) || template?.body || "";
+      let body = separateHeadings(s(args.body, 8000) || template?.body || "");
       // The photo staff sent in this chat (the widget still has it and uploads it when the draft opens).
       let photo: CampaignDraft["photo"];
       if (args.use_photo === true) {
@@ -2183,6 +2210,9 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       const theme = !s(args.theme, 20) && template ? themeForCategory(template.category) : cleanThemeChoice(args.theme);
       const preheader = s(args.preview_line, 150);
       if (!subject || !body) return { error: "Need a subject and a body, or a template_id." };
+      // Customer-facing: never quote internal sales numbers (only what the Concierge wrote, not a saved template).
+      const stats = internalStatsIn(s(args.subject, 150), s(args.body, 8000), s(args.preview_line, 150));
+      if (stats) return statsRewrite(stats);
       if (s(args.segment, 40)) {
         const g = await resolveSegment(s(args.segment, 40), { days: Number(args.segment_days), limit: Number(args.segment_limit), product: s(args.segment_product, 120) });
         if ("error" in g) return g;

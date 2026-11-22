@@ -55,7 +55,7 @@ export function useAdminTheme() {
     setPref(next);
   }, [pref]);
 
-  const label = pref === "auto" ? `◐ Auto` : pref === "dark" ? "☾ Dark" : "☀ Light";
+  const label = pref === "auto" ? `◐ Auto` : pref === "dark" ? "☾ Dark" : "☼ Light";
   const title =
     pref === "auto"
       ? `Theme follows this device (currently ${resolved}). Click for dark.`

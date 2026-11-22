@@ -7,6 +7,7 @@ import { tooMany } from "@/lib/publicLimits";
 import { auditSystem } from "@/lib/audit";
 import { clientIp } from "@/lib/assistant/limits";
 import { landingFor } from "@/lib/ambassadorPanel";
+import { recordSignInPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+  await recordSignInPlace(req, "member", check.user.email);
   await auditSystem({
     action: "member.set_password",
     actor: check.user.email,

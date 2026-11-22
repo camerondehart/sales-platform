@@ -1,3 +1,5 @@
+import { separateHeadings } from "./emailBody";
+
 /**
  * The inbox preview line of a campaign: the grey text inboxes show after the
  * subject. It's written into the email as hidden text at the very top
@@ -49,7 +51,7 @@ export function autoPreviewLine(body: string): string {
     const text = decodeBasic(raw.replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " "));
     return clip(text);
   }
-  const blocks = raw.replace(/\r\n/g, "\n").split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
+  const blocks = separateHeadings(raw).replace(/\r\n/g, "\n").split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
   const isText = (b: string) => !/^#{1,3}\s/.test(b) && !/^!\[/.test(b) && !/^-{3,}$/.test(b) && !/^\[[^\]]+\]\([^)]+\)$/.test(b) && b !== "[[PHOTO]]";
   const first = blocks.find((b) => isText(b) && plain(b)) ?? blocks.find((b) => plain(b)) ?? "";
   return clip(plain(first));

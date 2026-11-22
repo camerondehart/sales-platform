@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Glyph from "./Glyph";
 
 // Assistant → Voice: pick the Concierge's voice (play a sample first), the
 // speech model, and see daily voice use. Only shown while the
@@ -93,7 +94,7 @@ export default function VoiceSettings() {
     <section className="admin-section vs">
       <h2>Concierge voice</h2>
       <p className="field-hint" style={{ marginTop: "-0.4rem" }}>
-        People can tap the mic to talk, and tap ▶ Listen (or turn on “Read answers aloud”) to hear answers. Speech goes through the AI Gateway on
+        People can tap the mic to talk, and tap <Glyph name="play" /> Listen (or turn on “Read answers aloud”) to hear answers. Speech goes through the AI Gateway on
         the same bill as the chat, and its estimated cost is included in the Assistant's monthly spend and limit (at full list prices, so it runs a little high during the Gateway's half-price launch). Answers are read up to about 600 characters; the full text stays on screen.
       </p>
 
@@ -141,7 +142,7 @@ export default function VoiceSettings() {
               {d.presets.filter((p) => p.family === familyOf(model)).map((p) => <option key={p.id} value={p.id}>{p.name} — {p.note}</option>)}
               <option value={OTHER}>Other {FAMILY_NAME[familyOf(model)]} voice…</option>
             </select>
-            <button type="button" className="esc-btn" disabled={!!busy || (!voiceId && familyOf(model) !== "microsoft")} onClick={() => preview(voiceId)}>{busy === `p:${voiceId}` ? "…" : "▶ Play"}</button>
+            <button type="button" className="esc-btn" disabled={!!busy || (!voiceId && familyOf(model) !== "microsoft")} onClick={() => preview(voiceId)}>{busy === `p:${voiceId}` ? "…" : <><Glyph name="play" /> Play</>}</button>
           </div>
           {voiceOther && (
             <input className="vs-custom" value={custom} onChange={(e) => { setCustom(e.target.value.trim()); if (e.target.value.trim()) setVoiceId(e.target.value.trim()); }} placeholder={familyOf(model) === "elevenlabs" ? "ElevenLabs voice ID" : familyOf(model) === "google" ? "Voice name, e.g. Kore" : "Microsoft voice name"} aria-label="Other voice" />

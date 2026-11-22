@@ -21,6 +21,7 @@ import CampaignHistory from "./CampaignHistory";
 import RemindersPanel from "./RemindersPanel";
 import StaffPanel from "./StaffPanel";
 import SettingsTiles from "./SettingsTiles";
+import SectionNav, { useSection } from "./SectionNav";
 import RowMenu from "./RowMenu";
 import StoreLocationsPanel from "./StoreLocationsPanel";
 import RetailPanel from "./RetailPanel";
@@ -40,7 +41,6 @@ import SuspiciousPanel from "./SuspiciousPanel";
 import ShippingWeights from "./ShippingWeights";
 import StockCounts from "./StockCounts";
 import VenmoInbox from "./VenmoInbox";
-import VoiceSettings from "./VoiceSettings";
 import AmbassadorsPanel from "./AmbassadorsPanel";
 import PointsCheckPanel from "./PointsCheckPanel";
 import { backorders } from "@/lib/stockMath";
@@ -53,6 +53,8 @@ import { brand } from "@/lib/brand";
 import { cleanThemeChoice, themeForCategory, type ThemeChoice } from "@/lib/campaignThemes";
 import { BlockArranger, LivePreview, ThemePicker } from "./CampaignComposerParts";
 import { autoPreviewLine } from "@/lib/campaignPreview";
+import { safeBannerHtml } from "@/lib/safeHtml";
+import Glyph, { type GlyphName } from "./Glyph";
 
 // Extended type – bulk orders have an `items` array
 type RecentInquiry = Inquiry & {
@@ -67,20 +69,24 @@ const SUBS_PER_PAGE = 25;
 // Deprecated screen; flip to true to bring it back temporarily.
 const SHOW_LEGACY_INQUIRY_ARCHIVE = false;
 
+// Marketing tab sections (cards at the top; one shows at a time).
+const MKT_SECTIONS = ["compose", "sent", "codes", "bundles", "banner", "audience"] as const;
+type MktSection = (typeof MKT_SECTIONS)[number];
+
 type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "ambassadors" | "retail" | "assistant" | "settings";
 
-const TABS: Array<{ key: TabKey; label: string; icon: string }> = [
-  { key: "overview", label: "Overview", icon: "◧" },
-  { key: "analytics", label: "Analytics", icon: "◔" },
-  { key: "orders", label: "Orders", icon: "🧾" },
-  { key: "members", label: "Members", icon: "👥" },
-  { key: "products", label: "Products", icon: "🏷️" },
-  { key: "events", label: "Events", icon: "🎟" },
-  { key: "marketing", label: "Marketing", icon: "✦" },
-  { key: "ambassadors", label: "Ambassadors", icon: "★" },
-  { key: "retail", label: "Retail", icon: "🏪" },
-  { key: "assistant", label: "Assistant", icon: "✧" },
-  { key: "settings", label: "Settings", icon: "⚙" },
+const TABS: Array<{ key: TabKey; label: string; icon: GlyphName }> = [
+  { key: "overview", label: "Overview", icon: "overview" },
+  { key: "analytics", label: "Analytics", icon: "analytics" },
+  { key: "orders", label: "Orders", icon: "orders" },
+  { key: "members", label: "Members", icon: "members" },
+  { key: "products", label: "Products", icon: "products" },
+  { key: "events", label: "Events", icon: "events" },
+  { key: "marketing", label: "Marketing", icon: "marketing" },
+  { key: "ambassadors", label: "Ambassadors", icon: "ambassadors" },
+  { key: "retail", label: "Retail", icon: "retail" },
+  { key: "assistant", label: "Assistant", icon: "assistant" },
+  { key: "settings", label: "Settings", icon: "settings" },
 ];
 
 // One fulfilled status. Whether it shipped or was collected is already
@@ -127,6 +133,7 @@ export default function AdminDashboard({
 
   // Which dashboard tab is showing
   const [tab, setTab] = useState<TabKey>("overview");
+  const [mktSection, setMktSection] = useSection<MktSection>("fp_marketing_section", MKT_SECTIONS, "compose");
 
   // Stay on the tab you were working in across refreshes. Read after mount so
   // the server and first client render agree (no hydration mismatch).
@@ -539,7 +546,6 @@ export default function AdminDashboard({
   const [subActiveCount, setSubActiveCount] = useState(0);
   const [newSubEmail, setNewSubEmail] = useState("");
   const [newSubName, setNewSubName] = useState("");
-  const [showSubs, setShowSubs] = useState(false);
   const [campSubject, setCampSubject] = useState("");
   const [campBody, setCampBody] = useState("");
   const campBodyRef = useRef<HTMLTextAreaElement>(null);
@@ -805,10 +811,10 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       if (res.ok) {
         setCampMsg(
           testOnly
-            ? "✅ Test sent to your inbox."
+            ? "✓ Test sent to your inbox."
             : data.scheduled
-              ? `✅ Scheduled for ${whenLabel} to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`
-              : `✅ Sent to ${data.sent} people${data.failed ? `, ${data.failed} failed` : ""}${data.remaining ? ` — the other ${data.remaining} go out within 15 minutes` : ""}.`
+              ? `✓ Scheduled for ${whenLabel} to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`
+              : `✓ Sent to ${data.sent} people${data.failed ? `, ${data.failed} failed` : ""}${data.remaining ? ` — the other ${data.remaining} go out within 15 minutes` : ""}.`
         );
         if (!testOnly) {
           setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampHistoryKey((k) => k + 1);
@@ -820,10 +826,10 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           }
         }
       } else {
-        setCampMsg(`❌ ${data.error || "Failed to send."}`);
+        setCampMsg(`✕ ${data.error || "Failed to send."}`);
       }
     } catch {
-      setCampMsg("❌ Network error.");
+      setCampMsg("✕ Network error.");
     }
     setCampSending(false);
   }
@@ -858,14 +864,14 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         const label = new Date(whenMs).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" });
-        setCampMsg(`✅ Saved. Still scheduled for ${label} (local) to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`);
+        setCampMsg(`✓ Saved. Still scheduled for ${label} (local) to ${data.recipients} people.${data.note ? ` ${data.note}` : ""}`);
         setCampEditing(null);
         setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampHistoryKey((k) => k + 1);
       } else {
-        setCampMsg(`❌ ${data.error || "Couldn't save the changes."}`);
+        setCampMsg(`✕ ${data.error || "Couldn't save the changes."}`);
       }
     } catch {
-      setCampMsg("❌ Network error.");
+      setCampMsg("✕ Network error.");
     }
     setCampSending(false);
   }
@@ -903,14 +909,14 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       if (res.ok) {
         setUsers(users.map((u) => (u.id === loyaltyUser.id ? { ...u, loyaltyPoints: data.points } as any : u)));
         setLoyaltyUser({ ...loyaltyUser, loyaltyPoints: data.points } as any);
-        setLyMsg(`✅ Balance is now ${data.points} points.`);
+        setLyMsg(`✓ Balance is now ${data.points} points.`);
         setLyAmount("");
         setLyReason("");
       } else {
-        setLyMsg(`❌ ${data.error || "Failed."}`);
+        setLyMsg(`✕ ${data.error || "Failed."}`);
       }
     } catch {
-      setLyMsg("❌ Network error.");
+      setLyMsg("✕ Network error.");
     }
     setLyBusy(false);
   }
@@ -1193,14 +1199,14 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
         body: JSON.stringify({ userId: msgUser.id, subject: msgSubject, message: msgText }),
       });
       if (res.ok) {
-        setMsgStatus(`✅ Sent to ${msgUser.email}.`);
+        setMsgStatus(`✓ Sent to ${msgUser.email}.`);
         setMsgText("");
       } else {
         const data = await res.json().catch(() => ({}));
-        setMsgStatus(`❌ ${data.error || "Failed to send."}`);
+        setMsgStatus(`✕ ${data.error || "Failed to send."}`);
       }
     } catch {
-      setMsgStatus("❌ Network error.");
+      setMsgStatus("✕ Network error.");
     }
     setMsgSending(false);
   }
@@ -1270,7 +1276,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       const data = await res.json().catch(() => ({}));
       // Gift cards: say when a card went out, or when a cancel couldn't undo everything.
       if (data.warning) alert(data.warning);
-      else if (data.giftCardsDelivered) alert(`🎁 Gift card sent. The recipient has their email and the card is in their account; the order is now Completed.`);
+      else if (data.giftCardsDelivered) alert(`Gift card sent. The recipient has their email and the card is in their account; the order is now Completed.`);
       if (data.order) {
         setOrders((prev) => prev.map((o) => (o.id === id ? data.order : o)));
         setDetailOrder((d) => (d && d.id === id ? data.order : d));
@@ -2009,7 +2015,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
   }
 
   async function deleteInquiry(id: string) {
-    if (!confirm("⚠️ Delete this inquiry permanently? This action cannot be undone.")) return;
+    if (!confirm("Delete this inquiry permanently? This action cannot be undone.")) return;
     const res = await adminFetch(`/api/admin/inquiries/delete?id=${id}`, { method: "DELETE" });
     if (res.ok) {
       setAllInquiries(prev => prev.filter(i => i.id !== id));
@@ -2228,13 +2234,13 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
     try {
       const res = await adminFetch("/api/admin/export-email", { method: "POST" });
       if (res.ok) {
-        setExportMsg("✅ Export emailed successfully.");
+        setExportMsg("✓ Export emailed successfully.");
         setTimeout(() => setExportMsg(""), 3000);
       } else {
-        setExportMsg("❌ Failed to send export. Check server logs.");
+        setExportMsg("✕ Failed to send export. Check server logs.");
       }
     } catch {
-      setExportMsg("❌ Network error.");
+      setExportMsg("✕ Network error.");
     }
     setExporting(false);
   }
@@ -2584,6 +2590,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
           : "Draft from the assistant — review it, send yourself a test, then send."
       );
       setTab("marketing");
+      setMktSection("compose");
       setTimeout(() => document.getElementById("campaign-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
       // The photo staff sent the Concierge: upload it and put it where [[PHOTO]] is.
       if (d.photo && d.body.includes(PHOTO_SLOT)) {
@@ -2719,13 +2726,13 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               <><span className="save-spinner" aria-hidden="true" /> {saveStatus.message || "Still syncing…"}</>
             )}
             {saveStatus.state === "saved" && <>✓ {saveStatus.message || "Saved"}</>}
-            {saveStatus.state === "error" && <>⚠ {saveStatus.message || "Couldn't save"}</>}
+            {saveStatus.state === "error" && <><Glyph name="alert" /> {saveStatus.message || "Couldn't save"}</>}
           </div>
         )}
         <nav>
           {/* Opens the guide at the tab you're on. */}
-          <a href="/help" title="Staff guide: what do you need to do?">📖 Staff guide</a>
-          <a href="/gallery" target="_blank">View site ↗</a>
+          <a href="/help" title="Staff guide: what do you need to do?"><Glyph name="book" /> Staff guide</a>
+          <a href="/gallery" target="_blank">View site <Glyph name="external" /></a>
           <button type="button" className="theme-switch" onClick={theme.cycle} title={theme.title} aria-label={theme.title}>
             {theme.label}
           </button>
@@ -2755,7 +2762,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               aria-current={tab === t.key}
               title={badge > 0 ? badgeTitle : undefined}
             >
-              <span className="admin-tab-icon" aria-hidden="true">{t.icon}</span>
+              <span className="admin-tab-icon" aria-hidden="true"><Glyph name={t.icon} /></span>
               {t.label}
               {badge > 0 && (
                 <span className="admin-tab-badge" aria-label={badgeTitle}>{badge}</span>
@@ -2769,8 +2776,12 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
       {tab === "overview" && (
         <>
           <TodayBulletin
-            onOpen={(t, filter) => {
+            onOpen={(t, filter, key) => {
               setTab(t as TabKey);
+              if (t === "marketing" && key) {
+                if (/banner/.test(key)) setMktSection("banner");
+                else if (/code/.test(key)) setMktSection("codes");
+              }
               if (t === "orders" && filter) {
                 setOrderFilter(filter as OrderStatus);
                 setOrdersPage(0);
@@ -2868,8 +2879,8 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                 {
                   title: "Promote",
                   items: [
-                    { icon: "megaphone", label: "Send a campaign", go: () => setTab("marketing") },
-                    { icon: "tag", label: "Create a discount code", go: () => setTab("marketing") },
+                    { icon: "megaphone", label: "Send a campaign", go: () => { setMktSection("compose"); goTo("marketing"); } },
+                    { icon: "tag", label: "Create a discount code", go: () => { setMktSection("codes"); goTo("marketing"); } },
                     { icon: "calendar", label: "Schedule an event", go: () => setTab("events") },
                     { icon: "star", label: "Add an ambassador", go: () => goTo("ambassadors") },
                   ],
@@ -2952,7 +2963,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                   <div className="email">{u.email}</div>
                   <div className="signup-answers">
                     <span className={u.ageVerified ? "answer-yes" : "answer-no"}>
-                      {u.ageVerified ? "✓ Confirmed 21 or over" : "⚠ Did not confirm 21 or over"}
+                      {u.ageVerified ? "✓ Confirmed 21 or over" : <><Glyph name="alert" /> Did not confirm 21 or over</>}
                     </span>
                     <span className="answer-neutral">
                       {u.priorCustomer ? "Bought from us before" : "New customer"}
@@ -2988,7 +2999,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               onClick={() => setShowRejected(!showRejected)}
               style={{ background: "none", border: "none", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--ink-soft)", cursor: "pointer", padding: 0 }}
             >
-              {showRejected ? "▼" : "▶"} Rejected ({rejected.length})
+              {showRejected ? "▼" : "▶\uFE0E"} Rejected ({rejected.length})
             </button>
             {showRejected && rejected.length === 0 && (
               <div className="user-meta" style={{ padding: "0.75rem 0" }}>No rejected requests.</div>
@@ -3053,7 +3064,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               ↻ Refresh
             </button>
             <a className="export-btn" href="/api/admin/orders/export" download>Orders CSV</a>
-            <a className="export-btn" href="/api/admin/revenue/export" download>💰 Revenue report</a>
+            <a className="export-btn" href="/api/admin/revenue/export" download><Glyph name="cash" /> Revenue report</a>
           </div>
         </div>
 
@@ -3128,7 +3139,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       {!o.isInquiry && <span style={{ color: "var(--ink-soft)", fontWeight: 400 }}>· ${o.total.toFixed(2)}</span>}
                       {o.paymentMethod === "cash" && (
                         <span style={{ padding: "0.12rem 0.5rem", borderRadius: "999px", fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: "var(--yellow)", color: "var(--white)" }}>
-                          💵 Cash
+                          <Glyph name="cash" /> Cash
                         </span>
                       )}
                     </div>
@@ -3136,7 +3147,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       {o.items.map((i) => `${i.productName} ×${i.quantity}${i.restocking ? " (restocking)" : ""}`).join(", ")}
                     </div>
                     <div className="user-meta">
-                      {formatDateTime(o.createdAt)} · {o.giftCardOrder ? "🎁 Gift card" : o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
+                      {formatDateTime(o.createdAt)} · {o.giftCardOrder ? <><Glyph name="gift" /> Gift card</> : o.shippingMethod === "pickup" ? "Local pickup" : "Ship"}
                       {o.trackingNumber && <> · Tracking <TrackingLink n={o.trackingNumber} /></>}
                     </div>
                   </div>
@@ -3175,7 +3186,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               padding: "0",
             }}
           >
-            {showRecentInquiries ? "▼" : "▶"} Inquiry archive (legacy)
+            {showRecentInquiries ? "▼" : "▶\uFE0E"} Inquiry archive (legacy)
           </button>
           {showRecentInquiries && (
             <button
@@ -3218,7 +3229,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                           {inq.items && inq.items.length > 0 && (
                             <details style={{ display: "inline-block", position: "relative" }}>
                               <summary style={{ cursor: "pointer", fontWeight: 600, color: "var(--ink)", fontSize: "0.75rem", letterSpacing: "0.12em", textTransform: "uppercase", background: "var(--white)", padding: "0.4rem 0.8rem", border: "1px solid var(--rule)", borderRadius: "3px", display: "inline-block" }}>
-                                📦 Show items
+                                <Glyph name="box" /> Show items
                               </summary>
                               <div style={{ position: "absolute", top: "100%", left: 0, zIndex: 10, background: "var(--white)", border: "1px solid var(--rule)", borderRadius: "4px", padding: "0.75rem", marginTop: "0.25rem", minWidth: "200px", boxShadow: "var(--shadow)" }}>
                                 <ul style={{ margin: 0, paddingLeft: "1rem" }}>
@@ -3280,7 +3291,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
               padding: "0",
             }}
           >
-            {showMembers ? "▼" : "▶"} Members ({approved.length})
+            {showMembers ? "▼" : "▶\uFE0E"} Members ({approved.length})
           </button>
           {showMembers && (
             <div className="section-actions">
@@ -3593,7 +3604,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
                       )}
                       {p.promo?.type === "percent" && <span className="prod-promo">{p.promo.percent}% off</span>}
                       {p.promo?.type === "bogo" && <span className="prod-promo">BOGO {p.promo.percent}%</span>}
-                      {p.cashOnly && (p.salePrice?.trim() || p.promo) && <span className="prod-promo">💵 Cash pickup only</span>}
+                      {p.cashOnly && (p.salePrice?.trim() || p.promo) && <span className="prod-promo"><Glyph name="cash" /> Cash pickup only</span>}
                     </div>
                   </div>
 
@@ -3699,7 +3710,22 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
 
       {/* Subscribers & campaigns */}
       {tab === "marketing" && (
-      <section className="admin-section" id="campaign-composer">
+        <SectionNav
+          label="Marketing sections"
+          value={mktSection}
+          onChange={setMktSection}
+          items={[
+            { key: "compose", icon: "mail", label: "Write a campaign", status: campEditing ? <span className="secnav-dirty">Editing a scheduled one</span> : `${subActiveCount} active subscriber${subActiveCount === 1 ? "" : "s"}` },
+            { key: "sent", icon: "inbox", label: "Sent & scheduled", status: "Results, edit or cancel" },
+            { key: "codes", icon: "tag", label: "Discount codes", badge: discounts.filter((d) => codeState(d) === "live").length, status: `${discounts.filter((d) => codeState(d) === "live").length} live · ${discounts.length} in all` },
+            { key: "bundles", icon: "basket", label: "Bundles", status: "Mix & match sets" },
+            { key: "banner", icon: "megaphone", label: "Site banner", status: bannerEnabled ? "Showing on the site" : "Off" },
+            { key: "audience", icon: "members", label: "Subscribers & QR", status: `${subscribers.length} on the list · sign-up QR` },
+          ]}
+        />
+      )}
+      {tab === "marketing" && mktSection === "compose" && (
+      <section className="admin-section secnav-pane" id="campaign-composer">
         <h2>
           Email campaigns
           {subActiveCount > 0 && <span className="badge">{subActiveCount}</span>}
@@ -3721,7 +3747,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
 
         {campEditing && (
           <div className="cc-editing">
-            <span>✏️ Editing the scheduled campaign <strong>“{campEditing.subject}”</strong>. Changes apply when you press <strong>Save changes</strong>; it stays scheduled.</span>
+            <span><Glyph name="pencil" /> Editing the scheduled campaign <strong>“{campEditing.subject}”</strong>. Changes apply when you press <strong>Save changes</strong>; it stays scheduled.</span>
             <button type="button" className="esc-btn" onClick={() => { setCampEditing(null); setCampSubject(""); setCampBody(""); setCampWhen(""); setCampTheme("auto"); setCampPreheader(""); setCampMsg("Stopped editing. The scheduled campaign is unchanged."); }}>Stop editing</button>
           </div>
         )}
@@ -3838,7 +3864,15 @@ We just finished a new run and wanted you to hear it first.
           <LivePreview subject={campSubject} body={campBody} theme={campTheme} preheader={campPreheader} when={campWhen ? pacificToMs(campWhen) : undefined} onResolved={setCampResolved} />
         </div>
 
+      </section>
+      )}
+
+      {tab === "marketing" && mktSection === "sent" && (
+      <section className="admin-section secnav-pane">
+        <h2>Sent &amp; scheduled campaigns</h2>
         <CampaignHistory
+          bare
+          emptyText="No campaigns yet. Write one under Write a campaign."
           refreshKey={campHistoryKey}
           editingId={campEditing?.id}
           onEdit={(c) => {
@@ -3856,17 +3890,27 @@ We just finished a new run and wanted you to hear it first.
             }
             setCampWhen(msToPacificInput(c.scheduledFor));
             setCampMsg("");
+            setMktSection("compose");
             setTimeout(() => document.getElementById("campaign-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
           }}
           onDuplicate={(subject, body) => {
             setCampSubject(subject);
             setCampBody(body);
             setCampMsg("Loaded a copy of that campaign — edit it, send yourself a test, then send or schedule.");
+            setMktSection("compose");
             setTimeout(() => document.getElementById("campaign-composer")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
           }}
         />
+      </section>
+      )}
 
-        <div style={{ marginTop: "1.5rem", borderTop: "1px solid var(--rule-soft)", paddingTop: "1.15rem" }}>
+      {tab === "marketing" && mktSection === "audience" && (
+      <section className="admin-section secnav-pane">
+        <h2>
+          Subscribers &amp; sign-ups
+          {subActiveCount > 0 && <span className="badge">{subActiveCount}</span>}
+        </h2>
+        <div>
           <h3 style={{ margin: 0, fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--green)" }}>
             Event sign-up QR code
           </h3>
@@ -3894,13 +3938,10 @@ We just finished a new run and wanted you to hear it first.
         </div>
 
         <div style={{ marginTop: "1.5rem", borderTop: "1px solid var(--rule-soft)", paddingTop: "1.15rem" }}>
-          <button
-            onClick={() => setShowSubs(!showSubs)}
-            style={{ background: "none", border: "none", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--green)", cursor: "pointer", padding: 0 }}
-          >
-            {showSubs ? "▼" : "▶"} Manage subscribers ({subscribers.length})
-          </button>
-          {showSubs && (
+          <h3 style={{ margin: 0, fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--green)" }}>
+            Manage subscribers ({subscribers.length})
+          </h3>
+          {(
             <>
               <form onSubmit={addSubscriberManual} style={{ display: "flex", gap: "0.5rem", margin: "1rem 0", flexWrap: "wrap" }}>
                 <input type="email" required value={newSubEmail} onChange={(e) => setNewSubEmail(e.target.value)} placeholder="email@example.com" style={{ flex: "2 1 200px" }} />
@@ -3969,11 +4010,11 @@ We just finished a new run and wanted you to hear it first.
       )}
 
       {/* Discount codes */}
-      {tab === "marketing" && <BundlesPanel products={products} />}
+      {tab === "marketing" && mktSection === "bundles" && <BundlesPanel products={products} />}
       {tab === "ambassadors" && <AmbassadorsPanel products={products} />}
       {tab === "retail" && <RetailPanel onPending={setRetailPending} />}
-      {tab === "marketing" && (
-      <section className="admin-section">
+      {tab === "marketing" && mktSection === "codes" && (
+      <section className="admin-section secnav-pane">
         <h2>
           Discount codes
           {discounts.filter((d) => codeState(d) === "live").length > 0 && (
@@ -4049,11 +4090,10 @@ We just finished a new run and wanted you to hear it first.
 
       {tab === "analytics" && <AnalyticsDashboard />}
       {tab === "assistant" && <AssistantPanel />}
-      {tab === "assistant" && <VoiceSettings />}
 
 
-      {tab === "marketing" && (
-      <section className="admin-section">
+      {tab === "marketing" && mktSection === "banner" && (
+      <section className="admin-section secnav-pane">
         <h2>Announcement banner</h2>
         <div className="notice">
           Shows at the top of every page. Add an optional countdown for sales or events — the banner
@@ -4098,7 +4138,7 @@ We just finished a new run and wanted you to hear it first.
             {/* Live preview */}
             {bannerEnabled && bannerMessage.trim() && (
               <div style={{ background: bannerBg, color: bannerText, padding: "0.7rem 1rem", borderRadius: "6px", textAlign: "center", marginBottom: "1rem", fontSize: "0.9rem" }}>
-                <span dangerouslySetInnerHTML={{ __html: bannerMessage }} />
+                <span dangerouslySetInnerHTML={{ __html: safeBannerHtml(bannerMessage) }} />
                 {bannerCountdown && <span style={{ marginLeft: "0.6rem", background: "rgba(255,255,255,0.22)", padding: "0.15rem 0.6rem", borderRadius: "999px" }}>{bannerCountdownLabel || "Ends in"} 00:00:00</span>}
                 {bannerLinkUrl && <span style={{ marginLeft: "0.6rem", textDecoration: "underline", fontWeight: 700 }}>{bannerLinkLabel || "Learn more"} →</span>}
               </div>
@@ -4115,7 +4155,7 @@ We just finished a new run and wanted you to hear it first.
       {tab === "settings" && (
         <SettingsTiles
           tiles={[
-            { key: "rules", icon: "🏷️", title: "Sales & loyalty rules", summary: "Bundle-and-save discount and loyalty points.", render: () => (
+            { key: "rules", icon: "tag", title: "Sales & loyalty rules", summary: "Bundle-and-save discount and loyalty points.", render: () => (
       <section className="admin-section">
         <h2>Sales &amp; loyalty rules</h2>
         <div className="notice">
@@ -4163,10 +4203,10 @@ We just finished a new run and wanted you to hear it first.
         <div className="admin-form"><PointsCheckPanel /></div>
       </section>
             ) },
-            { key: "flags", icon: "🎛️", title: "Feature switches", summary: "Turn features on or off without a redeploy.", render: () => <FlagsPanel fold={false} /> },
-            { key: "reminders", icon: "⏰", title: "Payment reminders", summary: "Timing and wording of the automatic reminder emails.", badge: expiredCount, render: () => <RemindersPanel fold={false} /> },
-            { key: "staff", icon: "🔑", title: "Staff sign-in", summary: "Who can sign in with an emailed link, and Face ID for their devices.", render: () => <StaffPanel /> },
-            { key: "password", icon: "🔒", title: "Steward password", summary: "Today's staff password.", render: () => (
+            { key: "flags", icon: "sliders", title: "Feature switches", summary: "Turn features on or off without a redeploy.", render: () => <FlagsPanel fold={false} /> },
+            { key: "reminders", icon: "clock", title: "Payment reminders", summary: "Timing and wording of the automatic reminder emails.", badge: expiredCount, render: () => <RemindersPanel fold={false} /> },
+            { key: "staff", icon: "key", title: "Staff sign-in", summary: "Who can sign in with an emailed link, and Face ID for their devices.", render: () => <StaffPanel /> },
+            { key: "password", icon: "lock", title: "Steward password", summary: "Today's staff password.", render: () => (
       <section className="admin-section">
         <h2>Steward password</h2>
         <div className="notice">This is your admin sign-in. Member access is managed through the sections above — there is no longer a shared site password.</div>
@@ -4180,21 +4220,21 @@ We just finished a new run and wanted you to hear it first.
         />
       </section>
             ) },
-            { key: "export", icon: "📧", title: "Email data export", summary: "Send tonight's report and CSV backups now.", render: () => (
+            { key: "export", icon: "mail", title: "Email data export", summary: "Send tonight's report and CSV backups now.", render: () => (
       <section className="admin-section">
         <h2>Email Data Export</h2>
         <div className="notice">Sends the nightly report: revenue figures, what needs attention, top sellers, customer trends, plus CSV backups of revenue, orders, members, products and inquiries. Runs automatically each night — use this to send one now.</div>
-        <button className="submit" onClick={handleEmailExport} disabled={exporting} style={{ width: "auto", padding: "0.75rem 1.5rem" }}>{exporting ? "Sending…" : "📧 Email export now"}</button>
+        <button className="submit" onClick={handleEmailExport} disabled={exporting} style={{ width: "auto", padding: "0.75rem 1.5rem" }}>{exporting ? "Sending…" : <><Glyph name="mail" /> Email export now</>}</button>
         {exportMsg && <div style={{ marginTop: "1rem", fontStyle: "italic", color: "var(--mint)" }}>{exportMsg}</div>}
       </section>
             ) },
-            { key: "site-requests", icon: "🛠️", title: "Site requests", summary: "Changes to the website staff have asked for, and the developer's approvals.", render: () => <SiteRequestsPanel /> },
-            { key: "entrance", icon: "🌲", title: "Entrance animation", summary: "Seasonal and holiday versions of the members' entrance: preview them and choose one, or Auto.", render: () => <EntrancePanel /> },
-            { key: "gift-cards", icon: "🎁", title: "Gift cards", summary: "The buyer's bonus (e.g. $5 per $50) and every gift card: sent, waiting for payment, balances.", render: () => <GiftCardsPanel /> },
-            { key: "events-note", icon: "🎟️", title: "Events popup", summary: "The small note about upcoming events for members nearby: town, miles, heading, which events.", render: () => <EventsNotePanel /> },
-            { key: "faq", icon: "❓", title: "FAQ page", summary: "Questions and answers for /faq, which the Concierge also uses.", render: () => <FaqPanel /> },
-            { key: "stores", icon: "📍", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
-            { key: "activity", icon: "📜", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
+            { key: "site-requests", icon: "wrench", title: "Site requests", summary: "Changes to the website staff have asked for, and the developer's approvals.", render: () => <SiteRequestsPanel /> },
+            { key: "entrance", icon: "tree", title: "Entrance animation", summary: "Seasonal and holiday versions of the members' entrance: preview them and choose one, or Auto.", render: () => <EntrancePanel /> },
+            { key: "gift-cards", icon: "gift", title: "Gift cards", summary: "The buyer's bonus (e.g. $5 per $50) and every gift card: sent, waiting for payment, balances.", render: () => <GiftCardsPanel /> },
+            { key: "events-note", icon: "events", title: "Events popup", summary: "The small note about upcoming events for members nearby: town, miles, heading, which events.", render: () => <EventsNotePanel /> },
+            { key: "faq", icon: "question", title: "FAQ page", summary: "Questions and answers for /faq, which the Concierge also uses.", render: () => <FaqPanel /> },
+            { key: "stores", icon: "pin", title: "Store locations", summary: `Shops that carry ${brand.shortName}, for the public store map.`, render: () => <StoreLocationsPanel /> },
+            { key: "activity", icon: "scroll", title: "Activity log", summary: "Every change made in the dashboard, with who and what.", render: () => <ActivityLog fold={false} /> },
           ]}
         />
       )}
@@ -4295,7 +4335,7 @@ We just finished a new run and wanted you to hear it first.
                 <div className="field">
                   <label>New password</label>
                   <input type="text" value={pwResetValue} onChange={(e) => setPwResetValue(e.target.value)} style={{ fontFamily: "Consolas, monospace" }} />
-                  <button type="button" onClick={() => setPwResetValue(generatePassword())} style={{ alignSelf: "flex-start", marginTop: "0.5rem", padding: "0.4rem 0.85rem", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--ink)", border: "1px solid var(--rule)", borderRadius: "3px", background: "var(--white)", cursor: "pointer" }}>🔄 Generate new</button>
+                  <button type="button" onClick={() => setPwResetValue(generatePassword())} style={{ alignSelf: "flex-start", marginTop: "0.5rem", padding: "0.4rem 0.85rem", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--ink)", border: "1px solid var(--rule)", borderRadius: "3px", background: "var(--white)", cursor: "pointer" }}><Glyph name="refresh" /> Generate new</button>
                 </div>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.95rem", color: "var(--ink)", cursor: "pointer", lineHeight: 1.4 }}>
                   <input type="checkbox" checked={pwResetEmailToggle} onChange={(e) => setPwResetEmailToggle(e.target.checked)} style={{ marginTop: "0.25rem" }} />
@@ -4332,7 +4372,7 @@ We just finished a new run and wanted you to hear it first.
                 <div className="field">
                   <label>Password</label>
                   <input type="text" value={amPassword} onChange={(e) => setAmPassword(e.target.value)} style={{ fontFamily: "Consolas, monospace" }} autoComplete="off" />
-                  <button type="button" onClick={() => setAmPassword(generatePassword())} style={{ alignSelf: "flex-start", marginTop: "0.5rem", padding: "0.4rem 0.85rem", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--ink)", border: "1px solid var(--rule)", borderRadius: "3px", background: "var(--white)", cursor: "pointer" }}>🔄 Generate new</button>
+                  <button type="button" onClick={() => setAmPassword(generatePassword())} style={{ alignSelf: "flex-start", marginTop: "0.5rem", padding: "0.4rem 0.85rem", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--ink)", border: "1px solid var(--rule)", borderRadius: "3px", background: "var(--white)", cursor: "pointer" }}><Glyph name="refresh" /> Generate new</button>
                 </div>
                 <label style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem", fontSize: "0.95rem", color: "var(--ink)", cursor: "pointer", lineHeight: 1.4 }}>
                   <input type="checkbox" checked={amSendEmail} onChange={(e) => setAmSendEmail(e.target.checked)} style={{ marginTop: "0.25rem" }} />
@@ -4455,7 +4495,7 @@ We just finished a new run and wanted you to hear it first.
                   parseInt(edCapacity) > 0 &&
                   parseInt(edCapacity) < editEvent.registeredCount && (
                     <div className="callout-warn">
-                      ⚠ {editEvent.registeredCount} people are already registered. Lowering
+                      <Glyph name="alert" /> {editEvent.registeredCount} people are already registered. Lowering
                       capacity below that won't remove anyone, but no new spots will open.
                     </div>
                   )}
@@ -4532,7 +4572,7 @@ We just finished a new run and wanted you to hear it first.
                   {cashPickupOn && (salePrice.trim() || promoType !== "none") && (
                     <label className="cash-only-tick">
                       <input type="checkbox" checked={cashOnly} onChange={(e) => setCashOnly(e.target.checked)} />
-                      <span>💵 Cash pickup only <small>The sale applies only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
+                      <span><Glyph name="cash" /> Cash pickup only <small>The sale applies only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
                     </label>
                   )}
                 </div>
@@ -4606,7 +4646,7 @@ We just finished a new run and wanted you to hear it first.
                   {(cashPickupOn || editCashOnly) && (editSalePrice.trim() || editPromoType !== "none") && (
                     <label className="cash-only-tick">
                       <input type="checkbox" checked={editCashOnly} onChange={(e) => setEditCashOnly(e.target.checked)} />
-                      <span>💵 Cash pickup only <small>The sale price and promotion apply only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
+                      <span><Glyph name="cash" /> Cash pickup only <small>The sale price and promotion apply only to Local pickup paid in cash; shipped and invoiced orders pay the regular price.</small></span>
                     </label>
                   )}
                 </div>
@@ -5125,14 +5165,14 @@ function OrderDetailModal({
         body: JSON.stringify({ orderId: order.id, message }),
       });
       if (res.ok) {
-        setMessageStatus(`✅ Sent to ${order.userEmail}.`);
+        setMessageStatus(`✓ Sent to ${order.userEmail}.`);
         setMessage("");
       } else {
         const data = await res.json().catch(() => ({}));
-        setMessageStatus(`❌ ${data.error || "Failed to send."}`);
+        setMessageStatus(`✕ ${data.error || "Failed to send."}`);
       }
     } catch {
-      setMessageStatus("❌ Network error.");
+      setMessageStatus("✕ Network error.");
     }
     setMessageSending(false);
   }
@@ -5201,7 +5241,7 @@ function OrderDetailModal({
 
           {order.giftCardOrder && (
             <div className="notice" style={{ fontSize: "0.88rem", marginBottom: "1rem" }}>
-              🎁 <strong>Gift card order.</strong> Nothing to ship. Once you&apos;ve checked the money arrived, Mark paid (or match the Venmo/Zelle payment) and the card is sent to the recipient automatically, with the buyer&apos;s bonus. Cancelling voids the card if it hasn&apos;t been spent.
+              <Glyph name="gift" /> <strong>Gift card order.</strong> Nothing to ship. Once you&apos;ve checked the money arrived, Mark paid (or match the Venmo/Zelle payment) and the card is sent to the recipient automatically, with the buyer&apos;s bonus. Cancelling voids the card if it hasn&apos;t been spent.
             </div>
           )}
 
@@ -5227,7 +5267,7 @@ function OrderDetailModal({
               {(order.status === "paid" ||
                 (order.status === "pending" && order.paymentMethod === "cash")) && (
                 <button className="approve" onClick={() => onStatusChange(order.id, "completed")} style={{ padding: "0.55rem 1rem" }}>
-                  {order.shippingMethod === "pickup" ? "🤝" : "📦"} Mark completed
+                  <Glyph name={order.shippingMethod === "pickup" ? "bag" : "box"} /> Mark completed
                 </button>
               )}
             </div>

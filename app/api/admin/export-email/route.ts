@@ -281,12 +281,13 @@ async function runExport(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
   const secret = process.env.CRON_SECRET;
 
-  // NOTE: the header and user-agent checks can be faked by anyone, so a
-  // "cron" request is never trusted to choose the recipient (see below).
-  const isCron =
-    !!cronHeader ||
-    /vercel-cron/i.test(userAgent) ||
-    (!!secret && authHeader === `Bearer ${secret}`);
+  // With CRON_SECRET set (production), only Vercel's Bearer secret counts:
+  // the header and user-agent can be faked by anyone. Without a secret they
+  // are accepted only off Vercel (local runs and tests), never on a preview.
+  // Either way a "cron" request is never trusted to choose the recipient.
+  const isCron = secret
+    ? authHeader === `Bearer ${secret}`
+    : !process.env.VERCEL && (!!cronHeader || /vercel-cron/i.test(userAgent));
 
   const isAdminUser = await isAdmin();
 
@@ -314,7 +315,10 @@ async function runExport(req: Request) {
   // Only a signed-in admin may choose where the export goes. A cron run
   // always sends to the configured inbox, so a faked cron request can never
   // mail the member list to someone else.
-  let recipientEmail: string | null = isAdminUser ? url.searchParams.get("email") : null;
+  // POST only: a GET can be triggered by a link a staff member clicks while
+  // signed in (cookies go along with links), which must never mail the
+  // member list to an address in that link.
+  let recipientEmail: string | null = isAdminUser && req.method === "POST" ? url.searchParams.get("email") : null;
   if (!recipientEmail) {
     recipientEmail = process.env.EXPORT_RECIPIENT_EMAIL ?? process.env.INQUIRY_TO_EMAIL ?? null;
   }

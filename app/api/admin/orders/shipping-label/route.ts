@@ -4,7 +4,8 @@ import { isAdmin } from "@/lib/auth";
 import { getUsers } from "@/lib/users";
 import { getOrders, updateOrder } from "@/lib/orders";
 import { hrefSafe } from "@/lib/invoiceEmail";
-import { audited } from "@/lib/audit";
+import { audited, auditDetail } from "@/lib/audit";
+import { labelLogFields } from "@/lib/labelLog";
 import { getProducts } from "@/lib/storage";
 import { getSettings } from "@/lib/settings";
 import { orderWeight, packagingOzOf } from "@/lib/shippingWeight";
@@ -34,7 +35,8 @@ async function POST_handler(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { orderId, weightOz, serviceToken, force } = await req.json();
+  const body = await req.json();
+  const { orderId, weightOz, serviceToken, force } = body;
   if (!orderId) {
     return NextResponse.json({ error: "missing orderId" }, { status: 400 });
   }
@@ -72,7 +74,7 @@ async function POST_handler(req: Request) {
   }
   LABELS_IN_PROGRESS.add(order.id);
   try {
-    return await buyLabel(order, weight, serviceToken);
+    return await buyLabel(order, weight, serviceToken, body);
   } finally {
     LABELS_IN_PROGRESS.delete(order.id);
   }
@@ -81,7 +83,7 @@ async function POST_handler(req: Request) {
 // Orders with a label purchase running right now (this server instance).
 const LABELS_IN_PROGRESS: Set<string> = ((globalThis as unknown as { __fpLabels?: Set<string> }).__fpLabels ??= new Set<string>());
 
-async function buyLabel(order: Awaited<ReturnType<typeof getOrders>>[number], weightOz: number | undefined, serviceToken: string | undefined): Promise<Response> {
+async function buyLabel(order: Awaited<ReturnType<typeof getOrders>>[number], weightOz: number | undefined, serviceToken: string | undefined, input: Record<string, unknown> = {}): Promise<Response> {
 
   // Prefer the address captured at checkout; fall back to the member profile.
   let address = order.shippingAddress;
@@ -252,6 +254,9 @@ async function buyLabel(order: Awaited<ReturnType<typeof getOrders>>[number], we
       shippoTransactionId: transaction.object_id,
       shippedService: selectedRate.servicelevel?.name || service,
     });
+
+    // Put the shipping numbers in the Activity log entry too.
+    auditDetail({ after: { ...input, ...labelLogFields(selectedRate, transaction, service) } });
 
     // Automatically email the customer their tracking link (best-effort —
     // a failed email never fails the label).

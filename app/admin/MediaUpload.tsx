@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Glyph from "./Glyph";
 
 // "Upload" button for a photo or video field (products and events).
 // The file goes straight from this browser into the site's Blob store; the
@@ -109,7 +110,7 @@ export default function MediaUpload({ kind, value, onUploaded }: { kind: Kind; v
         }}
       />
       <button type="button" className="media-up-btn" disabled={pct !== null} onClick={() => input.current?.click()}>
-        {pct !== null ? `Uploading… ${pct}%` : kind === "video" ? "⬆ Upload video" : "⬆ Upload photo"}
+        {pct !== null ? `Uploading… ${pct}%` : kind === "video" ? <><Glyph name="upload" /> Upload video</> : <><Glyph name="upload" /> Upload photo</>}
       </button>
       {pct !== null && (
         <span className="media-up-bar" aria-hidden="true">

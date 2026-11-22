@@ -30,7 +30,7 @@ import {
   type WidgetMode,
 } from "@/lib/assistant/shared";
 
-type ActionState = "idle" | "running" | "done" | "failed" | "dismissed";
+type ActionState = "idle" | "running" | "done" | "failed" | "dismissed" | "replaced";
 
 /** Cards whose confirmation sends an email (for the wording of the ✓ line). */
 const SENT_KINDS = new Set<string>(["order_message", "member_message", "resend_invoice", "member_password", "manual_invoice", "campaign_send", "campaign_test", "handoff", "report", "store_request", "store_message"]);
@@ -46,7 +46,26 @@ const CARD_STATE: Record<ActionState, string> = {
   done: "CONFIRMED",
   failed: "failed",
   dismissed: "dismissed by staff",
+  replaced: "replaced by a newer card below (gone from the screen)",
 };
+/**
+ * The campaign draft card's quick read: a lone [text](url) line is the email's
+ * button, so show it as one; other links show just their words; images as a
+ * short note. The exact text is still what Copy and the composer get.
+ */
+function draftPreviewText(body: string): string {
+  return body
+    .split("\n")
+    .map((line) => {
+      const t = line.trim();
+      const img = t.match(/^!\[([^\]|]*)[^\]]*\]\([^)]*\)$/);
+      if (img) return `🖼 ${img[1] || "Image"}`;
+      const btn = t.match(/^\[([^\]]+)\]\([^)]*\)$/);
+      if (btn) return `[ ${btn[1]} ] (button)`;
+      return line.replace(/\[([^\]]+)\]\((?:https?:\/\/|\/)[^)\s]*\)/g, "$1");
+    })
+    .join("\n");
+}
 const CARD_LEDGER_PREFIX = "[Shown with this reply — recorded by the site:";
 function cardLedger(m: Msg): string {
   const rows: string[] = [];
@@ -416,8 +435,22 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
         if (done) v.endAfterSpeaking();
         if (voiceSig && (v.readAloud || v.handsFree)) setTimeout(() => voiceRef.current.speak(replyId, data.reply, voiceSig), 50);
         else if (v.handsFree) v.setHandsFree(false);
+        // A new card for the same thing (e.g. code BF26 with changed details)
+        // takes the place of an earlier one still waiting, so only the latest
+        // version can be confirmed.
+        const newKeys = new Set((data.actions || []).map((a) => a.replaces).filter((k): k is string => !!k));
+        const retire = (list: Msg[]): Msg[] =>
+          newKeys.size === 0
+            ? list
+            : list.map((m) => {
+                const stale = (m.actions || []).filter((a) => a.replaces && newKeys.has(a.replaces) && ["idle", "failed"].includes(m.actionState?.[a.id]?.state || "idle"));
+                if (!stale.length) return m;
+                const next = { ...(m.actionState || {}) };
+                for (const a of stale) next[a.id] = { state: "replaced" };
+                return { ...m, actionState: next };
+              });
         setMessages((prev) => [
-          ...prev,
+          ...retire(prev),
           {
             id: replyId,
             role: "assistant",
@@ -588,7 +621,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
     for (const m of messages) {
       if (!m.todayKey || m.draft || !m.actions?.length || ticked.current.has(m.id)) continue;
       const states = m.actions.map((a) => m.actionState?.[a.id]?.state);
-      if (!states.includes("done") || states.some((s) => s !== "done" && s !== "dismissed")) continue;
+      if (!states.includes("done") || states.some((s) => s !== "done" && s !== "dismissed" && s !== "replaced")) continue;
       ticked.current.add(m.id);
       fetch("/api/admin/today", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.todayKey, done: true }) })
         .then(() => window.dispatchEvent(new CustomEvent(EVT_ADMIN_REFRESH, { detail: ["today"] })))
@@ -817,7 +850,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                     )}
                     {m.actions?.map((a) => {
                       const st = m.actionState?.[a.id] || { state: "idle" as ActionState };
-                      if (st.state === "dismissed") return null;
+                      if (st.state === "dismissed" || st.state === "replaced") return null;
                       return (
                         <div key={a.id} className={`as-card${a.danger ? " is-danger" : ""} is-${st.state}`}>
                           <div className="as-card-kicker">Needs your OK</div>
@@ -879,7 +912,7 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                         </div>
                         <div className="as-card-title">{m.draft.subject}</div>
                         {m.draft.photo && chatPhotoRef.current && <img className="as-photo" src={chatPhotoRef.current.thumb} alt={m.draft.photo.alt} />}
-                        <div className="as-draft-body">{m.draft.body.split(PHOTO_SLOT).join("📷 (your photo)")}</div>
+                        <div className="as-draft-body">{draftPreviewText(m.draft.body.split(PHOTO_SLOT).join("📷 (your photo)"))}</div>
                         {isAdmin && <EmailPreview subject={m.draft.subject} theme={m.draft.theme || "auto"} body={m.draft.body.split(PHOTO_SLOT).join("*📷 Your photo from the chat goes here*")} />}
                         <div className="as-card-actions">
                           {isAdmin && (

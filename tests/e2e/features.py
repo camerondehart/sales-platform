@@ -214,6 +214,10 @@ s,r=req("/api/admin/templates/preview", {"subject":"News","body":"Hi","theme":"a
 check("campaign look: Auto falls back to the send date's season (July = summer)", s==200 and r.get("theme")=="summer", (s,r.get("theme")))
 s,r=req("/api/admin/templates/preview", {"subject":"T","body":"Hi"})
 check("campaign look: template previews without a look stay plain", s==200 and "theme" not in r and "email-art/" not in r.get("html",""), r.get("theme"))
+# A heading typed straight above its paragraph ("## A customer favorite" showed as literal text)
+s,r=req("/api/admin/templates/preview", {"subject":"BF","body":"Hi Boss,\n\n## A customer favorite\nGold Standard Chocolates led our shop.\n# Last line heading","theme":"none"})
+_h=r.get("html","") if isinstance(r,dict) else ""
+check("email heading right above its paragraph still renders as a heading", s==200 and "## " not in _h and "# Last" not in _h and re.search(r"<h2[^>]*>A customer favorite</h2>", _h) and re.search(r"<p[^>]*>Gold Standard Chocolates led our shop\.</p>", _h), _h[:800])
 s,r=req("/api/admin/templates/preview", {"subject":"T","body":"![Shelf|small](https://example.com/a.jpg)\n\n![Jar|medium](https://example.com/b.jpg)","theme":"fall"})
 check("campaign look: photo sizes (small / medium)", s==200 and 'width="200"' in r["html"] and 'width="340"' in r["html"], r.get("html","")[:300])
 

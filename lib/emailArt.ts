@@ -10,7 +10,7 @@ import type { ThemeKey } from "./campaignThemes";
  * site's own /email-art/ files are used.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const cache: Record<string, string> = {};
 let listed: Promise<Record<string, string>> | null = null;
 

@@ -2,6 +2,7 @@
 // Stored as discounts.json in Vercel Blob (data/discounts.json locally),
 // following the same dual-backend + safety-guard pattern as other modules.
 
+import crypto from "crypto";
 import { promises as fs } from "fs";
 import path from "path";
 import { VersionedStore } from "./versionedStore";
@@ -181,7 +182,7 @@ export function normalizeCode(code: string): string {
 export function generateCode(prefix = ""): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars
   let out = "";
-  for (let i = 0; i < 6; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 6; i++) out += chars[crypto.randomInt(chars.length)];
   return normalizeCode(prefix ? `${prefix}${out}` : out);
 }
 

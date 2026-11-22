@@ -5,6 +5,7 @@ import EntrancePlayer from "@/app/components/EntrancePlayer";
 import { ENTRANCE_THEMES, type EntranceChoice, type EntranceKey } from "@/lib/entranceThemes";
 import { useAdminRefresh } from "./useAdminRefresh";
 import type { AdminRefreshKey } from "@/lib/assistant/shared";
+import Glyph from "./Glyph";
 
 type Status = {
   switchOn: boolean;
@@ -56,7 +57,7 @@ export default function EntrancePanel() {
       <p className="ent-now">
         Members see <strong>{ENTRANCE_THEMES[st.showing].emoji} {st.showingLabel}</strong> right now
         {st.switchOn ? (st.choice === "auto" ? " (Auto)." : ".") : ". Seasonal entrances are switched off, so it's always Classic."}
-        <button type="button" className="esc-btn" onClick={() => setPlaying(st.showing)}>▶ Play it</button>
+        <button type="button" className="esc-btn" onClick={() => setPlaying(st.showing)}><Glyph name="play" /> Play it</button>
       </p>
       <p className="field-hint">
         {st.siteSwitchOn
@@ -69,7 +70,7 @@ export default function EntrancePanel() {
 
       <div className="ent-grid">
         <div className={`ent-card ent-auto${st.choice === "auto" ? " is-on" : ""}`}>
-          <div className="ent-swatch" aria-hidden="true">✨</div>
+          <div className="ent-swatch" aria-hidden="true"><Glyph name="sparkles" /></div>
           <strong>Auto</strong>
           <span className="ent-when">Holidays first, then the season</span>
           <div className="ent-actions">
@@ -88,7 +89,7 @@ export default function EntrancePanel() {
             <strong>{t.label}</strong>
             <span className="ent-when">{t.when}</span>
             <div className="ent-actions">
-              <button type="button" className="esc-btn" onClick={() => setPlaying(t.key)}>▶ Preview</button>
+              <button type="button" className="esc-btn" onClick={() => setPlaying(t.key)}><Glyph name="play" /> Preview</button>
               <a className="esc-btn" href={`/api/admin/season-preview?key=${t.key}&to=/`} target="_blank" rel="noopener" title="Open the site with this season's background, just for you (for an hour)">Preview background</a>
               <button type="button" className="esc-btn primary" disabled={busy || st.choice === t.key} onClick={() => choose(t.key)}>{st.choice === t.key ? "In use" : "Use"}</button>
             </div>
@@ -107,7 +108,7 @@ export default function EntrancePanel() {
           ))}
         </div>
       )}
-      <p className="field-hint"><strong>▶ Preview</strong> plays the entrance here. <strong>Preview background</strong> opens the site in a new tab with that season&rsquo;s background, just for you, for up to an hour (nothing changes for anyone else; the bar at the top has Stop).</p>
+      <p className="field-hint"><strong><Glyph name="play" /> Preview</strong> plays the entrance here. <strong>Preview background</strong> opens the site in a new tab with that season&rsquo;s background, just for you, for up to an hour (nothing changes for anyone else; the bar at the top has Stop).</p>
       {msg && <p className="field-hint" role="status">{msg}</p>}
       <p className="field-hint">The entrance plays once per visit, right after a member signs in. Anyone who has asked their device to reduce motion doesn&rsquo;t see it.</p>
       {playing && <EntrancePlayer theme={playing} onDone={() => setPlaying(null)} />}

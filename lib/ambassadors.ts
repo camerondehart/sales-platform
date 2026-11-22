@@ -56,11 +56,12 @@ export type Payout = { id: string; at: number; amount: number; note?: string };
 
 export const DEFAULT_TERMS: Omit<AmbassadorTerms, "startDate"> = {
   // 10% and no higher rate unless staff set something else for this ambassador (2026-11-13).
+  // No trial unless staff set one (2026-11-22).
   commissionPct: 10,
   growthGoal: "",
   growthOn: false,
   discountPct: 10,
-  trialDays: 90,
+  trialDays: 0,
   windowDays: ATTRIBUTION_DAYS,
   repeatPurchases: true,
   payoutSchedule: "monthly",
@@ -112,7 +113,8 @@ export type OrderAmbassador = { id: string; slug: string; name: string; via: "pa
 
 /** Their terms, with defaults filled in for older records. */
 export function termsOf(a: Pick<Ambassador, "terms" | "createdAt">): AmbassadorTerms {
-  return { ...DEFAULT_TERMS, startDate: pacificDay(a.createdAt), ...(a.terms || {}) };
+  // Records saved before terms existed keep the old 90-day trial default.
+  return { ...DEFAULT_TERMS, trialDays: 90, startDate: pacificDay(a.createdAt), ...(a.terms || {}) };
 }
 /** The commission % that applies today. */
 export function currentRate(t: AmbassadorTerms): number {

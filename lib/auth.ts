@@ -55,7 +55,7 @@ export async function getVisitor(): Promise<VisitorPayload | null> {
   const token = cookies().get(VISITOR_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET());
+    const { payload } = await jwtVerify(token, SECRET(), { algorithms: ["HS256"] });
     if (payload.role === "visitor" && typeof payload.userId === "string") {
       return { role: "visitor", userId: payload.userId, ...(typeof payload.as === "string" ? { as: payload.as } : {}) };
     }
@@ -69,7 +69,7 @@ async function adminPayload(): Promise<{ email?: string } | null> {
   const token = cookies().get(ADMIN_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, SECRET());
+    const { payload } = await jwtVerify(token, SECRET(), { algorithms: ["HS256"] });
     if (payload.role !== "admin") return null;
     if (typeof payload.email === "string") {
       // Link sign-ins end as soon as that person is taken off the staff list.

@@ -129,7 +129,7 @@ export default function SuspiciousPanel({ onFind }: { onFind: (email: string) =>
   return (
     <section className="admin-section sus">
       <button type="button" className="sus-fold" onClick={toggle} aria-expanded={open}>
-        {open ? "▼" : "▶"} Suspicious activity
+        {open ? "▼" : "▶\uFE0E"} Suspicious activity
         {cases.length > 0 ? <span className="badge">{cases.length}</span> : " (0)"}
       </button>
       {open && (
@@ -146,7 +146,7 @@ export default function SuspiciousPanel({ onFind }: { onFind: (email: string) =>
       {done.length > 0 && (
         <div className="sus-done">
           <button type="button" className="sus-toggle" onClick={() => setShowDone(!showDone)}>
-            {showDone ? "▼" : "▶"} Looked at ({done.length})
+            {showDone ? "▼" : "▶\uFE0E"} Looked at ({done.length})
           </button>
           {showDone && <ul className="sus-list">{done.map((c) => card(c, c))}</ul>}
         </div>

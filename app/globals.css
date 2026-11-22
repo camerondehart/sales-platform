@@ -2296,6 +2296,14 @@ input[type="checkbox"], input[type="radio"] {
   background: rgba(133, 186, 69, 0.08);
 }
 .admin-tab-icon { font-size: 0.95rem; line-height: 1; }
+/* Line glyphs (app/admin/Glyph.tsx): sized to the text, drawn in the text colour. */
+.glyph { display: inline-block; width: 1em; height: 1em; flex: none; vertical-align: -0.14em; overflow: visible; }
+.admin-tab-icon { display: inline-flex; }
+.admin-tab-icon .glyph { width: 1.1em; height: 1.1em; vertical-align: 0; }
+.secnav-icon .glyph { width: 0.95em; height: 0.95em; }
+.settings-tile-icon .glyph { width: 0.82em; height: 0.82em; color: var(--accent-strong, var(--green)); }
+.ent-swatch .glyph, .cc-theme-art .glyph { width: 1.1em; height: 1.1em; }
+.tb-leaf .glyph { color: var(--accent-strong, var(--green)); }
 .admin-tab-badge {
   min-width: 1.15rem;
   height: 1.15rem;
@@ -6501,6 +6509,8 @@ body.has-assistant .cart-fab { right: 1.4rem; bottom: calc(1.4rem + 68px); }
 }
 .as-assistant .as-bubble { background: #fff; color: var(--ink); border: 1px solid rgba(97, 103, 109, 0.12); border-top-left-radius: 6px; }
 .as-user .as-bubble { background: linear-gradient(180deg, #7fb542, #6fa336); color: #fff; border-top-right-radius: 6px; white-space: pre-wrap; box-shadow: 0 3px 10px rgba(95, 146, 48, 0.22); }
+/* Selected text in the green bubble: the site-wide pale-green highlight vanished on green, so use white with dark green text (same in light and dark mode). */
+.as-user .as-bubble::selection, .as-user .as-bubble ::selection { background: rgba(255, 255, 255, 0.92); color: #2b4a12; }
 .as-row.is-error .as-bubble { border-color: rgba(200, 97, 100, 0.35); background: rgba(200, 97, 100, 0.06); }
 .as-retry { align-self: flex-start; border: none; background: none; color: var(--danger-strong); font-weight: 700; font-size: 0.78rem; cursor: pointer; padding: 0 0.2rem; }
 
@@ -6546,7 +6556,7 @@ body.has-assistant .cart-fab { right: 1.4rem; bottom: calc(1.4rem + 68px); }
 .as-card-foot { margin-top: 0.55rem; font-size: 0.7rem; color: var(--ink-faint, #8f949a); }
 .as-draft-body {
   margin-top: 0.45rem; max-height: 180px; overflow-y: auto;
-  white-space: pre-wrap; font-size: 0.8rem; line-height: 1.5; color: var(--ink-soft);
+  white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8rem; line-height: 1.5; color: var(--ink-soft);
   background: rgba(234, 247, 201, 0.25); border-radius: 8px; padding: 0.55rem 0.65rem;
 }
 .as-btn {
@@ -7144,6 +7154,7 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
 
 /* ---------- Marketing → Campaign history ---------- */
 .ch { margin-top: 1.4rem; border-top: 1px solid var(--rule-soft); padding-top: 1.1rem; }
+.ch.ch-bare { margin-top: 0; border-top: 0; padding-top: 0; }
 .ch-title { margin: 0 0 0.6rem; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--green); }
 .ch-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .ch-row { display: grid; grid-template-columns: minmax(0, 1.4fr) auto auto; gap: 0.9rem; align-items: center; padding: 0.7rem 0.9rem; border: 1px solid rgba(43,47,39,0.1); border-radius: 12px; background: #fff; }
@@ -7428,6 +7439,15 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
 .msel select { width: 100%; }
 .msel-count { font-size: 0.74rem; color: var(--ink-soft); }
 .msel-warn { font-size: 0.76rem; line-height: 1.4; color: #8a5a00; background: #fdf3df; border-radius: 8px; padding: 0.45rem 0.6rem; }
+.msel-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; }
+.msel-sort { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.msel-sort button { border: 1px solid var(--rule-soft, rgba(0,0,0,0.12)); background: transparent; color: var(--ink-soft); border-radius: 999px; padding: 0.22rem 0.65rem; font-size: 0.74rem; font-weight: 600; cursor: pointer; }
+.msel-sort button[aria-pressed="true"] { background: #6fa336; border-color: #6fa336; color: #fff; }
+.msel-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.8rem; font-size: 0.76rem; color: var(--ink-soft); }
+.msel-filters label { display: inline-flex; align-items: center; gap: 0.3rem; cursor: pointer; margin: 0; font-size: 0.76rem; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ink-soft); }
+.msel-filters input[type="checkbox"] { width: auto; margin: 0; }
+.msel-filters select { width: auto !important; font-size: 0.76rem; padding: 0.2rem 1.7rem 0.2rem 0.5rem !important; }
+.msel-hint { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.35; }
 .ap-anymodel { margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.35rem; }
 .ap-anymodel-label { font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); }
 
@@ -7578,10 +7598,13 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
 .tb-caret { display: inline-block; width: 1.5px; height: 0.95em; margin-left: 1px; vertical-align: -0.1em; background: currentColor; animation: tb-blink 0.9s steps(1) infinite; }
 @keyframes tb-blink { 50% { opacity: 0; } }
 .tb-intro .tb-hello { animation: none; }
-.tb-intro .tb-sub { animation: tb-drift-in 1s ease 1.4s both; }
-.tb-intro .tb-tools { animation: tb-drift-in 1s ease 1.8s both; }
-.tb-intro .tb-chip { animation: tb-chip-float 1.3s cubic-bezier(0.22, 0.9, 0.3, 1) both; animation-delay: calc(1.7s + var(--d, 0ms)); }
-.tb-intro .tb-chip b { animation: tb-badge-pop 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(2.4s + var(--d, 0ms)); }
+.tb-intro .tb-sub { animation: tb-drift-in 0.8s ease 0.5s both; }
+.tb-intro .tb-tools { animation: tb-drift-in 0.8s ease 0.7s both; }
+/* --c0: when the chips start (0.8s in, or at once if the list came late); --d: each chip's own gap */
+.tb-intro .tb-chip { animation: tb-chip-float 1.1s cubic-bezier(0.22, 0.9, 0.3, 1) both; animation-delay: calc(var(--c0, 0.8s) + var(--d, 0ms) * 0.6); }
+.tb-intro .tb-chip b { animation: tb-badge-pop 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--c0, 0.8s) + 0.5s + var(--d, 0ms) * 0.6); }
+.tb-updating { opacity: 0.7; animation: tb-breathe 1.6s ease-in-out infinite; }
+@keyframes tb-breathe { 50% { opacity: 0.35; } }
 /* Each letter of the greeting fades in softly as it's "written" */
 .tb-letter { display: inline-block; white-space: pre; animation: tb-letter 0.55s ease both; }
 @keyframes tb-letter { from { opacity: 0; transform: translateY(3px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
@@ -10123,3 +10146,68 @@ html[data-admin-theme="dark"] .dc-chip.members { background: rgba(166, 213, 95, 
 .amb-invite { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.45rem; }
 .amb-invite input { flex: 1 1 14rem; max-width: 20rem; }
 .amb-invite .field-hint { flex-basis: 100%; margin: 0; }
+
+/* Analytics → Where people sign in (app/admin/LoginMap.tsx) */
+.lm-card { --lm-sea: #eef3e8; --lm-land: #dfe8d3; --lm-edge: rgba(43,47,39,0.22); --lm-state: rgba(43,47,39,0.12); --lm-dot: #6fa336; --lm-dot-edge: #fff; --lm-pick: #d08b3a; }
+html[data-admin-theme="dark"] .lm-card { --lm-sea: #141b10; --lm-land: #26301f; --lm-edge: rgba(230,240,215,0.22); --lm-state: rgba(230,240,215,0.1); --lm-dot: #9fd45f; --lm-dot-edge: #11150c; --lm-pick: #f0b25c; }
+.lm-skeleton { height: 260px; border-radius: 14px; background: rgba(43,47,39,0.05); }
+.lm-body { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.lm-map-wrap { position: relative; border-radius: 14px; overflow: hidden; background: var(--lm-sea); }
+.lm-map { display: block; width: 100%; aspect-ratio: 5 / 3; height: auto; }
+.lm-sea { fill: var(--lm-sea); }
+.lm-land { fill: var(--lm-land); stroke: var(--lm-edge); stroke-width: 0.8; stroke-linejoin: round; }
+.lm-states { fill: none; stroke: var(--lm-state); stroke-width: 0.7; stroke-linejoin: round; }
+.lm-dot { cursor: pointer; }
+.lm-dot circle { fill: var(--lm-dot); fill-opacity: 0.55; stroke: var(--lm-dot-edge); stroke-width: 1.2; transition: fill-opacity 0.15s ease; }
+.lm-dot:hover circle { fill-opacity: 0.8; }
+.lm-dot.on circle { fill: var(--lm-pick); fill-opacity: 0.85; }
+.lm-tip { position: absolute; left: 0.6rem; bottom: 0.6rem; max-width: calc(100% - 1.2rem); background: #16230f; color: #f4f8ea; padding: 0.45rem 0.7rem; border-radius: 10px; font-size: 0.78rem; display: flex; flex-direction: column; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
+.lm-tip span { opacity: 0.8; font-size: 0.74rem; }
+.lm-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1rem; font-size: 0.85rem; color: var(--ink-soft); }
+.lm-side { display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.lm-total { display: flex; align-items: baseline; gap: 0.45rem; flex-wrap: wrap; }
+.lm-total strong { font-family: "Libre Baskerville", Georgia, serif; font-size: 1.5rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lm-total span { font-size: 0.78rem; color: var(--ink-soft); }
+.lm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.lm-list button { position: relative; width: 100%; display: flex; justify-content: space-between; gap: 0.5rem; border: none; background: none; font: inherit; font-size: 0.84rem; color: var(--ink); padding: 0.3rem 0.1rem 0.45rem; cursor: pointer; text-align: left; border-radius: 6px; }
+.lm-list button.on .lm-name { color: var(--lm-pick); font-weight: 700; }
+.lm-list .lm-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.lm-list em { font-style: normal; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lm-list i { position: absolute; left: 0; bottom: 0; height: 3px; border-radius: 2px; background: var(--lm-dot); opacity: 0.7; }
+@media (max-width: 760px) { .lm-body { grid-template-columns: 1fr; } .lm-tip { position: static; margin: 0 0.5rem 0.5rem; max-width: none; } }
+
+/* ─────────────── Section cards: Marketing + Assistant tabs (2026-11-22) ───────────────
+   A row of small cards splits a long tab into sections; only the chosen one shows. */
+.secnav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.65rem; margin: 0 0 var(--sp-5, 1.5rem); }
+@media (min-width: 1500px) { .secnav { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.secnav-card {
+  all: unset; box-sizing: border-box; cursor: pointer; position: relative; display: flex; align-items: flex-start; gap: 0.65rem; min-width: 0;
+  padding: 0.75rem 0.85rem; border: 1px solid var(--rule-soft); border-radius: var(--r-lg, 14px); background: var(--surface);
+  box-shadow: var(--e-1, 0 1px 2px rgba(0,0,0,0.04)); color: var(--ink); text-align: left;
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.secnav-card:hover { transform: translateY(-1px); border-color: var(--green); }
+.secnav-card:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.secnav-card.is-on { border-color: var(--green); background: linear-gradient(180deg, rgba(133, 186, 69, 0.16), rgba(133, 186, 69, 0.06)); box-shadow: 0 0 0 1px var(--green) inset, var(--e-1, 0 1px 2px rgba(0,0,0,0.04)); }
+.secnav-card.is-alert:not(.is-on) { border-color: var(--yellow, #d8b400); }
+.secnav-icon { flex: none; font-size: 1.05rem; line-height: 1; width: 1.9rem; height: 1.9rem; display: grid; place-items: center; border-radius: 9px; background: rgba(133, 186, 69, 0.12); }
+.secnav-card.is-on .secnav-icon { background: var(--green); color: #fff; }
+.secnav-text { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.secnav-text strong { font-size: 0.88rem; line-height: 1.25; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.secnav-text small { font-size: 0.74rem; line-height: 1.35; color: var(--ink-soft); overflow-wrap: anywhere; }
+.secnav-badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 0.35rem; border-radius: 999px; background: var(--mint); color: #fff; font-size: 0.64rem; font-weight: 700; }
+.secnav-card.is-alert .secnav-badge { background: var(--yellow-deep, #b89a00); color: #1b1b12; }
+.secnav-dirty { color: var(--accent-strong); font-weight: 700; }
+.secnav-pane { animation: secnav-in 0.22s ease both; }
+@keyframes secnav-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .secnav-card { transition: none; } .secnav-pane { animation: none; } }
+@media (max-width: 560px) {
+  /* Phones: a compact 3 x 2 grid of icon + name; the status line hides to save room. */
+  .secnav { gap: 0.45rem; }
+  .secnav-card { flex-direction: column; align-items: center; text-align: center; gap: 0.3rem; padding: 0.55rem 0.35rem 0.5rem; }
+  .secnav-icon { width: 1.7rem; height: 1.7rem; font-size: 0.95rem; border-radius: 8px; }
+  .secnav-text { align-items: center; }
+  .secnav-text strong { font-size: 0.74rem; line-height: 1.2; justify-content: center; }
+  .secnav-text small { display: none; }
+  .secnav-badge { position: absolute; top: 0.3rem; right: 0.3rem; }
+}

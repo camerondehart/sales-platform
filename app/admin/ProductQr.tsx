@@ -56,7 +56,7 @@ export default function ProductQr({ id, name }: { id: string; name: string }) {
             <div className="field-hint">
               Permanent — safe to print. Scanning opens this product{" "}
               {`(and its video, if it has one)`}.
-              {!isLive && " ⚠ You're not on the live site, so this code points here. Print codes from the live dashboard."}
+              {!isLive && " ⚠\uFE0E You're not on the live site, so this code points here. Print codes from the live dashboard."}
             </div>
             <div className="tpl-actions">
               <button type="button" className="esc-btn" onClick={download}>Download</button>

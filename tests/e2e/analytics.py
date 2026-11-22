@@ -22,7 +22,7 @@ def get(path, cookie=ADMIN):
 
 # a few sessions
 check("event accepted (204, no body)", t("visit", {"path":"/retail","ref":"instagram.com","device":"phone","campaign":"fall-2026","first":"1"})==204)
-t("visit", {"path":"/","ref":"","device":"desktop"})
+t("visit", {"path":"/","ref":"","device":"desktop","campaign":"cmwtest1"})
 t("visit", {"path":"/","ref":"google.com","device":"phone"})
 for _ in range(3): t("page", {"path":"/retail"})
 t("page", {"path":"/pay/abcdef123456"})
@@ -52,6 +52,7 @@ pv={p["id"]:p for p in d["products"]}
 check("per-product views & carts", pv["p_pub"]["views"]==2 and pv["p_pub"]["adds"]==1 and pv["p_mem"]["views"]==1, pv.get("p_pub"))
 camp={c["id"]:c for c in d["sources"]["campaigns"]}
 check("campaign visits, orders and sales attributed", camp["fall-2026"]["visits"]==1 and camp["fall-2026"]["orders"]==1 and camp["fall-2026"]["revenue"]==49.99, camp)
+check("campaigns show their subject, not the id", camp.get("cmwtest1",{}).get("name")=="Holiday hello" and camp["fall-2026"]["name"]=="fall-2026", camp)
 check("QR scan counted", d["sources"]["qr"]["scans"]==1 and d["sources"]["qr"]["byProduct"][0]["key"]=="p_pub", d["sources"]["qr"])
 check("sales numbers come from real paid orders", d["kpis"]["orders"]["value"]>=0 and isinstance(d["daily"], list) and len(d["daily"])==7)
 files=glob.glob(D+"traffic-*.json"); blob=open(files[0]).read() if files else ""
@@ -129,4 +130,41 @@ urllib.request.urlopen(rq).read()
 mails=json.loads(urllib.request.urlopen("http://127.0.0.1:4555/__mail").read())
 em=[m for m in mails if m.get("to") in ("tz@example.com",["tz@example.com"])]
 check("event sign-up email shows the event's Pacific time", em and hm in em[-1]["html"], (hm, em and em[-1]["html"][:400]))
+# ---- Where people sign in (switch login_map): rough town per sign-in, daily totals only
+_ps,_pp=get("/api/admin/staff-phrase")
+STAFF_PW=_pp.get("phrase") if _ps==200 and _pp.get("on") and _pp.get("phrase") else "changemetoo"
+LOGINS=[]
+def login(hdrs):
+    r=urllib.request.Request(BASE+"/api/login", data=json.dumps({"role":"admin","password":STAFF_PW}).encode(), method="POST")
+    r.add_header("content-type","application/json")
+    for k,v in hdrs.items(): r.add_header(k,v)
+    try:
+        with urllib.request.urlopen(r, timeout=30) as resp: LOGINS.append((resp.status, resp.read()[:200])); return resp.status
+    except urllib.error.HTTPError as e: LOGINS.append((e.code, e.read()[:200])); return e.code
+CHICO={"x-forwarded-for":"10.61.0.1","x-vercel-ip-latitude":"39.7285","x-vercel-ip-longitude":"-121.8375","x-vercel-ip-city":"Chico","x-vercel-ip-country-region":"CA","x-vercel-ip-country":"US"}
+check("sign-in map: staff sign-in still works with location headers", login(CHICO)==200, (LOGINS, _ps, _pp))
+login(dict(CHICO, **{"x-forwarded-for":"10.61.0.2"}))
+login({"x-forwarded-for":"10.61.0.3","x-vercel-ip-latitude":"47.61","x-vercel-ip-longitude":"-122.33","x-vercel-ip-city":"Seattle","x-vercel-ip-country-region":"WA","x-vercel-ip-country":"US"})
+check("sign-in map: no location headers still signs in", login({"x-forwarded-for":"10.61.0.4"})==200, LOGINS)
+s,d=get("/api/admin/login-places?days=7")
+check("sign-in map: Everyone leaves staff sign-ins out", s==200 and d.get("on") and d.get("total")==0, d)
+s,d=get("/api/admin/login-places?days=7&kind=staff")
+pl={p["city"]:p for p in d.get("places",[])}
+check("sign-in map: staff towns counted, biggest first", s==200 and d.get("on") and d.get("total")==3 and d["places"][0]["city"]=="Chico" and pl["Chico"]["count"]==2 and pl["Seattle"]["byKind"]["staff"]==1, d)
+s,d=get("/api/admin/login-places?days=7&kind=member")
+check("sign-in map: kind filter", s==200 and d.get("total")==0, d)
+s,_d=get("/api/admin/login-places?days=7", cookie=MEMBER)
+check("sign-in map: staff only", s==401, s)
+blob=open(D+"login-places.json").read() if glob.glob(D+"login-places.json") else json.dumps([json.load(open(f)) for f in glob.glob(D+"login-places*/*")])
+check("sign-in map: no internet address or email saved", "10.61.0" not in blob and "@" not in blob and "Chico" in blob, blob[:300])
+rq=urllib.request.Request(BASE+"/api/admin/flags", data=json.dumps({"key":"login_map","on":False}).encode(), method="POST"); rq.add_header("content-type","application/json"); rq.add_header("cookie",ADMIN)
+urllib.request.urlopen(rq).read()
+login(dict(CHICO, **{"x-forwarded-for":"10.61.0.5"}))
+s,d=get("/api/admin/login-places?days=7&kind=staff")
+check("sign-in map: switch off hides the map", s==200 and d=={"on":False}, d)
+rq=urllib.request.Request(BASE+"/api/admin/flags", data=json.dumps({"key":"login_map","on":True}).encode(), method="POST"); rq.add_header("content-type","application/json"); rq.add_header("cookie",ADMIN)
+urllib.request.urlopen(rq).read()
+s,d=get("/api/admin/login-places?days=7&kind=staff")
+check("sign-in map: nothing noted while off", d.get("total")==3, d)
+
 print(f"\n{sum(res)}/{len(res)} passed")
