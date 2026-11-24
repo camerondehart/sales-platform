@@ -27,6 +27,8 @@ type Config = {
   enabledStaff: boolean;
   model: string;
   fallbackModel: string;
+  managerModel?: string;
+  managerRunsPerDay?: number;
   monthlyCapUsd: number;
   assistantName: string;
   persona: string;
@@ -189,6 +191,8 @@ export default function AssistantPanel() {
           enabledStaff: draft.enabledStaff,
           model: draft.model,
           fallbackModel: draft.fallbackModel,
+          managerModel: draft.managerModel ?? "anthropic/claude-sonnet-4.6",
+          managerRunsPerDay: draft.managerRunsPerDay ?? 1,
           monthlyCapUsd: draft.monthlyCapUsd,
           assistantName: draft.assistantName,
           persona: draft.persona,
@@ -247,7 +251,7 @@ export default function AssistantPanel() {
 
   // Unsaved edits, per settings section (one Save button saves both).
   const changed = (keys: Array<keyof Config>) => keys.some((k) => JSON.stringify(data.config[k]) !== JSON.stringify(draft[k]));
-  const dirtyModel = changed(["enabledPublic", "enabledMembers", "enabledStaff", "model", "fallbackModel", "monthlyCapUsd"]);
+  const dirtyModel = changed(["enabledPublic", "enabledMembers", "enabledStaff", "model", "fallbackModel", "managerModel", "managerRunsPerDay", "monthlyCapUsd"]);
   const dirtyKnow = changed(["assistantName", "persona", "knowledge", "escalationEmail"]);
   const openCount = openLive ?? data.escalationsOpen;
   const onFor = ([["enabledPublic", "Visitors"], ["enabledMembers", "Members"], ["enabledStaff", "Staff"]] as const).filter(([k]) => data.config[k]).map(([, l]) => l);
@@ -428,6 +432,28 @@ export default function AssistantPanel() {
               outage doesn’t take out both.
               {draft.fallbackModel && draft.fallbackModel === draft.model ? " ⚠\uFE0E This is the same as the main model, so it can’t help." : ""}
             </div>
+          </div>
+
+          <div className="field">
+            <label>Manager model</label>
+            <ModelSelect models={models} value={draft.managerModel ?? "anthropic/claude-sonnet-4.6"} onChange={(id) => set("managerModel", id)} recommended={RECOMMENDED.map((r) => r.id)} allowNone ariaLabel="Manager model" />
+            <div className="field-hint">
+              The “brain” for the background reviews: the morning site manager review (Manager’s take on Today) and the
+              nightly Concierge notes review (which teaches the Concierge), and product description rewrites. A smarter model here gives better insights; chat still uses the main model.
+              None = use the main model.
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Manager reviews a day</label>
+            <select value={draft.managerRunsPerDay ?? 1} onChange={(e) => set("managerRunsPerDay", Number(e.target.value))}>
+              {[0, 1, 2, 3, 4, 6, 8].map((n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? "Only when I press Run now" : n === 1 ? "Once (midnight)" : `${n} times (every ${24 / n} hours from midnight)`}
+                </option>
+              ))}
+            </select>
+            <div className="field-hint">How often the site manager looks over everything on its own ({brand.timezoneLabel} time). The first run is at midnight so the nightly report has it. Each run costs a little AI, counted toward the monthly limit.</div>
           </div>
 
           <div className="field">

@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { brand } from "@/lib/brand";
 import { ENTRANCE_THEMES, type EntranceKey, type EntranceTheme, type Ground } from "@/lib/entranceThemes";
 
@@ -15,6 +15,11 @@ import { ENTRANCE_THEMES, type EntranceKey, type EntranceTheme, type Ground } fr
  * `theme` swaps in a seasonal or holiday version (lib/entranceThemes.ts): the
  * same scene with its own colours (CSS variables) and little extras. Classic
  * (no theme) renders exactly as before.
+ *
+ * At night (switch night_sky: <html data-night> on the visitor's own clock,
+ * lib/nightSky.ts) the same scene plays by moonlight: deep blue sky, the sun
+ * becomes the moon, stars come out, the peaks and forest go dusky and more
+ * fireflies rise. Staff previews pass `night` directly.
  */
 
 const SEED_START = 7;
@@ -110,16 +115,28 @@ const PEAKS: Array<[number, number, number, number, string, string, string, stri
   [1080, 1320, 130, 1580, "#a8c874", "#93b865", "#6f9858", "#5f854d"],
 ];
 
+/** The same four peaks by moonlight: cool, lit faces toward the moon. */
+const NIGHT_PEAKS: typeof PEAKS = [
+  [40, 330, 150, 640, "#4a557f", "#414b75", "#2f385e", "#293154"],
+  [380, 640, 70, 930, "#57618c", "#4d5782", "#363f68", "#2f375d"],
+  [700, 980, 20, 1290, "#515b87", "#47517c", "#323b63", "#2b3358"],
+  [1080, 1320, 130, 1580, "#44625a", "#3c5850", "#2d4540", "#273c37"],
+];
+
 const SHROOMS: Array<[number, number, number]> = [[300, 70, 1.1], [420, 46, 0.7], [700, 34, 0.45], [910, 30, 0.4], [1170, 50, 0.75], [1300, 80, 1.2], [180, 120, 1.5], [1430, 128, 1.4]];
 const CLOUDS: Array<[number, number, number]> = [[12, 10, 15], [64, 7, 12], [80, 20, 9], [30, 22, 8]];
 
 const v = (o: Record<string, string>) => o as CSSProperties;
 
-export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: () => void; theme?: EntranceKey }) {
+export default function ForestEntrance({ onSkip, theme = "classic", night: nightProp }: { onSkip: () => void; theme?: EntranceKey; night?: boolean }) {
   const t: EntranceTheme = ENTRANCE_THEMES[theme] || ENTRANCE_THEMES.classic;
-  const x = t.extras || {};
+  // Only ever mounted in the browser (after sign-in, or a staff preview), so reading the page is safe.
+  const [night] = useState(() => nightProp ?? (typeof document !== "undefined" && document.documentElement.hasAttribute("data-night")));
+  const x = night ? { ...(t.extras || {}), moon: !(t.extras || {}).earth, stars: true } : t.extras || {};
+  const peaks = night ? NIGHT_PEAKS : PEAKS;
+  const greeting = t.greeting ? `${t.emoji} ${t.greeting}` : night ? "🌙 A moonlit welcome" : "";
   return (
-    <div className={`en-entrance en-theme-${t.key}`} aria-hidden="true" onClick={onSkip} style={v(t.vars)}>
+    <div className={`en-entrance en-theme-${t.key}${night ? " en-night" : ""}`} aria-hidden="true" onClick={onSkip} style={v(t.vars)}>
       <div className="en-sky" />
       <div className="en-world">
         {x.stars && <Stars />}
@@ -137,7 +154,7 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
           <path d="M0,200 L0,150 L160,120 L300,150 L470,112 L620,146 L800,118 L980,150 L1150,110 L1330,146 L1480,120 L1600,140 L1600,200 Z" fill="var(--en-far2, #c9a6a6)" />
         </svg>
         <svg className="en-peaks" viewBox="0 0 1600 460" preserveAspectRatio="xMidYMax meet">
-          {PEAKS.map(([l, ax, ay, r, lit, lit2, sh1, sh2], i) => {
+          {peaks.map(([l, ax, ay, r, lit, lit2, sh1, sh2], i) => {
             const B = 460, mx = ax + (r - ax) * 0.18, my = ay + (B - ay) * 0.45, ll = ax - (ax - l) * 0.15;
             return (
               <g key={i}>
@@ -146,7 +163,7 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
                 <polygon points={`${ax},${ay} ${mx},${B} ${mx},${my}`} fill={lit2} />
                 <polygon points={`${ax},${ay} ${mx},${my} ${r},${B}`} fill={sh1} />
                 <polygon points={`${mx},${my} ${mx},${B} ${r},${B}`} fill={sh2} />
-                <polygon points={`${ax},${ay} ${ax - (ax - l) * 0.32},${ay + (B - ay) * 0.42} ${ax - (ax - l) * 0.08},${ay + (B - ay) * 0.3}`} fill="rgba(255,238,205,0.4)" />
+                <polygon points={`${ax},${ay} ${ax - (ax - l) * 0.32},${ay + (B - ay) * 0.42} ${ax - (ax - l) * 0.08},${ay + (B - ay) * 0.3}`} fill={night ? "rgba(220,228,255,0.22)" : "rgba(255,238,205,0.4)"} />
                 {x.snowcaps && (
                   <>
                     <polygon points={`${ax},${ay} ${ax - (ax - l) * 0.24},${ay + (B - ay) * 0.24} ${ax - (ax - l) * 0.12},${ay + (B - ay) * 0.18} ${ax - (ax - l) * 0.03},${ay + (B - ay) * 0.27} ${ax},${ay + (B - ay) * 0.2}`} fill="#fbfdff" />
@@ -182,8 +199,8 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
             </svg>
           );
         })}
-        {Array.from({ length: 12 }).map((_, i) => (
-          <span key={`f${i}`} className="en-fly" style={{ left: `${10 + ((i * 53) % 80)}%`, top: `${55 + ((i * 31) % 35)}%`, animationDelay: `${0.9 + (i % 6) * 0.3}s` }} />
+        {Array.from({ length: night ? 26 : 12 }).map((_, i) => (
+          <span key={`f${i}`} className="en-fly" style={{ left: night ? `${4 + ((i * 37 + i * i * 11) % 92)}%` : `${10 + ((i * 53) % 80)}%`, top: night ? `${30 + ((i * 29 + i * i * 7) % 62)}%` : `${55 + ((i * 31) % 35)}%`, animationDelay: `${(night ? 0.4 : 0.9) + (i % 6) * 0.3}s` }} />
         ))}
       </div>
       {Array.from({ length: 26 }).map((_, i) => {
@@ -214,7 +231,7 @@ export default function ForestEntrance({ onSkip, theme = "classic" }: { onSkip: 
       <div className="en-title">
         <div className="en-kicker">{brand.name.toUpperCase()}</div>
         <div className="en-name">{brand.members.toUpperCase()}</div>
-        {t.greeting && <div className="en-greet">{t.emoji} {t.greeting}</div>}
+        {greeting && <div className="en-greet">{greeting}</div>}
       </div>
       <div className="en-skip">Tap to skip</div>
     </div>
@@ -479,10 +496,6 @@ function Turkey() {
         <circle cx="115" cy="77" r="2.8" fill="#2b2f36" />
         <polygon points="104,84 116,84 110,95" fill="#f2b33d" />
         <path className="en-wattle" d="M112,88 C120,92 120,106 113,110 C108,104 108,94 112,88 Z" fill="#d23a3a" />
-      </g>
-      <g className="en-gobble">
-        <path d="M150,30 h58 a10,10 0 0 1 10,10 v18 a10,10 0 0 1 -10,10 h-40 l-12,10 l2,-10 h-8 a10,10 0 0 1 -10,-10 v-18 a10,10 0 0 1 10,-10 Z" fill="#fffaf0" stroke="#c2662d" strokeWidth="2.5" />
-        <text x="179" y="54" textAnchor="middle" fontFamily="Helvetica, Arial, sans-serif" fontWeight="800" fontSize="15" fill="#a8552a">Gobble!</text>
       </g>
     </svg>
   );

@@ -6,6 +6,7 @@ import { pacificDay } from "@/lib/periods";
 import { useAdminRefresh } from "./useAdminRefresh";
 import { brand } from "@/lib/brand";
 import Glyph from "./Glyph";
+import ManagerTake, { type Manager } from "./ManagerTake";
 
 // Overview → "Today": a stand-in site manager. The day's to-do list plus
 // proactive suggestions, refreshed on its own. Each button asks the staff
@@ -29,13 +30,15 @@ type Task = {
   why?: string;
   /** From the Concierge's learned notes. */
   learned?: string[];
+  /** Moved here by the site manager review, and why. */
+  managerWhy?: string;
   items: string[];
   ask?: string;
   tab: string;
   orderFilter?: string;
   button: string;
 };
-type Data = { asOf: string; allClear: boolean; tasks: Task[]; conciergeReady: boolean; done?: string[] };
+type Data = { asOf: string; allClear: boolean; tasks: Task[]; conciergeReady: boolean; done?: string[]; manager?: Manager | null };
 
 const GROUPS: Array<[Priority, string]> = [
   ["now", "Do now"],
@@ -351,6 +354,8 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
         </div>
       )}
 
+      {data && data.manager !== undefined && <ManagerTake manager={data.manager} onChanged={() => load(true)} />}
+
       {/* Folded: one tappable chip per group. */}
       {collapsed && tasks.length > 0 && (
         <div className="tb-chips" style={{ ["--c0" as string]: `${chipsStart()}ms` }}>
@@ -400,6 +405,7 @@ export default function TodayBulletin({ onOpen }: { onOpen: (tab: string, orderF
                       <div className="tb-body">
                         <div className="tb-task">{t.task}</div>
                         {t.why && <div className="tb-why">{t.why}</div>}
+                        {t.managerWhy && <div className="tb-learned"><span>✦ Manager</span> {t.managerWhy}</div>}
                         {t.learned?.map((l, i) => (
                           <div key={i} className="tb-learned"><span>✦ Learned</span> {l}</div>
                         ))}

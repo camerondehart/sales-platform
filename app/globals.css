@@ -3374,6 +3374,151 @@ input:focus, textarea:focus, select:focus {
 }
 
 /* =========================================================
+   Members' shop category filter (app/components/ShopCategories.tsx)
+   One quiet capsule in the same language as the top nav: All, the
+   biggest categories that fit on one line, then More (every category).
+   Phones use the dropdown in .shop-controls instead.
+   ========================================================= */
+.shop-cats {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: -1.5rem auto 2.5rem;
+  max-width: 980px;
+}
+.sc-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 0.3rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 1px 2px rgba(97, 103, 109, 0.05), 0 8px 24px rgba(97, 103, 109, 0.08);
+}
+.sc-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 0;
+  padding: 0.55rem 0.95rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.25s ease;
+}
+.sc-item:hover { background: rgba(133, 186, 69, 0.1); color: var(--accent-strong); transform: none; }
+.sc-item:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+.sc-item.active {
+  background: var(--accent-strong);
+  color: #fff;
+  box-shadow: 0 3px 12px rgba(111, 163, 54, 0.32);
+}
+.sc-more { padding-right: 0.75rem; }
+.sc-more svg { width: 0.8rem; height: 0.8rem; flex: none; transition: transform 0.2s ease; }
+.sc-more.open svg { transform: rotate(180deg); }
+.sc-more.open:not(.active) { background: rgba(133, 186, 69, 0.1); color: var(--accent-strong); }
+.sc-more-label { max-width: 14em; overflow: hidden; text-overflow: ellipsis; }
+.sc-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  max-width: none;
+}
+
+/* More: every category with its count */
+.sc-panel {
+  position: absolute;
+  top: calc(100% + 0.55rem);
+  left: 50%;
+  z-index: 30;
+  width: min(620px, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  padding: 0.9rem 0.9rem 0.75rem;
+  border: 1px solid var(--rule-soft);
+  border-radius: 18px;
+  background: rgba(252, 252, 250, 0.97);
+  box-shadow: 0 18px 44px -12px rgba(60, 66, 72, 0.28), 0 2px 6px rgba(60, 66, 72, 0.06);
+  animation: sc-drop 0.18s ease-out;
+}
+@keyframes sc-drop { from { opacity: 0; transform: translate(-50%, -4px); } }
+.sc-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.35rem 0.6rem;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--rule-soft);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.sc-panel-all {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-strong);
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.sc-panel-all:hover { text-decoration: underline; text-underline-offset: 3px; }
+.sc-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 2px 0.5rem;
+}
+.sc-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-height: 0;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sc-opt em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.sc-opt:hover { background: rgba(133, 186, 69, 0.1); color: var(--accent-strong); }
+.sc-opt.active { background: rgba(133, 186, 69, 0.16); color: var(--accent-strong); }
+.sc-opt.active em { color: var(--accent-strong); }
+@media (max-width: 640px) { .shop-cats { display: none; } }
+@media (prefers-reduced-motion: reduce) { .sc-panel { animation: none; } }
+
+/* =========================================================
    Approval timeline notice (sign-up flow)
    ========================================================= */
 .approval-notice {
@@ -5947,6 +6092,11 @@ body.is-peeking .scroll-cue-chev {
   color: var(--accent-strong);
 }
 .footnote-link:hover .footnote-cta { text-decoration: underline; }
+/* Phone: linked cards use the same icon-beside layout as the others
+   (the display:block above came later and undid it). */
+@media (max-width: 720px) {
+  .footnote-link { display: grid; padding: 1rem 1.1rem; }
+}
 
 @media (max-width: 720px) {
   /* The meta row never wrapped, so a full-width nav just overflowed the
@@ -7511,6 +7661,58 @@ a.ask-product { text-decoration: none; box-sizing: border-box; }
 .tb-why { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.15rem; line-height: 1.4; }
 .tb-learned { margin-top: 0.35rem; font-size: 0.82rem; color: var(--ink-soft); line-height: 1.4; }
 .tb-learned span { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-strong, #6fa336); margin-right: 0.25rem; }
+/* Manager's take (app/admin/ManagerTake.tsx): calm by default, one section at a time */
+.mt { --mt: var(--accent-strong, #6fa336); margin: 0.75rem 0 0.5rem; padding: 0.85rem 1rem; border: 1px solid var(--rule-soft); border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--mt) 9%, transparent), transparent 70%); }
+.mt-head { display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 0.75rem; }
+.mt-mark { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 0.85rem; color: var(--mt);
+  background: color-mix(in srgb, var(--mt) 14%, transparent); margin-top: 0.1rem; }
+.mt-toggle { min-width: 0; display: grid; gap: 0.2rem; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.mt-kicker { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mt); }
+.mt-when { color: var(--ink-soft); font-weight: 600; letter-spacing: 0.06em; text-transform: none; }
+.mt-headline { font-family: var(--font-serif, Georgia, serif); font-size: 1rem; line-height: 1.4; color: var(--ink); }
+.mt:not(.is-open) .mt-headline { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mt-counts { display: flex; flex-wrap: wrap; gap: 0.35rem 0.8rem; margin-top: 0.15rem; font-size: 0.74rem; color: var(--ink-soft); }
+.mt-count::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 0.35rem; vertical-align: 0.1em; background: var(--dot, var(--mt)); }
+.mt-c-missed { --dot: #c0663a; } .mt-c-concerns { --dot: #c99a2e; } .mt-c-insights { --dot: #6b7fd7; } .mt-c-wins { --dot: var(--mt); }
+.mt-run { display: inline-flex; align-items: center; gap: 0.35rem; font: inherit; font-size: 0.74rem; font-weight: 700; color: var(--mt); background: none;
+  border: 1px solid color-mix(in srgb, var(--mt) 40%, transparent); border-radius: 999px; padding: 0.35rem 0.7rem; cursor: pointer; white-space: nowrap; }
+.mt-run:hover { background: color-mix(in srgb, var(--mt) 10%, transparent); }
+.mt-run:disabled { opacity: 0.6; cursor: default; }
+.mt-msg { font-size: 0.78rem; color: var(--ink-soft); margin: 0.5rem 0 0 calc(30px + 0.75rem); }
+.mt-err { color: #b5651d; }
+.mt-body { margin: 0.8rem 0 0 calc(30px + 0.75rem); display: grid; gap: 0.9rem; }
+.mt-tabs { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 0.3rem; border-bottom: 1px solid var(--rule-soft); }
+.mt-more { font-weight: 700; color: var(--mt); }
+.mt-tab { white-space: nowrap; flex: none; font: inherit; font-size: 0.76rem; font-weight: 600; color: var(--ink-soft); background: none; border: 0; border-bottom: 2px solid transparent;
+  padding: 0.35rem 0.55rem 0.45rem; margin-bottom: -1px; cursor: pointer; }
+.mt-tab b { font-weight: 700; margin-left: 0.2rem; color: var(--dot); }
+.mt-tab.on { color: var(--ink); border-bottom-color: var(--dot); }
+.mt-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.55rem; }
+.mt-items li { font-size: 0.86rem; line-height: 1.5; color: var(--ink); padding-left: 0.75rem; border-left: 2px solid color-mix(in srgb, var(--dot) 55%, transparent); }
+.mt-sub { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); margin-bottom: 0.3rem; }
+.mt-suggest { display: grid; }
+.mt-action { display: flex; align-items: center; gap: 0.55rem; width: 100%; font: inherit; font-size: 0.84rem; color: var(--ink); text-align: left;
+  background: none; border: 0; border-top: 1px solid var(--rule-soft); padding: 0.55rem 0.1rem; cursor: pointer; }
+.mt-action:last-child { border-bottom: 1px solid var(--rule-soft); }
+.mt-action-dot { color: var(--mt); font-size: 0.7rem; }
+.mt-action-text { flex: 1; min-width: 0; }
+.mt-action-go { color: var(--ink-soft); transition: transform 0.15s ease, color 0.15s ease; }
+.mt-action:hover .mt-action-go { transform: translateX(3px); color: var(--mt); }
+.mt-moves { font-size: 0.78rem; color: var(--ink-soft); display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; }
+.mt-moves ul { flex-basis: 100%; margin: 0.2rem 0 0 1rem; padding: 0; line-height: 1.5; }
+.mt-moves strong { color: var(--ink); font-weight: 600; }
+.mt-link { font: inherit; font-weight: 700; color: var(--mt); background: none; border: 0; padding: 0; cursor: pointer; }
+.mt-foot { font-size: 0.7rem; color: var(--ink-soft); }
+.mt-warn-note { font-size: 0.74rem; line-height: 1.45; color: #b5651d; background: color-mix(in srgb, #c99a2e 10%, transparent); border-radius: 8px; padding: 0.45rem 0.6rem; }
+@media (max-width: 560px) {
+  .mt { padding: 0.75rem 0.8rem; }
+  .mt-head { grid-template-columns: 1fr auto; }
+  .mt-mark { display: none; }
+  .mt-run-text { display: none; }
+  .mt-run { padding: 0.4rem 0.55rem; }
+  .mt-msg, .mt-body { margin-left: 0; }
+}
 .tb-items { margin: 0.35rem 0 0.15rem 1rem; padding: 0; font-size: 0.76rem; color: var(--ink-soft); line-height: 1.5; }
 .tb-go { white-space: nowrap; font: inherit; font-size: 0.76rem; font-weight: 700; padding: 0.4rem 0.75rem; border-radius: 999px; cursor: pointer;
   border: 1px solid var(--rule-soft); background: #fff; color: var(--ink); transition: all 0.15s ease; }
@@ -8678,7 +8880,6 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 .en-turkey-tail { transform-box: fill-box; transform-origin: 50% 100%; animation: en-fan 0.9s ease-in-out 1.5s infinite alternate; }
 .en-turkey-head { transform-box: fill-box; transform-origin: 50% 100%; animation: en-gobble-head 0.32s ease-in-out 1.6s infinite alternate; }
 .en-wattle { transform-box: fill-box; transform-origin: 50% 0%; animation: en-wattle 0.32s ease-in-out 1.6s infinite alternate; }
-.en-gobble { opacity: 0; transform-box: fill-box; transform-origin: 0% 100%; animation: en-gobble-say 1.6s ease 1.7s both; }
 .en-cupid { position: absolute; left: -18%; top: 14%; width: clamp(90px, 13vw, 170px); animation: en-cupid-fly 3.3s cubic-bezier(0.4, 0, 0.5, 1) 0.4s both; }
 .en-cupid svg { width: 100%; height: auto; overflow: visible; }
 .en-cupid-wing { transform-box: fill-box; transform-origin: 0% 100%; animation: en-cupid-flap 0.24s ease-in-out infinite alternate; }
@@ -8688,7 +8889,6 @@ html[data-admin-theme="dark"] .stock-owed-box { background: rgba(214, 120, 80, 0
 @keyframes en-fan { from { transform: scaleX(0.92) scaleY(0.96); } to { transform: scaleX(1.06) scaleY(1.02); } }
 @keyframes en-gobble-head { from { transform: translateY(0) rotate(-4deg); } to { transform: translateY(5px) rotate(5deg); } }
 @keyframes en-wattle { from { transform: rotate(-12deg); } to { transform: rotate(14deg); } }
-@keyframes en-gobble-say { 0% { opacity: 0; transform: scale(0.4); } 15%, 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
 @keyframes en-cupid-fly { 0% { transform: translate(0, 4vh) rotate(-6deg); } 50% { transform: translate(62vw, -3vh) rotate(4deg); } 100% { transform: translate(128vw, 2vh) rotate(-4deg); } }
 @keyframes en-cupid-flap { from { transform: rotate(0deg); } to { transform: rotate(-18deg); } }
 @keyframes en-arrow-shot { 0% { opacity: 0; transform: translate(0, 0); } 10% { opacity: 1; } 100% { opacity: 0; transform: translate(60vw, 24vh) rotate(18deg); } }
@@ -9102,6 +9302,7 @@ body[data-season="winter"] .scene-yeti-hole { display: block; position: absolute
 /* Staff "Preview background" bar (app/layout.tsx) */
 .season-preview-bar { position: fixed; bottom: calc(18px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; align-items: center; gap: 0.7rem; max-width: calc(100vw - 24px);
   padding: 0.45rem 0.55rem 0.45rem 0.95rem; border-radius: 999px; background: rgba(43, 47, 39, 0.88); color: #f6f6f1; font-family: var(--font-sans); font-size: 0.8rem; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); }
+.season-preview-bar > span { min-width: 0; }
 .season-preview-bar a { color: #2b2f27; background: #e7f2d6; border-radius: 999px; padding: 0.25rem 0.75rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
 a.esc-btn { display: inline-flex; align-items: center; text-decoration: none; }
 
@@ -10150,6 +10351,7 @@ html[data-admin-theme="dark"] .dc-chip.members { background: rgba(166, 213, 95, 
 /* Analytics → Where people sign in (app/admin/LoginMap.tsx) */
 .lm-card { --lm-sea: #eef3e8; --lm-land: #dfe8d3; --lm-edge: rgba(43,47,39,0.22); --lm-state: rgba(43,47,39,0.12); --lm-dot: #6fa336; --lm-dot-edge: #fff; --lm-pick: #d08b3a; }
 html[data-admin-theme="dark"] .lm-card { --lm-sea: #141b10; --lm-land: #26301f; --lm-edge: rgba(230,240,215,0.22); --lm-state: rgba(230,240,215,0.1); --lm-dot: #9fd45f; --lm-dot-edge: #11150c; --lm-pick: #f0b25c; }
+.lm-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; }
 .lm-skeleton { height: 260px; border-radius: 14px; background: rgba(43,47,39,0.05); }
 .lm-body { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
 .lm-map-wrap { position: relative; border-radius: 14px; overflow: hidden; background: var(--lm-sea); }
@@ -10211,3 +10413,352 @@ html[data-admin-theme="dark"] .lm-card { --lm-sea: #141b10; --lm-land: #26301f; 
   .secnav-text small { display: none; }
   .secnav-badge { position: absolute; top: 0.3rem; right: 0.3rem; }
 }
+
+/* ─────────────── Night sky (switch night_sky; lib/nightSky.ts, app/components/NightSky.tsx) ───────────────
+   Dusk to dawn on the visitor's own clock, <html data-night="1">: the same valley by moonlight.
+   Deep blue sky, the hills as soft dark silhouettes, the sun swapped for a glowing moon, stars,
+   fireflies. Colours are set on .scene itself so they win over a season's colours (set on <body>);
+   the season's drifting leaves / snow / petals still fall. Staff pages never change. */
+html[data-night] body:not(:has(.admin-shell)) {
+  background:
+    radial-gradient(ellipse 900px 600px at 82% 0%, rgba(150, 170, 235, 0.12), transparent 70%),
+    radial-gradient(ellipse 700px 500px at 12% 100%, rgba(15, 199, 163, 0.06), transparent 70%),
+    #111a2e;
+}
+html[data-night] { background: #111a2e; }
+html[data-night] .scene { --sc-tree: 22, 40, 50; --sc-tree2: 26, 48, 54; }
+html[data-night] .scene-sky {
+  background:
+    radial-gradient(ellipse 60% 45% at 84% 6%, rgba(190, 205, 255, 0.16), transparent 70%),
+    linear-gradient(180deg, #0d1528 0%, #152039 42%, #1c2c45 72%, #22384a 100%);
+}
+html[data-night] .scene-sun, html[data-night] .scene-spore, html[data-night] .scene-fly { display: none; }
+html[data-night] .scene-cloud { background: radial-gradient(ellipse at 50% 55%, rgba(170, 186, 230, 0.2), rgba(150, 166, 215, 0.08) 55%, transparent 75%); }
+html[data-night] .scene-haze { background: linear-gradient(180deg, transparent, rgba(70, 92, 130, 0.28) 45%, rgba(60, 80, 120, 0.12)); }
+html[data-night] .scene-ridge-haze { fill: rgba(90, 110, 160, 0.16); }
+html[data-night] .scene-ridge-far { fill: rgba(30, 46, 72, 0.78); }
+html[data-night] .scene-ridge-near { fill: rgba(22, 38, 54, 0.88); }
+html[data-night] .scene-meadow { fill: rgba(20, 38, 42, 0.95); }
+html[data-night] .scene-grass { stroke: rgba(80, 120, 100, 0.55); }
+html[data-night] .scene-tree .tr-trunk { fill: rgba(16, 26, 34, 0.7); }
+html[data-night] .scene-trees-near .scene-tree :is(.tr-a, .tr-c) { fill: rgba(var(--sc-tree), 0.92); }
+html[data-night] .scene-trees-near .scene-tree :is(.tr-b, .tr-b2) { fill: rgba(14, 28, 38, 0.95); }
+html[data-night] .scene-trees-far .scene-tree :is(.tr-a, .tr-b, .tr-c, .tr-b2) { fill: rgba(36, 54, 82, 0.8); }
+html[data-night] .scene-tree .tr-snow { fill: rgba(220, 230, 250, 0.7); }
+/* Mushrooms catch the moonlight; their spots glow a little, like the woods at night. */
+html[data-night] .scene-shrooms .ss-stem { fill: #b9b7b6; stroke: rgba(10, 20, 30, 0.4); }
+html[data-night] .scene-shrooms .ss-cap { stroke: rgba(10, 20, 30, 0.35); }
+html[data-night] .scene-shrooms .ss-spot { fill: #fff6cf; }
+html[data-night] .scene-aurora { opacity: 0.75; }
+html[data-night] .season-drift.k-leaf .season-drop, html[data-night] .season-drift.k-petal .season-drop { filter: brightness(0.75); }
+
+.night-sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+html:not([data-night]) .night-sky { display: none; }
+.night-moon { position: absolute; top: clamp(130px, 17vh, 190px); right: clamp(22px, 13vw, 260px); width: clamp(54px, 10vmin, 112px); aspect-ratio: 1; border-radius: 50%;
+  box-shadow: 0 0 0 clamp(8px, 1.6vmin, 18px) rgba(255, 244, 214, 0.1), 0 0 0 clamp(18px, 3.6vmin, 40px) rgba(255, 244, 214, 0.05), 0 0 clamp(40px, 9vmin, 110px) clamp(8px, 2vmin, 24px) rgba(255, 238, 196, 0.32);
+  animation: night-moon-in 2.4s cubic-bezier(0.2, 0.7, 0.2, 1) both, night-moon-glow 7s ease-in-out 2.4s infinite alternate; }
+.night-moon svg { display: block; width: 100%; height: 100%; }
+.night-moon .nm-face { fill: #fbf1d6; }
+.night-moon .nm-crater { fill: rgba(196, 176, 140, 0.32); }
+@keyframes night-moon-in { from { opacity: 0; transform: translateY(18px); } }
+@keyframes night-moon-glow { from { opacity: 0.9; } to { opacity: 1; transform: scale(1.03); } }
+.night-star { position: absolute; width: var(--sz); height: var(--sz); border-radius: 50%; background: #fff8e4; box-shadow: 0 0 4px 1px rgba(255, 248, 228, 0.6); opacity: 0.3; animation: night-twinkle 3s ease-in-out infinite alternate; }
+@keyframes night-twinkle { from { opacity: 0.18; } to { opacity: 0.95; } }
+.night-sparkle { position: absolute; fill: #fff4d2; opacity: 0; animation: night-sparkle 6s ease-in-out infinite; }
+@keyframes night-sparkle { 0%, 70%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 82% { opacity: 0.9; transform: scale(1) rotate(25deg); } }
+/* Fireflies: the outer dot wanders a slow loop, the inner glow blinks on its own beat. */
+.night-fly { position: absolute; width: 5px; height: 5px; animation: night-wander-0 12s ease-in-out infinite; will-change: transform; }
+.night-fly.nf-1 { animation-name: night-wander-1; }
+.night-fly.nf-2 { animation-name: night-wander-2; }
+.night-fly i { position: absolute; inset: 0; border-radius: 50%; background: #fff6b0; box-shadow: 0 0 8px 3px rgba(222, 240, 120, 0.55); opacity: 0; animation: night-blink 2.6s ease-in-out infinite; }
+@keyframes night-blink { 0%, 100% { opacity: 0.05; } 40%, 60% { opacity: 1; } }
+@keyframes night-wander-0 { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(5vw, -4vh); } 50% { transform: translate(9vw, 1vh); } 75% { transform: translate(3vw, 3vh); } }
+@keyframes night-wander-1 { 0%, 100% { transform: translate(0, 0); } 30% { transform: translate(-6vw, -3vh); } 60% { transform: translate(-2vw, -8vh); } 80% { transform: translate(2vw, -3vh); } }
+@keyframes night-wander-2 { 0%, 100% { transform: translate(0, 0); } 33% { transform: translate(3vw, -7vh); } 66% { transform: translate(-4vw, -4vh); } }
+@media (max-width: 700px) {
+  .night-star:nth-child(3n) { display: none; }
+  .night-fly:nth-of-type(n + 10) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .night-moon, .night-star, .night-sparkle, .night-fly, .night-fly i { animation: none !important; }
+  .night-star { opacity: 0.6; }
+  .night-fly i { opacity: 0.7; }
+  .night-sparkle { display: none; }
+}
+.night-preview-bar ~ .season-preview-bar { bottom: calc(66px + env(safe-area-inset-bottom)); }
+/* By moonlight the panes take a soft dusk tint (blue-grey, a little dimmer) with a faint glow
+   instead of bright white, so the page reads as one moonlit scene and doesn't glare. */
+html[data-night] .gate-card { background: linear-gradient(160deg, rgba(214, 220, 233, 0.95), rgba(198, 206, 222, 0.94)); border-color: rgba(255, 255, 255, 0.16); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35), 0 0 70px rgba(150, 170, 235, 0.1); }
+html[data-night] .card {
+  background: linear-gradient(160deg, rgba(214, 220, 233, 0.95), rgba(196, 204, 221, 0.94));
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 14px 34px -12px rgba(0, 0, 0, 0.5), 0 0 26px rgba(150, 170, 235, 0.08);
+}
+html[data-night] .card .card-image { background: rgba(196, 204, 221, 0.5); }
+/* Photos (mostly on white) dimmed a touch so they sit in the night instead of shining out of it. */
+html[data-night] :is(.card .card-image img, .modal-image img, .event-img img, img.event-img) { filter: brightness(0.86) saturate(0.95); }
+html[data-night] :is(.card:hover .card-image img, .card:focus-within .card-image img, .modal-image img) { filter: brightness(0.93); }
+/* …and a faint moonlight-blue wash over the photo so white backgrounds match the card's dusk tint. */
+html[data-night] .card .card-image::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgba(70, 92, 150, 0.13); transition: opacity 0.35s ease; }
+html[data-night] .card:hover .card-image::before { opacity: 0.5; }
+html[data-night] .home-shop { background: linear-gradient(180deg, rgba(17, 26, 46, 0) 0%, rgba(17, 26, 46, 0.7) 14%, rgba(17, 26, 46, 0.82) 100%); }
+html[data-night] :is(.masthead-nav, .site-nav) { background: rgba(206, 213, 228, 0.92); border-color: rgba(255, 255, 255, 0.14); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+html[data-night] .sc-track { background: rgba(206, 213, 228, 0.92); border-color: rgba(255, 255, 255, 0.14); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+html[data-night] .sc-panel { background: linear-gradient(160deg, #d6dce9, #c6cede); border-color: rgba(255, 255, 255, 0.16); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4); }
+html[data-night] .modal:has(> .modal-image) { background: linear-gradient(160deg, rgba(214, 220, 233, 0.94), rgba(198, 206, 222, 0.9)); border-color: rgba(255, 255, 255, 0.16); }
+@media (max-width: 700px) { .night-moon { top: auto; bottom: 46vh; right: 8vw; } }
+/* The page's own text turns moonlit so it reads on the dark sky (light surfaces put the daytime
+   ink back: the generated list below). The admin never gets data-night at all. */
+html[data-night] body {
+  --ink: #e6e9f1; --ink-soft: #bcc3d1; --ink-faint: #8e97aa; --dark-grey: #e6e9f1; --grey: #bcc3d1; --light-grey: #8e97aa;
+  --rule: rgba(220, 228, 245, 0.3); --rule-soft: rgba(220, 228, 245, 0.16);
+  --accent-strong: #a6d55f; --mint-deep: #4fd9bb; --yellow-deep: #d6d86a;
+  /* Surfaces painted with the light tokens take the same dusk tint as the cards. */
+  --white: #d3d9e6; --surface: #d3d9e6; --paper: #d3d9e6; --cream: #c3cad9; --surface-alt: #c6cddc;
+  color: var(--ink);
+}
+
+/* The members' entrance by moonlight (ForestEntrance `night`): the theme's own extras (snow, leaves,
+   a snowman…) stay; the sky, forest and meadow take night colours (!important: themes set theirs inline). */
+.en-entrance.en-night {
+  --en-sky-top: #0a1224 !important; --en-sky-mid: #16244a !important; --en-sky-low: #2b3a68 !important; --en-sky-hor: #4a5482 !important; --en-sun: #fbf1d6 !important;
+  --en-meadow: #2e4a3e !important; --en-meadow2: #243e34 !important; --en-meadow3: #1b322a !important; --en-path: #4d5468 !important;
+  --en-t1: #24443f !important; --en-t1s: #1c3733 !important; --en-t2: #1a3530 !important; --en-t2s: #142b27 !important; --en-t3: #10241f !important; --en-t3s: #0c1c18 !important; --en-trunk: #2a201d !important;
+  --en-far1: #39456f !important; --en-far2: #48527f !important; --en-mist: 64, 78, 124 !important; --en-cream: #aeb7d6 !important;
+  --en-title: #f7f1dd !important; --en-kicker: #f2c26b !important;
+}
+.en-night .en-cloud { opacity: 0.35; filter: none; }
+.en-night .en-sun.is-moon { top: 22%; box-shadow: 0 0 0 2.4vmin rgba(255, 244, 214, 0.12), 0 0 0 5.5vmin rgba(255, 244, 214, 0.06), 0 0 9vmin 3vmin rgba(255, 238, 196, 0.38); }
+.en-night .en-fly { background: #fff6b0; box-shadow: 0 0 12px 4px rgba(222, 240, 120, 0.6); }
+.en-night .en-skip { color: rgba(230, 236, 250, 0.7); }
+
+/* night-surfaces:start (generated by scripts/night-surfaces.cjs; don't edit by hand) */
+/* Light surfaces (dusk-tinted at night) get a slightly deeper ink so text stays easy to read. :where() keeps this at zero specificity,
+   so each surface's own colours still win; only what it would inherit from the page changes. */
+:where(html[data-night]) :where(
+  .about-value,
+  .abp-card,
+  .abp-chip,
+  .abp-earn div,
+  .abp-emoji,
+  .abp-hero,
+  .abp-range button,
+  .abp-search,
+  .abp-seg button,
+  .abp-sel li,
+  .abp-sel-btns button,
+  .abp-share-item,
+  .abp-thumb,
+  .abp-tile,
+  .abp-tile-earned,
+  .account-dropdown,
+  .account-trigger,
+  .address-suggestions,
+  .address-suggestions li:hover,
+  .amb-acard,
+  .amb-box,
+  .amb-card,
+  .amb-emoji,
+  .amb-emoji-pick,
+  .amb-form,
+  .amb-join,
+  .amb-join-mark,
+  .amb-offer,
+  .amb-page .amb-card,
+  .amb-page .amb-social,
+  .amb-report-preview iframe,
+  .amb-slug,
+  .amb-social,
+  .amb-tile,
+  .as-assistant .as-bubble,
+  .as-avatar,
+  .as-card,
+  .as-card-preview,
+  .as-chip,
+  .as-compose,
+  .as-hint,
+  .as-panel,
+  .as-prod,
+  .as-prod-btn,
+  .as-qr,
+  .ask-product,
+  .auth-tab.active,
+  .aw-badge,
+  .aw-stars span,
+  .bd-row,
+  .card,
+  .card-image,
+  .card-locked-art,
+  .card-locked-lock,
+  .card-members-tag,
+  .cart-button,
+  .cart-drawer,
+  .cart-drawer-foot,
+  .cart-item-qty button,
+  .cat-pill,
+  .catalog-bulk button,
+  .ch-row,
+  .consult-ack,
+  .consult-days button,
+  .consult-times button,
+  .event-card,
+  .event-details-btn,
+  .event-img,
+  .faq-item,
+  .fid-card,
+  .field .event-offer-new,
+  .field .event-offer-new input:not([type="checkbox"]),
+  .field .event-offer-new select,
+  .field input,
+  .field textarea,
+  .footnote,
+  .footnote-link,
+  .gate-card,
+  .gate-input,
+  .gate-kicker,
+  .gate-radio,
+  .gc-birthday .gc-bits i:nth-child(4n + 2),
+  .gc-sparkles i:nth-child(3),
+  .gc-sparkles i:nth-child(7),
+  .gc-thank-you .gc-bits i:nth-child(3n),
+  .gift-amount,
+  .gift-copy-btn,
+  .gift-form,
+  .gift-form input[type="email"],
+  .gift-form input[type="number"],
+  .gift-form input[type="text"],
+  .gift-form textarea,
+  .gift-open-page .gift-btn-ghost,
+  .gift-open-panel,
+  .grid-toggle,
+  .history-close,
+  .history-close:hover,
+  .history-item,
+  .history-message,
+  .history-modal,
+  .home-staff-link,
+  .home-staff-link:focus-visible,
+  .home-staff-link:hover,
+  .home-store-link,
+  .home-store-link:focus-visible,
+  .home-store-link:hover,
+  .ip,
+  .legal-table th,
+  .lev-card,
+  .masthead-nav,
+  .mi-grid div,
+  .modal,
+  .modal-close,
+  .modal-close:hover,
+  .modal-image,
+  .modal:has(> .modal-image),
+  .ms-aud-card,
+  .ms-model,
+  .ms-summary,
+  .msel-search,
+  .nav-pill,
+  .pay-card,
+  .pay-shell,
+  .pay-step,
+  .pqr-code,
+  .prod-actions button,
+  .prod-card,
+  .prod-form-preview,
+  .prod-rows .prod-select,
+  .prod-select,
+  .prod-thumb,
+  .qr-preview,
+  .quick-actions .quick-link,
+  .quick-actions button,
+  .reg-pager button,
+  .rem-stage,
+  .row-menu-list,
+  .rt-form,
+  .save-banner.save-saving,
+  .sc-panel,
+  .sc-track,
+  .scene-cloud,
+  .scene-haze,
+  .scene-sky,
+  .scene-spore,
+  .search-input,
+  .secnav-card,
+  .seg,
+  .seg button.on,
+  .seg-btn.active,
+  .shop-select select,
+  .site-foot,
+  .site-nav,
+  .sn-signin,
+  .sp-btn-ghost,
+  .sp-card,
+  .sp-guide-steps li,
+  .sp-noimg,
+  .sp-note-line,
+  .sp-products img,
+  .sp-products li,
+  .sp-qty button,
+  .sp-qty input,
+  .sp-req,
+  .sp-stat,
+  .sr-form input,
+  .sr-form select,
+  .sr-form textarea,
+  .sr-row,
+  .src-list li,
+  .st-sugs,
+  .staff-row,
+  .stock-card-chip,
+  .store-card,
+  .store-carries li,
+  .store-form,
+  .store-map,
+  .store-map .maplibregl-ctrl-attrib,
+  .store-map .maplibregl-ctrl-group,
+  .store-popup-wrap .maplibregl-popup-content,
+  .stores-tools input,
+  .sub-filter button,
+  .sus-case,
+  .sw-row,
+  .tabs,
+  .tb-box,
+  .tb-chip,
+  .tb-go,
+  .tb-ring span,
+  .tb-row,
+  .user-actions button,
+  .user-actions button:hover,
+  .user-note,
+  .vi-codes pre,
+  .vi-order select,
+  .vi-row,
+  .vs-custom,
+  .vs-pick select,
+  .vs-voice,
+  input:focus,
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="email"],
+  input[type="number"],
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="text"],
+  select,
+  select:focus,
+  textarea,
+  textarea:focus
+) {
+  --ink: #434a56; --ink-soft: #565e6b; --ink-faint: #7a8291; --dark-grey: #434a56; --grey: #565e6b; --light-grey: #8b93a2;
+  --rule: #9aa2b3; --rule-soft: #b6bdcc; --accent-strong: #557f27; --mint-deep: #087a67; --yellow-deep: #6a6c20;
+  color: var(--ink);
+}
+/* night-surfaces:end */
+
+/* Marketing → Sitewide sales (app/admin/SiteSalesPanel.tsx; rows reuse the bundle styles) */
+.ss-state { font-weight: 700; }
+.ss-running { color: var(--accent-strong, #6fa336); }
+.ss-scheduled { color: var(--ink); }
+.ss-picks { margin-top: 0.7rem; display: grid; gap: 0.2rem; max-height: 320px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 8px; padding: 0.5rem 0.7rem; }
+.ss-pick { display: flex; gap: 0.55rem; align-items: center; font-size: 0.9rem; padding: 0.15rem 0; }
+.ss-pick > span:nth-child(2) { flex: 1; }

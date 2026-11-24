@@ -1,5 +1,6 @@
 "use client";
 
+import Markdown from "@/app/components/assistant/Markdown";
 import { useEffect, useMemo, useState } from "react";
 import { EVT_ESCALATIONS } from "@/lib/assistant/shared";
 import { brand } from "@/lib/brand";
@@ -188,7 +189,7 @@ export default function EscalationsList({ initial }: { initial: EscalationItem[]
                         {e.transcript.map((m, i) => (
                           <div key={i} className={`esc-bubble ${m.role}`}>
                             <span>{m.role === "user" ? e.name.split(/\s+/)[0] || "Customer" : "Concierge"}</span>
-                            {m.content}
+                            {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
                           </div>
                         ))}
                       </div>

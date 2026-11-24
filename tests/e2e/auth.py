@@ -14,7 +14,7 @@ def req(path, body=None, cookie=ADMIN, method=None, ip="10.9.0.1"):
             ck=[h for h in resp.headers.get_all("set-cookie") or []]
             txt=resp.read()
             try: j=json.loads(txt or b"{}")
-            except Exception: j={"_html":txt.decode()[:3000]}
+            except Exception: j={"_html":txt.decode()[:400000]}
             return resp.status, j, ck
     except urllib.error.HTTPError as e:
         try: return e.code, json.loads(e.read() or b"{}"), []

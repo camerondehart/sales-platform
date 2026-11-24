@@ -32,9 +32,13 @@ check("rows past the keep window are dropped", !rows.some((r) => r.city === "Old
 
 const all = summarize(rows, "2026-11-01");
 check("totals per town, biggest first", all.total === 4 && all.places[0].city === "Chico" && all.places[0].count === 3, all);
-check("Everyone leaves staff out; each town splits by kind", JSON.stringify(all.places[0].byKind) === JSON.stringify({ member: 2, staff: 0, store: 1 }), all.places[0].byKind);
+check("Everyone leaves staff out; each town splits by kind", JSON.stringify(all.places[0].byKind) === JSON.stringify({ member: 2, staff: 0, store: 1, visit: 0 }), all.places[0].byKind);
 check("kind filter", summarize(rows, "2026-11-01", "staff").total === 1);
 check("period filter", summarize(rows, "2026-11-21").total === 2);
+let vrows = addSignIn(rows.map((r) => ({ ...r })), "2026-11-21", "visit", chico, "2025-10-18", 5);
+check("visits add by a batch count", vrows.find((r) => r.kind === "visit").count === 5, vrows);
+check("visits stay out of Everyone", summarize(vrows, "2026-11-01").total === 4);
+check("visits show under Visits", summarize(vrows, "2026-11-01", "visit").total === 5);
 check("labels: US towns show the state, others the country", placeLabel(chico) === "Chico, CA" && placeLabel(sp) === "São Paulo, BR", [placeLabel(chico), placeLabel(sp)]);
 
 console.log(`${pass} passed, ${fail} failed`);

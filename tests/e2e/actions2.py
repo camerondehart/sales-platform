@@ -323,6 +323,56 @@ check("public Concierge: explains points as members-only, no balance", dp.get("l
 check("public Concierge: only public-shop products in the sale list", "Secret Member Tincture" not in json.dumps(dp), dp.get("on_sale_now"))
 r=tool("propose_delete_member",{"member_id":"u_member"}, cookie=MEMBER, mode="site")
 check("members can't use staff tools", not r.get("actions") and "not available" in r["reply"].lower(), r)
+# ================= scheduled sitewide sales (lib/siteSales.ts)
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+def _pt(ms): return datetime.fromtimestamp(ms/1000, ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%dT%H:%M")
+_n=int(time.time()*1000)
+_ip=[0]
+def _buy(pid):
+    _ip[0]+=1
+    s,r=http("POST","/api/checkout",{"items":[{"productId":pid,"quantity":1}],"shippingMethod":"pickup","paymentMethod":"invoice"}, cookie=MEMBER, headers={"x-forwarded-for":f"10.77.0.{_ip[0]}"})
+    o=[x for x in J("orders.json",[]) if x["id"]==r.get("orderId")]
+    return o[0]["items"][0]["price"] if o else (s,r)
+_ls=toolres(tool("list_site_sales"))
+check("sitewide sales: none at first, switch on by default", _ls.get("switch_on") is True and _ls.get("sales")==[], _ls)
+check("sitewide sales: regular price before any sale", _buy("p_mem")=="$40")
+r=tool("propose_site_sale",{"name":"Black Friday","percent":20,"starts":_pt(_n+3*86400000),"last_minute":_pt(_n+3*86400000+3600000)})
+c=card(r)
+check("sitewide sale card: 20% off all products, window in Pacific, price examples, nothing saved yet", c and c["kind"]=="site_sale" and c["confirmLabel"]=="Schedule sale" and "all products" in c["lines"][0] and "Pacific" in c["lines"][1] and any("Secret Member Tincture: $40 → $32" in l for l in c["lines"]) and not J("site-sales.json",[]), c)
+s,o=confirm(c)
+check("sitewide sale scheduled", s==200 and o.get("sale",{}).get("percent")==20, (s,o))
+_sid=o.get("sale",{}).get("id")
+check("scheduled (future) sale doesn't change prices yet", _buy("p_mem")=="$40")
+_ls=toolres(tool("list_site_sales"))
+check("list sitewide sales: shows it as scheduled with Pacific times", len(_ls["sales"])==1 and _ls["sales"][0]["state"]=="scheduled" and _ls["sales"][0]["id"]==_sid, _ls)
+r=tool("propose_site_sale",{"sale_id":_sid,"name":"Black Friday","percent":20,"starts":_pt(_n-3600000),"last_minute":_pt(_n+7200000)})
+c=card(r)
+check("change sitewide sale: card shows what it was", c and c["request"]["method"]=="PUT" and c["lines"][0].startswith("Was:"), c)
+s,o=confirm(c)
+check("running sale: member pays 20% off", s==200 and _buy("p_mem")=="$32", (s,o))
+check("running sale: the better price wins over a product's own sale ($24.99 sale vs $23.99)", _buy("p_pub")=="$23.99")
+check("running sale: never saved onto the product", not any("sitePromo" in x for x in J("products.json",[])))
+_s,_ap=http("GET","/api/admin/products")
+check("running sale: the Products tab still shows saved prices", _s==200 and not any("sitePromo" in x for x in _ap["products"]), _s)
+_lp=toolres(tool("list_products"))
+check("running sale: the Concierge sees the sale price", "$32" in json.dumps(_lp), json.dumps(_lp)[:300])
+http("POST","/api/admin/flags",{"key":"scheduled_sales","on":False})
+check("switch off: regular prices again", _buy("p_mem")=="$40")
+http("POST","/api/admin/flags",{"key":"scheduled_sales","on":True})
+r=tool("propose_site_sale",{"name":"Oops","percent":20,"starts":_pt(_n+86400000),"last_minute":_pt(_n+3600000)})
+check("sitewide sale: an end before the start is refused", not r.get("actions") and "after the start" in r["reply"], r)
+r=tool("propose_site_sale",{"name":"Huge","percent":95,"starts":_pt(_n),"last_minute":_pt(_n+3600000)})
+check("sitewide sale: more than 90% refused", not r.get("actions"), r)
+c=card(tool("propose_site_sale",{"name":"Tinctures","percent":10,"starts":_pt(_n+86400000),"last_minute":_pt(_n+2*86400000),"applies_to":"category","category":"tinctures"}))
+check("sitewide sale by category: counts its products", c and "Tinctures" in c["lines"][0] and "(1 product today)" in c["lines"][0], c)
+c=card(tool("propose_end_site_sale",{"sale_id":_sid}))
+check("end sitewide sale: red card", c and c["danger"] and c["confirmLabel"]=="End sale" and c["request"]["body"]=={"id":_sid,"action":"end"}, c)
+s,o=confirm(c)
+check("ended: prices straight back", s==200 and o.get("state")=="ended" and _buy("p_mem")=="$40", (s,o))
+_au=[json.loads(l) for l in open(D+"audit.jsonl")]
+check("sitewide sales in the Activity log as Concierge", all(any(a.get("action")==k and a.get("targetId")==_sid and a.get("source")=="ai" for a in _au) for k in ("sale.schedule","sale.edit","sale.end")), [a.get("action") for a in _au if a.get("targetId")==_sid])
+
 aud=[json.loads(l) for l in open(D+"audit.jsonl")]
 ai=[a for a in aud if a.get("source")=="ai"]
 check("every confirmed card is in the Activity log as Concierge", len(ai)>=len(executed)-1, (len(ai), len(executed)))
@@ -331,7 +381,7 @@ check("every confirmed card is in the Activity log as Concierge", len(ai)>=len(e
 expected={("/api/admin/users","POST"),("/api/admin/users","PATCH"),("/api/admin/users","DELETE"),("/api/admin/users/profile","PATCH"),("/api/admin/users/password","POST"),
  ("/api/admin/send-invoice","POST"),("/api/admin/orders/shipping-label","POST"),("/api/admin/reminders","POST"),("/api/admin/reminders","PUT"),
  ("/api/admin/products","POST"),("/api/admin/products","PUT"),("/api/admin/products","PATCH"),("/api/admin/products","DELETE"),
- ("/api/admin/events","POST"),("/api/admin/events","PATCH"),("/api/admin/events","DELETE"),("/api/admin/discounts","PATCH"),("/api/admin/discounts","PUT"),("/api/admin/events-note","PATCH"),("/api/admin/event-offers","PUT"),("/api/admin/gift-cards","POST"),("/api/admin/discounts","DELETE"),
+ ("/api/admin/events","POST"),("/api/admin/events","PATCH"),("/api/admin/events","DELETE"),("/api/admin/discounts","PATCH"),("/api/admin/discounts","PUT"),("/api/admin/events-note","PATCH"),("/api/admin/event-offers","PUT"),("/api/admin/gift-cards","POST"),("/api/admin/discounts","DELETE"),("/api/admin/site-sales","POST"),("/api/admin/site-sales","PUT"),("/api/admin/site-sales","PATCH"),
  ("/api/admin/bundles","POST"),("/api/admin/bundles","PATCH"),("/api/admin/bundles","DELETE"),("/api/admin/campaigns","POST"),("/api/admin/campaigns","PATCH"),
  ("/api/admin/templates","POST"),("/api/admin/subscribers","POST"),("/api/admin/subscribers","DELETE"),("/api/admin/settings","POST"),("/api/admin/flags","POST"),
  ("/api/admin/admins","PUT"),("/api/admin/export-email","POST"),("/api/admin/assistant","PUT"),("/api/admin/assistant/sources","POST")}

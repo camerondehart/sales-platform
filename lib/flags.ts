@@ -51,6 +51,10 @@ export const FLAG_KEYS = [
   "gift_cards",
   "ambassador_panel",
   "login_map",
+  "night_sky",
+  "scheduled_sales",
+  "manager_review",
+  "pickup_ready",
 ] as const;
 export type FlagKey = (typeof FLAG_KEYS)[number];
 
@@ -247,8 +251,32 @@ export const FLAGS: Record<FlagKey, FlagDef> = {
     built: true,
   },
   login_map: {
-    label: "Sign-in map",
-    description: "Analytics → Where people sign in: a map and town list of where member, staff and store sign-ins come from (staff only under Staff, never in Everyone), for the period picked at the top. Each sign-in notes only the rough town worked out from the internet address (city-level, from Vercel), saved as daily totals per town (kept about 13 months). The internet address and who signed in are never saved with it. Off = nothing is noted and the map is hidden.",
+    label: "Sign-in & visit map",
+    description: "Analytics → Where people sign in: a map and town list of where member, staff and store sign-ins come from (staff only under Staff, never in Everyone), and with Visits, where site visitors come from (once per browser tab session, added Nov 22, 2026; no bots, staff pages, staff browsers or Do Not Track browsers), for the period picked at the top. Each sign-in or visit notes only the rough town worked out from the internet address (city-level, from Vercel), saved as daily totals per town (kept about 13 months). The internet address and who it was are never saved with it. Visits also need Visitor analytics on. Off = nothing is noted, the map is hidden and the Privacy page drops these rows.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  night_sky: {
+    label: "Night sky",
+    description: "From dusk to dawn on each visitor's own clock (wherever they are), the site's valley turns to a softly darker night with a glowing moon, twinkling stars and fireflies drifting about, and the members' entrance plays its moonlit version. Works with the seasonal backgrounds. No location is asked for. Staff pages never change. Preview it in Settings → Entrance animation. Off = the usual daytime look all day.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  scheduled_sales: {
+    label: "Scheduled sitewide sales",
+    description: "Marketing → Sitewide sales: one percent off every product, chosen products or a category, from a start to an end time (the shop's local time), without editing each product. The Concierge can schedule, change or end them as cards. Customers get the better of the sitewide sale and a product's own sale (never both); BOGO products keep their BOGO; at most $100 off a unit. Off = no sitewide sale prices anywhere (sales stay saved and come back when it's on).",
+    defaults: on,
+    built: true,
+  },
+  pickup_ready: {
+    label: "Ready-for-pickup messages",
+    description: "Pickup orders get a Ready for pickup button in order details that emails the customer the pickup details. If a pickup order placed after 9pm Nov 23 goes a day (after payment, or after ordering for cash at pickup) without one, the site sends it automatically and emails the staff inbox to check the order is packed.",
+    defaults: { production: false, preview: true, development: true },
+    built: true,
+  },
+  manager_review: {
+    label: "Site manager review",
+    description: "Every night (midnight local time, in time for the nightly report) and on Run now, the manager model (Assistant → Model & access) reads the Today list, Concierge notes, sales, site traffic, chats and the full Activity log, and writes a Manager's take on the Today panel and in the nightly report: wins, concerns, insights, things that may have been missed and suggested actions. It may move Today cards to another priority or hide them for the day (logged, with Undo); anything touching money, customers or sending stays a suggestion you confirm. Counts toward the monthly AI limit.",
     defaults: { production: false, preview: true, development: true },
     built: true,
   },

@@ -32,7 +32,7 @@ const AREAS: Array<[string, string]> = [
   ["order", "Orders"],
   ["member", "Members"],
   ["product", "Products"],
-  ["discount", "Discount codes"],
+  ["discount", "Discounts & sales"],
   ["campaign", "Emails & campaigns"],
   ["event", "Events"],
   ["store", "Store locations"],

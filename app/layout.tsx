@@ -9,11 +9,15 @@ import { brand } from "@/lib/brand";
 import { safeBannerHtml, safeHref } from "@/lib/safeHtml";
 import { currentSiteSeason } from "@/lib/entrance";
 import { SITE_LOOKS, siteLookVars } from "@/lib/seasonLooks";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { isAdmin } from "@/lib/auth";
 import { ENTRANCE_THEMES, isEntranceKey } from "@/lib/entranceThemes";
 import { SEASON_PREVIEW_COOKIE } from "@/lib/seasonPreview";
 import SeasonDrift from "./components/SeasonDrift";
+import NightSky from "./components/NightSky";
+import { isEnabled } from "@/lib/flags";
+import { NIGHT_PREVIEW_COOKIE, nightHeadScript, roughArea } from "@/lib/nightSky";
+import { geoFromHeaders } from "@/lib/localEvents";
 
 export const metadata: Metadata = {
   title: `${brand.name} · ${brand.members}`,
@@ -38,6 +42,15 @@ export default async function RootLayout({
   const previewing = previewKey && isEntranceKey(previewKey) && (await isAdmin().catch(() => false)) ? previewKey : null;
   if (previewing) season = previewing === "classic" ? null : previewing;
   const seasonVars = season ? siteLookVars(season) : null;
+  // Night sky (switch night_sky): dusk to dawn on the visitor's own clock, decided in the
+  // browser by the <head> script below. Staff can preview night or day (Settings → Entrance animation).
+  const nightOn = await isEnabled("night_sky").catch(() => false);
+  const nightCookie = cookies().get(NIGHT_PREVIEW_COOKIE)?.value;
+  const nightForce = (nightCookie === "on" || nightCookie === "off") && (await isAdmin().catch(() => false)) ? nightCookie : null;
+  // Meadow decor only: "plain" has no valley to turn to night.
+  const nightSky = brand.decor === "meadow" && (nightOn || nightForce === "on"); // staff can preview it with the switch off too
+  // Rough area (Vercel's IP headers, rounded, never stored) so dusk matches where the visitor is.
+  const nightArea = nightSky ? roughArea(geoFromHeaders((n) => headers().get(n))) : null;
   // Whether a banner will render. SiteBanner also hides it on staff pages,
   // which only the client knows, so this is a "probably" — close enough for
   // the first-paint estimate below.
@@ -47,8 +60,10 @@ export default async function RootLayout({
     (!banner.countdownTo || banner.countdownTo > Date.now());
 
   return (
-    <html lang="en" style={{ ["--brand-emoji" as any]: `"${brand.emoji}"`, ["--brand-members" as any]: `"${brand.members.replace(/"/g, "")}"` }}>
+    // suppressHydrationWarning: the night script sets data-night on <html> before React loads.
+    <html lang="en" suppressHydrationWarning style={{ ["--brand-emoji" as any]: `"${brand.emoji}"`, ["--brand-members" as any]: `"${brand.members.replace(/"/g, "")}"` }}>
       <head>
+        {nightSky && <script dangerouslySetInnerHTML={{ __html: nightHeadScript(nightForce, nightArea) }} />}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -81,9 +96,17 @@ export default async function RootLayout({
         {children}
         {/* After the page so it drifts over the valley but behind the content (z-index 1). */}
         {season && SITE_LOOKS[season]?.drift && <SeasonDrift {...SITE_LOOKS[season]!.drift!} />}
+        {nightSky && <NightSky force={nightForce} area={nightArea} />}
+        {nightForce && (
+          <div className="season-preview-bar night-preview-bar" role="status">
+            {/* One span: the bar is a flex row, and loose text + <strong> became separate squeezed columns. */}
+            <span>Previewing the site {nightForce === "on" ? <strong>at night</strong> : <strong>by day</strong>} · only you see this</span>
+            <a href="/api/admin/season-preview?night=auto&amp;to=/admin">Stop</a>
+          </div>
+        )}
         {previewing && (
           <div className="season-preview-bar" role="status">
-            Previewing the <strong>{ENTRANCE_THEMES[previewing].label}</strong> background · only you see this
+            <span>Previewing the <strong>{ENTRANCE_THEMES[previewing].label}</strong> background · only you see this</span>
             <a href="/api/admin/season-preview?key=off&amp;to=/admin">Stop</a>
           </div>
         )}

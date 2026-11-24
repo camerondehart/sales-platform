@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/lib/auth";
-import { getProducts, mutateProducts, reorderProduct, updateProduct, updateProducts, type Product, type Promo, type ProductVisibility } from "@/lib/storage";
+import { getCatalog, mutateProducts, reorderProduct, updateProduct, updateProducts, type Product, type Promo, type ProductVisibility } from "@/lib/storage";
 import { formatMoney, parsePrice } from "@/lib/pricing";
 import { cleanVideoInput } from "@/lib/video";
 import { cleanWeightOz } from "@/lib/shippingWeight";
@@ -32,7 +32,8 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   return NextResponse.json(
-    { products: await getProducts() },
+    // As saved: a running sitewide sale isn't part of a product (Marketing → Sitewide sales).
+    { products: await getCatalog() },
     { headers: { "Cache-Control": "no-store, max-age=0" } }
   );
 }
@@ -220,7 +221,7 @@ async function PUT_handler(req: Request) {
   }
   let prev: Product | undefined;
   try {
-    prev = (await getProducts()).find((p) => p.id === body.id);
+    prev = (await getCatalog()).find((p) => p.id === body.id);
     if (prev) auditDetail({ before: prev });
   } catch {
     /* best effort */

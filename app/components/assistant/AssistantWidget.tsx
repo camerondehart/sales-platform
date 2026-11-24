@@ -674,6 +674,21 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
     if (window.matchMedia("(max-width: 640px)").matches) setOpen(false);
   };
 
+  /** A campaign send/test card as a composer draft (same subject, body, look, preview line and audience). */
+  const cardDraft = (a: ActionProposal): CampaignDraft | null => {
+    const b = (a.request?.body || {}) as { subject?: unknown; body?: unknown; theme?: unknown; preheader?: unknown; audience?: unknown; customList?: unknown };
+    if (typeof b.subject !== "string" || typeof b.body !== "string" || !b.body) return null;
+    const aud = typeof b.audience === "string" && ["subscribers", "all", "members", "nonmembers", "custom"].includes(b.audience) ? (b.audience as CampaignDraft["audience"]) : "subscribers";
+    return {
+      subject: b.subject,
+      body: b.body,
+      audience: aud,
+      customList: aud === "custom" && typeof b.customList === "string" ? b.customList : undefined,
+      theme: typeof b.theme === "string" ? b.theme : undefined,
+      preheader: typeof b.preheader === "string" ? b.preheader : undefined,
+    };
+  };
+
   // --------------------------------------------------------------- render
   if (!visible || !status) return null;
 
@@ -898,6 +913,14 @@ export default function AssistantWidget({ mode }: { mode: WidgetMode }) {
                                 >
                                   Dismiss
                                 </button>
+                                {isAdmin && (a.kind === "campaign_send" || a.kind === "campaign_test") && (() => {
+                                  const d = cardDraft(a);
+                                  return d ? (
+                                    <button className="as-btn as-btn-ghost" onClick={() => applyDraft(d)} disabled={st.state === "running"}>
+                                      Open in composer
+                                    </button>
+                                  ) : null;
+                                })()}
                               </div>
                             </>
                           )}

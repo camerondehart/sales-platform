@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { getProducts, type Product } from "../storage";
+import { getCatalog, getProducts, type Product } from "../storage";
 import { getEvents, getRegistrations } from "../events";
 import { getUsers } from "../users";
 import { getOrders } from "../orders";
@@ -30,6 +30,9 @@ import { endOfPacificDay } from "../periods";
 import { eventKey, getEventOffers, offerText, usable } from "../eventOffers";
 import { getNoteSettings } from "../localEventsNote";
 import { allGiftCards, GIFT_ADJUST_MAX } from "../giftCards";
+import { listSales } from "../siteSales";
+import { cleanSale, coveredCount, endFromMinute, lastMinute, saleCovers, saleState, saleWindow, scopeLabel, type SiteSale } from "../siteSaleRules";
+import { msToPacificInput, pacificToMs } from "../periods";
 import type { GatewayTool } from "./gateway";
 import type { ToolContext } from "./tools";
 import type { ActionProposal, Audience } from "./shared";
@@ -198,6 +201,19 @@ export const ADMIN_EXTRA_DEFS: Def[] = [
     name: str("Display name"), tone: str("Replace the tone notes"), add_knowledge_note: str("A note to ADD to its knowledge"), model: str("Model id"), fallback_model: str("Backup model id"), handoff_email: str("Where hand-offs go"),
   })),
   admin("propose_knowledge_page", "Prepare adding a web page (or sitemap.xml) for the Concierge to learn from, refreshing all pages, or removing one.", obj({ action: str("add | refresh | remove"), url: str("Page address (add/remove)") }, ["action"])),
+  // ------------------------------------------------------------ sitewide sales
+  admin("list_site_sales", "Scheduled sitewide sales (Marketing → Sitewide sales): id, name, percent, start and last minute (shop's local time), what it covers, state (scheduled / running / ended / cancelled).", obj({ include_past: bool("Also list ended and cancelled sales") })),
+  admin("propose_site_sale", "Prepare a scheduled SITEWIDE sale: one percent off all products, chosen products or one category, from a start time to an end time in the shop's local time, without editing each product. Prices change on the site by themselves at the start and go back at the end. Use this for any sale with a future start or a set end, or 'X% off everything'. Pass sale_id to change one that's scheduled or running (send every field you want it to have). Customers get the better of this and a product's own sale (never both); BOGO products keep their BOGO; at most $100 off one item.", obj({
+    sale_id: str("Optional: id from list_site_sales to change that sale instead of making a new one"),
+    name: str("Short name customers won't see, e.g. Black Friday"),
+    percent: num("Whole percent off, 1-90"),
+    starts: str("Start in the shop's local time, YYYY-MM-DDTHH:mm (e.g. 2026-11-27T00:00 for midnight Black Friday)"),
+    last_minute: str("The LAST minute it runs, in the shop's local time, YYYY-MM-DDTHH:mm (e.g. 2026-11-27T23:59 for the whole day)"),
+    applies_to: str("all | products | category (default all)", { enum: ["all", "products", "category"] }),
+    product_ids: { type: "array", items: { type: "string" }, description: "For applies_to=products: product ids from list_products" },
+    category: str("For applies_to=category: the category name"),
+  }, ["name", "percent", "starts", "last_minute"])),
+  admin("propose_end_site_sale", "Prepare ending a running sitewide sale now (prices go straight back), or cancelling one that hasn't started.", obj({ sale_id: str("Id from list_site_sales") }, ["sale_id"])),
   admin("propose_handoff_reply", "Prepare replying to a customer request that was handed to the team (emails them), and/or marking it resolved or reopening it.", obj({ request_id: str("Id from list_handed_to_team"), reply: str("Reply to email the customer (optional)"), resolve: bool("Mark resolved (default true when replying)"), reopen: bool("Reopen instead") }, ["request_id"])),
 ];
 
@@ -1004,6 +1020,85 @@ export async function runAdminExtra(name: string, args: Record<string, unknown>,
         confirmLabel: "Set offer",
         request: { method: "PUT", url: "/api/admin/event-offers", body: { event: name, discountId: d.id } },
         refresh: ["discounts"],
+      });
+      return READY;
+    }
+    // ================================================= sitewide sales
+    case "list_site_sales": {
+      const [sales, products] = await Promise.all([listSales(), getCatalog()]);
+      const now = Date.now();
+      const show = sales.filter((x) => args.include_past === true || ["scheduled", "running"].includes(saleState(x, now)));
+      return {
+        switch_on: await isEnabled("scheduled_sales"),
+        sales: show.slice(0, 30).map((x) => ({
+          id: x.id, name: x.name, percent: x.percent, state: saleState(x, now),
+          starts: msToPacificInput(x.startsAt), last_minute: msToPacificInput(lastMinute(x.endsAt)), when: saleWindow(x),
+          applies_to: x.scope, covers: scopeLabel(x), products_covered: coveredCount(x, products),
+          ...(x.scope === "products" ? { product_ids: x.productIds } : {}), ...(x.scope === "category" ? { category: x.category } : {}),
+        })),
+      };
+    }
+    case "propose_site_sale": {
+      const products = await getCatalog();
+      const id = s(args.sale_id, 40);
+      const existing = id ? (await listSales()).find((x) => x.id === id) : undefined;
+      if (id && !existing) return { error: "No sale with that id. Use list_site_sales." };
+      if (existing && !["scheduled", "running"].includes(saleState(existing))) return { error: "That sale is already over. Prepare a new one instead (leave out sale_id)." };
+      const startsAt = pacificToMs(s(args.starts, 20));
+      const lastAt = pacificToMs(s(args.last_minute, 20));
+      if (!Number.isFinite(startsAt) || !/T\d{1,2}:\d{2}/.test(s(args.starts, 20))) return { error: "starts must be a local date and time like 2026-11-27T00:00." };
+      if (!Number.isFinite(lastAt) || !/T\d{1,2}:\d{2}/.test(s(args.last_minute, 20))) return { error: "last_minute must be a local date and time like 2026-11-27T23:59." };
+      const ids = Array.isArray(args.product_ids) ? args.product_ids.map((x) => s(x, 80)).filter(Boolean).slice(0, 200) : undefined;
+      const input = {
+        name: s(args.name, 80), percent: Math.round(Number(args.percent)), startsAt, endsAt: endFromMinute(lastAt),
+        scope: s(args.applies_to, 12) || "all", productIds: ids, category: s(args.category, 60),
+      };
+      const c = cleanSale(input, products);
+      if (!c.ok) return { error: c.error };
+      const sale = { ...c.value, id: "preview", createdAt: 0, updatedAt: 0 } as SiteSale;
+      const covered = products.filter((p) => saleCovers(sale, p));
+      const before = (p: Product) => effectivePrice({ ...p, sitePromo: undefined });
+      const after = (p: Product) => effectivePrice({ ...p, sitePromo: c.value.percent });
+      const changed = covered.filter((p) => after(p) !== before(p));
+      const kept = covered.filter((p) => after(p) === before(p));
+      const lines = [
+        `${c.value.percent}% off ${scopeLabel(c.value).replace(/^All products$/, "all products").replace(/^Category: /, "the category ")} (${covered.length} product${covered.length === 1 ? "" : "s"} today)`,
+        `${saleWindow(c.value)}${saleState(sale) === "running" ? " (starts as soon as you confirm)" : ""}`,
+        ...changed.slice(0, 6).map((p) => `${p.name}: ${before(p)} → ${after(p)}`),
+        changed.length > 6 ? `…and ${changed.length - 6} more` : "",
+        kept.length ? `Keep their own deal (already as low, or BOGO): ${kept.slice(0, 5).map((p) => p.name).join(", ")}${kept.length > 5 ? ` and ${kept.length - 5} more` : ""}` : "",
+        "Prices change on the site by themselves at the start and go back at the end. At most $100 off one item.",
+        (await isEnabled("scheduled_sales")) ? "" : "Feature switches → Scheduled sitewide sales is OFF, so prices won't change until it's on",
+      ].filter(Boolean);
+      if (existing) {
+        const was = `${existing.percent}% off, ${scopeLabel(existing)}, ${saleWindow(existing)}`;
+        lines.unshift(`Was: ${was}`);
+      }
+      push(ctx, {
+        kind: "site_sale",
+        title: existing ? `Change sale “${existing.name}”` : `Schedule ${c.value.name}: ${c.value.percent}% off`,
+        lines,
+        confirmLabel: existing ? "Save sale" : "Schedule sale",
+        request: { method: existing ? "PUT" : "POST", url: "/api/admin/site-sales", body: { ...(existing ? { id: existing.id } : {}), ...input, scope: c.value.scope, productIds: c.value.productIds, category: c.value.category } },
+        refresh: ["sales", "products"],
+        replaces: existing ? `sale:${existing.id}` : `sale:new:${c.value.name.toLowerCase()}`,
+      });
+      return READY;
+    }
+    case "propose_end_site_sale": {
+      const x = (await listSales()).find((y) => y.id === s(args.sale_id, 40));
+      if (!x) return { error: "No sale with that id. Use list_site_sales." };
+      const st = saleState(x);
+      if (st !== "running" && st !== "scheduled") return { note: `${x.name} has already ${st === "cancelled" ? "been cancelled" : "ended"}.` };
+      push(ctx, {
+        kind: "site_sale",
+        title: st === "running" ? `End ${x.name} now` : `Cancel ${x.name}`,
+        lines: [`${x.percent}% off ${scopeLabel(x)}`, saleWindow(x), st === "running" ? "Prices go back to normal straight away" : "It won't start; prices stay as they are"],
+        confirmLabel: st === "running" ? "End sale" : "Cancel sale",
+        danger: st === "running",
+        request: { method: "PATCH", url: "/api/admin/site-sales", body: { id: x.id, action: "end" } },
+        refresh: ["sales", "products"],
+        replaces: `sale:${x.id}`,
       });
       return READY;
     }

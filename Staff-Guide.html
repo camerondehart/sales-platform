@@ -848,8 +848,29 @@ Deleting an event throws away everyone who signed up. If a date moves or a price
 <section id="tab-marketing">
 <h2 class="sec">Marketing</h2>
 <span class="where">Dashboard → Marketing</span>
-<p class="lede">Discount codes, mix &amp; match bundles, the site banner, and email campaigns.</p>
-<p>The tab opens with a row of cards: <strong>Write a campaign</strong>, <strong>Sent &amp; scheduled</strong>, <strong>Discount codes</strong>, <strong>Bundles</strong>, <strong>Site banner</strong> and <strong>Subscribers &amp; QR</strong>. Each card shows a quick status (live codes, whether the banner is showing, how many subscribers). Tap one to open it; the dashboard remembers the last one you used on this device.</p>
+<p class="lede">Discount codes, scheduled sitewide sales, mix &amp; match bundles, the site banner, and email campaigns.</p>
+<p>The tab opens with a row of cards: <strong>Write a campaign</strong>, <strong>Sent &amp; scheduled</strong>, <strong>Discount codes</strong>, <strong>Sitewide sales</strong>, <strong>Bundles</strong>, <strong>Site banner</strong> and <strong>Subscribers &amp; QR</strong>. Each card shows a quick status (live codes, whether the banner is showing, how many subscribers). Tap one to open it; the dashboard remembers the last one you used on this device.</p>
+
+<h3 id="sitewide-sales">Sitewide sales (scheduled)</h3>
+<p>One percent off <strong>every product</strong>, a few <strong>chosen products</strong>, or <strong>one category</strong>, from a start time to an end time. You don't touch any product: prices drop on the site by themselves when the sale starts and go back when it ends. For example: 20% off everything, Black Friday, 12:00 am to 11:59 pm.</p>
+<ol class="steps">
+<li>Marketing → <strong>Sitewide sales</strong> → <kbd>New sitewide sale</kbd>.</li>
+<li>Give it a name (only staff see it, e.g. "Black Friday") and the percent off (1 to 90).</li>
+<li>Set <strong>Starts</strong> and <strong>Last minute</strong>, both in the shop&rsquo;s local time. <kbd>Whole day</kbd> fills in 12:00 am to 11:59 pm of the start day.</li>
+<li>Choose <strong>Applies to</strong>: All products, Chosen products (tick them) or One category. The preview shows how many products it covers and a few before → after prices.</li>
+<li><kbd>Schedule sale</kbd>.</li>
+</ol>
+<ul>
+<li>The list shows each sale as <strong>Scheduled</strong> or <strong>Running now</strong>, with its times. <kbd>Edit</kbd> changes it; <kbd>End now</kbd> stops a running sale straight away; <kbd>Cancel</kbd> stops a scheduled one from starting. Finished sales are under <em>Show past sales</em>.</li>
+<li><strong>Already on sale?</strong> The customer gets whichever price is lower, the product's own sale price or the sitewide one. Never both on top of each other.</li>
+<li><strong>Buy-one-get-one</strong> products keep their BOGO deal and aren't also marked down.</li>
+<li>Members-only products are included when the sale covers them (they still only show in the members' shop).</li>
+<li>Like any percent sale, at most <strong>$100 off one item</strong>.</li>
+<li>Discount codes, bundles and points work on top, exactly as they do with any sale price today.</li>
+<li>Your saved prices never change: the Products tab still shows each product's own price while a sale runs.</li>
+<li>The Concierge can do all of it: "Schedule 20% off everything from 12am Black Friday, the whole day" gives you a card to confirm. It can also change or end a sale.</li>
+<li>Pair it with the banner countdown (below) so customers know when it ends. Every change is in the Activity log under <em>Discounts &amp; sales</em>. Switch: <strong>Scheduled sitewide sales</strong> (on).</li>
+</ul>
 
 <h3>Mix &amp; match bundles</h3>
 <p>A set discount: buy every product in the set, save automatically. For example Sacred Immunity + Revive + Thrive + Harmony capsules, 20% off.</p>
@@ -1314,7 +1335,7 @@ When you ask it to approve someone, change an order, move products between shops
 <li><strong>Banners</strong> it writes are plain text and keep your current colours. For bold text or other styling, edit the banner in Settings.</li>
 </ul>
 <p><strong>Emails to specific people</strong>, like payment reminders, order updates or a personal note, appear as a card showing who it goes to, the subject and the full email. Nothing is sent until you press <strong>Send email</strong>, and the card confirms who it went to. Reminders for unpaid orders include a <strong>View &amp; pay</strong> button for that order. It prepares up to 10 at a time. Replies come back to your inbox.</p>
-<p>Newsletter drafts for the whole mailing list come with an <strong>Open in composer</strong> button. That fills in the Marketing tab for you. It is never sent until you press Send there yourself.</p>
+<p>Newsletter drafts for the whole mailing list come with an <strong>Open in composer</strong> button. That fills in the Marketing tab for you. It is never sent until you press Send there yourself. Ready-to-send cards (<kbd>Send to …</kbd>, <kbd>Schedule</kbd> or <kbd>Send test</kbd>) always have <kbd>Open in composer</kbd> too, next to Dismiss, so you can preview and tweak the email in Marketing first.</p>
 
 <h3>Anything in the dashboard, by asking</h3>
 <p>Everything you can do in the dashboard, you can also ask for. It looks things up, then shows a card with exactly what will happen and a button. Nothing changes until you press it, and every confirmed card appears in the Activity log marked <strong>Concierge</strong>. For example:</p>
@@ -1639,12 +1660,13 @@ No draft, no undo. Read it once before clicking send.
 <section id="job-sale">
 <h2 class="sec">Run a sale</h2>
 <span class="where">Products · and · Settings · and · Marketing</span>
-<p class="lede">Four separate tools lower a price. They stack, so be deliberate.</p>
+<p class="lede">Five separate tools lower a price. Most stack, so be deliberate.</p>
 
 <table>
 <tr><th>Tool</th><th>Where</th><th>Scope</th></tr>
 <tr><td><strong>Sale price</strong></td><td>On the product</td><td>One product. Original shows crossed out.</td></tr>
 <tr><td><strong>Promotion</strong></td><td>On the product</td><td>One product. % off, or buy-one-get-one % off.</td></tr>
+<tr><td><strong>Sitewide sale</strong></td><td>Marketing → Sitewide sales</td><td>Everything, chosen products or a category, between a start and end time you set. The customer gets the lower of this and a product's own sale (not both).</td></tr>
 <tr><td><strong>Bundle rule</strong></td><td>Settings</td><td>Whole cart, once it hits a set number of items</td></tr>
 <tr><td><strong>Discount code</strong></td><td>Marketing</td><td>Whole cart, when the customer types the code</td></tr>
 </table>

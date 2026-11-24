@@ -10,7 +10,7 @@ free_ports() {
 }
 free_ports
 python3 /tmp/harness/seed.py >/dev/null
-rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/email-templates.json /tmp/final/data/traffic-*.json /tmp/final/data/login-places.json
+rm -f /tmp/final/data/audit.jsonl /tmp/final/data/flags-development.json /tmp/final/data/email-templates.json /tmp/final/data/traffic-*.json /tmp/final/data/login-places.json /tmp/final/data/visit-places-*.json
 python3 - <<'PY'
 import json,time
 D="/tmp/final/data/"; now=int(time.time()*1000)

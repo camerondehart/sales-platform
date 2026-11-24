@@ -22,6 +22,8 @@ import { brand } from "@/lib/brand";
 import StoreHint from "@/app/components/StoreHint";
 import { FaceIdDevices, FaceIdIcon, FaceIdPrompt, useFaceIdPrompt } from "@/app/components/MemberFaceId";
 import LocalEventNote from "@/app/components/LocalEventNote";
+import ShopCategories from "@/app/components/ShopCategories";
+import { shopCategories, categoryKey } from "@/lib/shopCategories";
 import type { LocalEventNote as LocalEventNoteData } from "@/lib/localEvents";
 
 // ------------------------------------------------------------------
@@ -415,7 +417,8 @@ export default function GalleryClient({
   }
 
   // Category filter — derived from product data, so new categories
-  // added in the admin appear here automatically. Bundles pinned last.
+  // added in the admin appear here automatically. Near-duplicates ("Bundle" /
+  // "Bundles") are one choice; biggest categories first.
   const [activeCat, setActiveCat] = useState<string>("all");
 
   // Phone layout: two per row by default, one per row if they prefer bigger
@@ -435,25 +438,16 @@ export default function GalleryClient({
       return next;
     });
   }
-  const categories = useMemo(() => {
-    const map = new Map<string, string>();
-    products.forEach((p) => {
-      const c = p.category?.trim();
-      if (c) map.set(c.toLowerCase(), c);
-    });
-    const arr = Array.from(map.values()).sort((a, b) => a.localeCompare(b));
-    const bi = arr.findIndex((c) => /bundle/i.test(c));
-    if (bi >= 0) arr.push(arr.splice(bi, 1)[0]);
-    return arr;
-  }, [products]);
-  const hasUncategorized = useMemo(
-    () => categories.length > 0 && products.some((p) => !p.category?.trim()),
+  const categories = useMemo(() => shopCategories(products), [products]);
+  const uncategorizedCount = useMemo(
+    () => (categories.length > 0 ? products.filter((p) => !categoryKey(p.category)).length : 0),
     [categories, products]
   );
+  const hasUncategorized = uncategorizedCount > 0;
   const visibleProducts = useMemo(() => {
     if (activeCat === "all") return products;
-    if (activeCat === "__other") return products.filter((p) => !p.category?.trim());
-    return products.filter((p) => p.category?.trim().toLowerCase() === activeCat);
+    if (activeCat === "__other") return products.filter((p) => !categoryKey(p.category));
+    return products.filter((p) => categoryKey(p.category) === activeCat);
   }, [products, activeCat]);
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
@@ -688,21 +682,13 @@ export default function GalleryClient({
                 aria-label="Filter by category"
               >
                 <option value="all">All products ({products.length})</option>
-                {categories.map((c) => {
-                  const key = c.toLowerCase();
-                  const n = products.filter(
-                    (p) => p.category?.trim().toLowerCase() === key
-                  ).length;
-                  return (
-                    <option key={c} value={key}>
-                      {c} ({n})
-                    </option>
-                  );
-                })}
-                {hasUncategorized && (
-                  <option value="__other">
-                    Other ({products.filter((p) => !p.category?.trim()).length})
+                {categories.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label} ({c.count})
                   </option>
+                ))}
+                {hasUncategorized && (
+                  <option value="__other">Other ({uncategorizedCount})</option>
                 )}
               </select>
             </div>
@@ -721,33 +707,15 @@ export default function GalleryClient({
           </button>
         </div>
 
-        {/* Category filter pills */}
+        {/* Category filter (tablet + desktop) */}
         {categories.length > 0 && (
-          <div className="cat-filter">
-            <button
-              className={`cat-pill ${activeCat === "all" ? "active" : ""}`}
-              onClick={() => setActiveCat("all")}
-            >
-              All
-            </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                className={`cat-pill ${/bundle/i.test(c) ? "bundle" : ""} ${activeCat === c.toLowerCase() ? "active" : ""}`}
-                onClick={() => setActiveCat(c.toLowerCase())}
-              >
-                {c}
-              </button>
-            ))}
-            {hasUncategorized && (
-              <button
-                className={`cat-pill ${activeCat === "__other" ? "active" : ""}`}
-                onClick={() => setActiveCat("__other")}
-              >
-                Other
-              </button>
-            )}
-          </div>
+          <ShopCategories
+            categories={categories}
+            total={products.length}
+            otherCount={uncategorizedCount}
+            active={activeCat}
+            onChange={setActiveCat}
+          />
         )}
 
         {products.length === 0 ? (

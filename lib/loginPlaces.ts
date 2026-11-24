@@ -8,15 +8,20 @@
  * (x-vercel-ip-city / -country-region / -country / -latitude / -longitude).
  * Rows are daily totals per town and kind of sign-in: no internet address,
  * no email, no account id, so nothing here can be traced back to a person.
+ *
+ * Visits: kind "visit" counts site visits the same way,
+ * once per browser tab session, from the cookie-free visit counter (/api/t).
  */
 
 export type LoginKind = "member" | "staff" | "store";
 export const LOGIN_KINDS: LoginKind[] = ["member", "staff", "store"];
+export type PlaceKind = LoginKind | "visit";
+export const PLACE_KINDS: PlaceKind[] = [...LOGIN_KINDS, "visit"];
 
-/** One row = how many sign-ins of one kind came from one town on one local day (brand.timezone). */
+/** One row = how many sign-ins (or visits) of one kind came from one town on one local day (brand.timezone). */
 export type PlaceRow = {
   day: string; // YYYY-MM-DD, local (brand.timezone)
-  kind: LoginKind;
+  kind: PlaceKind;
   city: string;
   region?: string;
   country?: string;
@@ -60,35 +65,35 @@ export function placeFromHeaders(get: (name: string) => string | null | undefine
 const keyOf = (r: { day: string; kind: string; city: string; region?: string; country?: string }) =>
   `${r.day}|${r.kind}|${r.city.toLowerCase()}|${r.region || ""}|${r.country || ""}`;
 
-/** Adds one sign-in to the daily totals and drops rows past KEEP_DAYS (cutoffDay is YYYY-MM-DD). */
-export function addSignIn(rows: PlaceRow[], day: string, kind: LoginKind, place: Place, cutoffDay: string): PlaceRow[] {
+/** Adds one sign-in (or `by` of them) to the daily totals and drops rows past KEEP_DAYS (cutoffDay is YYYY-MM-DD). */
+export function addSignIn(rows: PlaceRow[], day: string, kind: PlaceKind, place: Place, cutoffDay: string, by = 1, maxRows = MAX_ROWS): PlaceRow[] {
   const kept = rows.filter((r) => r.day >= cutoffDay);
   const k = keyOf({ day, kind, ...place });
   const hit = kept.find((r) => keyOf(r) === k);
   if (hit) {
-    hit.count += 1;
+    hit.count += by;
     return kept;
   }
-  return [...kept, { day, kind, ...place, count: 1 }].slice(-MAX_ROWS);
+  return [...kept, { day, kind, ...place, count: by }].slice(-maxRows);
 }
 
-export type PlaceSummary = Place & { key: string; count: number; byKind: Record<LoginKind, number> };
+export type PlaceSummary = Place & { key: string; count: number; byKind: Record<PlaceKind, number> };
 
 /**
  * Totals per town from `fromDay` (inclusive) on, biggest first. With a kind,
- * only that kind; without one ("Everyone") members and stores only: staff
- * sign-ins show only under Staff.
+ * only that kind; without one ("Everyone") member and store sign-ins only:
+ * staff sign-ins show only under Staff, visits only under Visits.
  */
-export function summarize(rows: PlaceRow[], fromDay: string, kind?: LoginKind): { places: PlaceSummary[]; total: number } {
+export function summarize(rows: PlaceRow[], fromDay: string, kind?: PlaceKind): { places: PlaceSummary[]; total: number } {
   const map = new Map<string, PlaceSummary>();
   let total = 0;
   for (const r of rows) {
     if (r.day < fromDay) continue;
-    if (kind ? r.kind !== kind : r.kind === "staff") continue;
+    if (kind ? r.kind !== kind : r.kind === "staff" || r.kind === "visit") continue;
     const key = `${r.city.toLowerCase()}|${r.region || ""}|${r.country || ""}`;
     let p = map.get(key);
     if (!p) {
-      p = { key, city: r.city, region: r.region, country: r.country, lat: r.lat, lon: r.lon, count: 0, byKind: { member: 0, staff: 0, store: 0 } };
+      p = { key, city: r.city, region: r.region, country: r.country, lat: r.lat, lon: r.lon, count: 0, byKind: { member: 0, staff: 0, store: 0, visit: 0 } };
       map.set(key, p);
     }
     p.count += r.count;

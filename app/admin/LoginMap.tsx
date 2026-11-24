@@ -7,7 +7,8 @@ import { num } from "./charts";
 // Analytics → Where people sign in (switch login_map). Draws the rough towns
 // from /api/admin/login-places on a plain inline map: no map service, no
 // tiles, nothing leaves the site. The outlines (app/admin/mapShapes.ts) load
-// only when this card is on screen.
+// only when this card is on screen. Sign-ins / Visits switches between member,
+// staff and store sign-ins and site visits (once per browser tab session).
 
 type Shapes = typeof import("./mapShapes");
 type Resp =
@@ -47,7 +48,10 @@ const fmtDay = (ymd: string) =>
   new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabel: string }) {
+  const [mode, setMode] = useState<"signins" | "visits">("signins");
   const [kind, setKind] = useState<"" | LoginKind>("");
+  const visits = mode === "visits";
+  const noun = visits ? "visit" : "sign-in";
   const [data, setData] = useState<Resp | null>(null);
   const [err, setErr] = useState("");
   const [shapes, setShapes] = useState<Shapes | null>(null);
@@ -56,18 +60,19 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
   useEffect(() => {
     let live = true;
     setErr("");
-    fetch(`/api/admin/login-places?days=${days}${kind ? `&kind=${kind}` : ""}`, { cache: "no-store" })
+    const k = visits ? "visit" : kind;
+    fetch(`/api/admin/login-places?days=${days}${k ? `&kind=${k}` : ""}`, { cache: "no-store" })
       .then(async (r) => {
         const j = await r.json().catch(() => ({}));
         if (!live) return;
-        if (!r.ok) setErr(j.error || "Couldn't load sign-in places.");
+        if (!r.ok) setErr(j.error || "Couldn't load the map.");
         else setData(j as Resp);
       })
-      .catch(() => live && setErr("Couldn't load sign-in places."));
+      .catch(() => live && setErr("Couldn't load the map."));
     return () => {
       live = false;
     };
-  }, [days, kind]);
+  }, [days, kind, visits]);
 
   useEffect(() => {
     if (data && data.on && !shapes) import("./mapShapes").then(setShapes).catch(() => {});
@@ -83,7 +88,7 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
   const total = data && data.on ? data.total : 0;
   const firstDay = data && data.on ? data.firstDay : null;
   const sel = places.find((p) => p.key === picked) || null;
-  const selParts = sel && !kind
+  const selParts = sel && !kind && !visits
     ? ([["member", "member"], ["staff", "staff"], ["store", "store"]] as const).filter(([k]) => sel.byKind[k]).map(([k, w]) => `${num(sel.byKind[k])} ${w}`)
     : [];
   const rMin = view.w * 0.01, rMax = view.w * 0.036;
@@ -92,13 +97,24 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
   return (
     <div className="an-card an-wide lm-card">
       <div className="an-card-head">
-        <h3>Where people sign in</h3>
-        <div className="seg small" role="tablist" aria-label="Who">
-          {KINDS.map(([k, label]) => (
-            <button key={k || "all"} type="button" role="tab" aria-selected={kind === k} className={kind === k ? "on" : ""} onClick={() => { setKind(k); setPicked(null); }}>
-              {label}
-            </button>
-          ))}
+        <h3>{visits ? "Where people visit from" : "Where people sign in"}</h3>
+        <div className="lm-filters">
+          <div className="seg small" role="tablist" aria-label="Show">
+            {([["signins", "Sign-ins"], ["visits", "Visits"]] as const).map(([m, label]) => (
+              <button key={m} type="button" role="tab" aria-selected={mode === m} className={mode === m ? "on" : ""} onClick={() => { setMode(m); setPicked(null); }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {!visits && (
+            <div className="seg small" role="tablist" aria-label="Who">
+              {KINDS.map(([k, label]) => (
+                <button key={k || "all"} type="button" role="tab" aria-selected={kind === k} className={kind === k ? "on" : ""} onClick={() => { setKind(k); setPicked(null); }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {err && <div className="notice">{err}</div>}
@@ -109,7 +125,7 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
             viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
             preserveAspectRatio="xMidYMid slice"
             role="img"
-            aria-label={`Map of sign-ins, last ${rangeLabel}`}
+            aria-label={`Map of ${noun}s, last ${rangeLabel}`}
             onClick={() => setPicked(null)}
           >
             <rect x={view.x} y={view.y} width={view.w} height={view.h} className="lm-sea" />
@@ -132,7 +148,7 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
                         onClick={(e) => { e.stopPropagation(); setPicked(on ? null : p.key); }}
                       >
                         <circle cx={x} cy={y} r={radius(p.count)} vectorEffect="non-scaling-stroke" />
-                        <title>{`${placeLabel(p)}: ${num(p.count)} sign-in${p.count === 1 ? "" : "s"}`}</title>
+                        <title>{`${placeLabel(p)}: ${num(p.count)} ${noun}${p.count === 1 ? "" : "s"}`}</title>
                       </g>
                     );
                   })}
@@ -143,21 +159,21 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
             <div className="lm-tip">
               <strong>{placeLabel(sel)}</strong>
               <span>
-                {num(sel.count)} sign-in{sel.count === 1 ? "" : "s"}
+                {num(sel.count)} {noun}{sel.count === 1 ? "" : "s"}
                 {selParts.length > 1 ? ` · ${selParts.join(", ")}` : ""}
               </span>
             </div>
           )}
           {data && data.on && total === 0 && (
             <div className="lm-empty">
-              No sign-ins noted in the last {rangeLabel}.
+              No {noun}s noted in the last {rangeLabel}.
             </div>
           )}
         </div>
         <div className="lm-side">
           <div className="lm-total">
             <strong>{num(total)}</strong>
-            <span>sign-in{total === 1 ? "" : "s"} · {num(data && data.on ? data.towns : 0)} town{data && data.on && data.towns === 1 ? "" : "s"}</span>
+            <span>{noun}{total === 1 ? "" : "s"} · {num(data && data.on ? data.towns : 0)} town{data && data.on && data.towns === 1 ? "" : "s"}</span>
           </div>
           <ol className="lm-list">
             {places.slice(0, 8).map((p) => (
@@ -173,11 +189,20 @@ export default function LoginMap({ days, rangeLabel }: { days: number; rangeLabe
           {places.length > 8 && <div className="an-muted">+ {num(places.length - 8)} more town{places.length - 8 === 1 ? "" : "s"}</div>}
         </div>
       </div>
-      <div className="an-foot">
-        Rough town from each sign-in&apos;s internet address (city-level, can be off by a few miles or show the provider&apos;s town). Only daily totals per town
-        are kept, never who signed in or their internet address. Staff sign-ins (including staff signing in to a member or store account) show only under Staff.
-        {firstDay ? ` Noted since ${fmtDay(firstDay)}; earlier sign-ins weren't recorded.` : " Sign-ins are noted from now on; earlier ones weren't recorded."}
-      </div>
+      {visits ? (
+        <div className="an-foot">
+          Rough town of each visit&apos;s internet address (city-level, can be off by a few miles or show the provider&apos;s town), counted once per browser tab
+          session. Bots, staff pages, browsers signed in to this dashboard and browsers asking not to be tracked aren&apos;t counted. Only daily totals per town are
+          kept, never who visited or their internet address.
+          {firstDay ? ` Noted since ${fmtDay(firstDay)}; earlier visits weren't recorded.` : total === 0 ? " Visits are noted from now on; earlier ones weren't recorded." : ""}
+        </div>
+      ) : (
+        <div className="an-foot">
+          Rough town from each sign-in&apos;s internet address (city-level, can be off by a few miles or show the provider&apos;s town). Only daily totals per town
+          are kept, never who signed in or their internet address. Staff sign-ins (including staff signing in to a member or store account) show only under Staff.
+          {firstDay ? ` Noted since ${fmtDay(firstDay)}; earlier sign-ins weren't recorded.` : " Sign-ins are noted from now on; earlier ones weren't recorded."}
+        </div>
+      )}
     </div>
   );
 }

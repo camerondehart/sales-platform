@@ -1,5 +1,5 @@
 import { isEnabled } from "../flags";
-import { getAssistantConfig } from "./config";
+import { getAssistantConfig, managerModelOf } from "./config";
 import { chatCompletion, costOf, explainGatewayError, gatewayCredential, resolveAnsweringModel, type GatewayMessage } from "./gateway";
 import { monthSpend, recordUsage } from "./usage";
 import { brand } from "../brand";
@@ -55,8 +55,10 @@ export async function tidyDescription(input: { name: string; category?: string; 
   ];
   const started = Date.now();
   try {
-    const res = await chatCompletion({ credential, model: config.model, fallbackModel: config.fallbackModel, messages, maxTokens: 900, temperature: 0.85, timeoutMs: 40_000 });
-    const model = resolveAnsweringModel(res.model, config.model, config.fallbackModel);
+    // Not a live chat, so it uses the smarter manager model (Assistant → Model & access).
+    const main = managerModelOf(config);
+    const res = await chatCompletion({ credential, model: main, fallbackModel: config.fallbackModel, messages, maxTokens: 900, temperature: 0.85, timeoutMs: 40_000 });
+    const model = resolveAnsweringModel(res.model, main, config.fallbackModel);
     const cost = await costOf(model, res.usage);
     recordUsage({ audience: "admin", model, inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, costUsd: cost, toolCalls: 0, latencyMs: Date.now() - started });
     const text = cleanReply(res.message.content || "");

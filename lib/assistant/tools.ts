@@ -1794,7 +1794,8 @@ export async function runTool(name: string, rawArgs: string, ctx: ToolContext): 
       if (items.length < 2) return { error: "A bundle needs at least 2 existing products. Use list_products for ids." };
       if (items.length > 10) return { error: "Keep bundles to 10 products or fewer." };
       if (items.some((p) => p.isBundle)) return { error: "A bundle can't contain another bundle." };
-      const value = Math.round(items.reduce((n, p) => n + parsePrice(effectivePrice(p)), 0) * 100) / 100;
+      // Own sale prices only: a sitewide sale running today shouldn't set a bundle's lasting price.
+      const value = Math.round(items.reduce((n, p) => n + parsePrice(effectivePrice({ ...p, sitePromo: undefined })), 0) * 100) / 100;
       const explicit = Number(args.price);
       const pct = Number.isFinite(Number(args.discount_percent)) ? Math.round(Number(args.discount_percent)) : 10;
       if (!(explicit > 0) && (pct < 0 || pct > 90)) return { error: "discount_percent must be between 0 and 90." };

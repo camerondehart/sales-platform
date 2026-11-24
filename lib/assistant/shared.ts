@@ -88,7 +88,8 @@ export type ActionProposal = {
     | "event_note"
     | "event_offer"
     | "member_discount_limit"
-    | "gift_card_balance";
+    | "gift_card_balance"
+    | "site_sale";
   title: string;
   /** Human-readable facts, built from real records on the server. */
   lines: string[];
@@ -113,7 +114,7 @@ export type ActionProposal = {
 export type AdminRefreshKey =
   | "users" | "orders" | "products" | "discounts" | "settings" | "banner"
   | "events" | "subscribers" | "bundles" | "campaigns" | "templates" | "flags"
-  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance" | "site_requests" | "retail";
+  | "staff" | "reminders" | "assistant" | "sources" | "escalations" | "today" | "ambassadors" | "faq" | "entrance" | "site_requests" | "retail" | "sales";
 
 export type CampaignDraft = {
   subject: string;

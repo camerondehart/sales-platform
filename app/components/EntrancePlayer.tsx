@@ -8,7 +8,7 @@ import ForestEntrance from "./ForestEntrance";
 import type { EntranceKey } from "@/lib/entranceThemes";
 
 /** Plays one entrance full-screen (staff previews), with the members' timing. Tap to stop. */
-export default function EntrancePlayer({ theme, onDone }: { theme: EntranceKey; onDone: () => void }) {
+export default function EntrancePlayer({ theme, night, onDone }: { theme: EntranceKey; night?: boolean; onDone: () => void }) {
   const done = useRef(onDone);
   done.current = onDone;
   useEffect(() => {
@@ -19,10 +19,10 @@ export default function EntrancePlayer({ theme, onDone }: { theme: EntranceKey; 
       clearTimeout(t);
       window.removeEventListener("keydown", esc);
     };
-  }, [theme]);
+  }, [theme, night]);
   // Rendered into <body> so nothing on the page (or the Concierge panel) sits above it.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
-  return createPortal(<ForestEntrance key={theme} theme={theme} onSkip={onDone} />, document.body);
+  return createPortal(<ForestEntrance key={`${theme}-${night ? "n" : "d"}`} theme={theme} night={!!night} onSkip={onDone} />, document.body);
 }

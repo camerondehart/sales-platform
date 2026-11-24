@@ -294,6 +294,11 @@ export async function offsiteSales(): Promise<Order[]> {
   return offsiteAsOrders((await payments.read()).data);
 }
 
+/** Payments still waiting in "Sort by hand" (new, including quarantined ones), for the nightly report. */
+export async function paymentsToSort(): Promise<number> {
+  return (await payments.read()).data.filter((r) => r.state === "new").length;
+}
+
 export async function getPayment(id: string): Promise<VenmoPayment | undefined> {
   return (await payments.read()).data.find((r) => r.id === id);
 }

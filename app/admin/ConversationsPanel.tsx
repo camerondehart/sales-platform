@@ -1,5 +1,6 @@
 "use client";
 
+import Markdown from "@/app/components/assistant/Markdown";
 import { useEffect, useState } from "react";
 import { BarList, num } from "./charts";
 import { brand } from "@/lib/brand";
@@ -202,7 +203,7 @@ export default function ConversationsPanel() {
                           {m.role === "user" ? (t.audience === "admin" ? "Staff" : t.who.split(" <")[0]) : "Concierge"} · {when(m.at)}
                           {m.role === "assistant" && m.model && <em className="cv-model" title={m.model}> · {m.model.split("/").pop()}</em>}
                         </span>
-                        {m.content}
+                        {m.role === "assistant" ? <Markdown text={m.content} /> : m.content}
                       </div>
                     ))}
                   </div>

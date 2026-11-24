@@ -16,6 +16,11 @@ export type Priced = {
   promo?: Promo;
   /** The sale price / promo only applies to Local pickup paid in cash (see asCash). */
   cashOnly?: boolean;
+  /**
+   * A scheduled sitewide sale running right now (lib/siteSales.ts), as a
+   * percent off the regular price. Added when products are read, never saved.
+   */
+  sitePromo?: number;
 };
 
 /**
@@ -23,7 +28,7 @@ export type Priced = {
  * where the order is Local pickup + Pay cash: those callers price `asCash(p)`.
  * So anything that doesn't know about cash deals can never give one away.
  */
-const deal = <T extends Priced>(p: T): Priced => (p.cashOnly ? { price: p.price } : p);
+const deal = <T extends Priced>(p: T): Priced => (p.cashOnly ? { price: p.price, sitePromo: p.sitePromo } : p);
 
 /** The product as priced for a Local pickup + Pay cash order (its cash-only sale applies). */
 export function asCash<T extends Priced>(p: T): T {
@@ -62,12 +67,8 @@ export function memberCodeCap(member?: { percentCap?: number } | null): number {
   return typeof c === "number" && Number.isFinite(c) && c >= 0 ? c : PERCENT_OFF_CAP;
 }
 
-/**
- * The unit price a customer actually pays:
- * a fixed sale price wins, then a percent-off promo, then the regular price.
- */
-export function effectivePrice(product: Priced): string {
-  const p = deal(product);
+/** The unit price from the product's own sale (fixed sale price, then percent promo), as before sitewide sales. */
+function ownPrice(p: Priced): string {
   if (p.salePrice?.trim()) return p.salePrice.trim();
   if (p.promo?.type === "percent" && p.promo.percent > 0) {
     const full = parsePrice(p.price);
@@ -75,6 +76,32 @@ export function effectivePrice(product: Priced): string {
     return formatMoney(full * (1 - p.promo.percent / 100));
   }
   return p.price;
+}
+
+/**
+ * The unit price under a running sitewide sale, or null.
+ * Percent off the regular price, at most PERCENT_OFF_CAP off a unit. Products
+ * whose own deal is BOGO keep their BOGO instead (no stacking), and the sale
+ * only counts when it beats the product's own sale price.
+ */
+function siteSaleUnit(p: Priced): number | null {
+  const pct = Number(p.sitePromo);
+  if (!(pct > 0) || p.promo?.type === "bogo") return null;
+  const full = parsePrice(p.price);
+  if (!(full > 0)) return null;
+  const unit = Math.round((full - capPercentOff(full * (Math.min(pct, 100) / 100))) * 100) / 100;
+  return unit < parsePrice(ownPrice(p)) ? unit : null;
+}
+
+/**
+ * The unit price a customer actually pays:
+ * a fixed sale price wins, then a percent-off promo, then the regular price;
+ * a running sitewide sale replaces that when it's cheaper for the customer.
+ */
+export function effectivePrice(product: Priced): string {
+  const p = deal(product);
+  const site = siteSaleUnit(p);
+  return site !== null ? formatMoney(site) : ownPrice(p);
 }
 
 /**
@@ -93,7 +120,7 @@ export function lineDiscount(product: Priced, quantity: number): number {
 /** Is the unit price itself reduced? (BOGO is not — it's a quantity deal.) */
 export function onSale(product: Priced): boolean {
   const p = deal(product);
-  return !!p.salePrice?.trim() || (p.promo?.type === "percent" && p.promo.percent > 0);
+  return !!p.salePrice?.trim() || (p.promo?.type === "percent" && p.promo.percent > 0) || siteSaleUnit(p) !== null;
 }
 
 /** Whole-number percent off the unit price, or null when there's no saving. */
@@ -110,6 +137,7 @@ export function discountPercent(product: Priced): number | null {
 /** Short human label for a promo, e.g. "BOGO 50% off". */
 export function promoLabel(product: Priced): string | null {
   const p = deal(product);
+  if (siteSaleUnit(p) !== null) return `${p.sitePromo}% off`;
   if (p.promo?.type === "bogo" && p.promo.percent > 0) return `BOGO ${p.promo.percent}% off`;
   if (p.promo?.type === "percent" && p.promo.percent > 0) return `${p.promo.percent}% off`;
   return null;
@@ -122,7 +150,8 @@ export function promoLabel(product: Priced): string | null {
 export function cashDeal(p: Priced): string | null {
   if (!p.cashOnly) return null;
   const c = asCash(p);
-  if (onSale(c)) return `${effectivePrice(c)} cash at pickup`;
-  const label = promoLabel(c);
-  return label ? `${label}, cash at pickup` : null;
+  // Only a deal when cash pickup is cheaper than what everyone pays (a sitewide sale can match it).
+  if (onSale(c) && parsePrice(effectivePrice(c)) < parsePrice(effectivePrice(p))) return `${effectivePrice(c)} cash at pickup`;
+  if (c.promo?.type === "bogo" && c.promo.percent > 0) return `BOGO ${c.promo.percent}% off, cash at pickup`;
+  return null;
 }

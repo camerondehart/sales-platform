@@ -17,7 +17,7 @@ export const metadata = {
  * §14; bump EFFECTIVE when it changes. The 12-month / 7-year retention
  * periods come from the lawyer's draft; the business confirms them.
  */
-const EFFECTIVE = "November 22, 2026";
+const EFFECTIVE = "November 24, 2026";
 const SUPPORT = brand.supportEmail;
 const AGE = brand.minimumAge || 18;
 const HOST = brand.siteUrl.replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -73,13 +73,35 @@ const AREA_KEEP: [string, string] = [
   "Approximate area when you sign in",
   "Daily counts of sign-ins per town, which don't identify you, for about 13 months. We also keep the date you were shown the events note",
 ];
+// With the map on, visits are counted per rough town too (lib/loginPlacesLog.ts).
+const SITE_COLLECT: [string, string, string] = [
+  "Site information",
+  "Pages viewed, products looked at, which link or code brought you here, country and the rough town (about city level) your internet (IP) address points to, counted as daily totals. Your browser remembers a creator's page you came through",
+  "Automatically, as you use the site. Each visit adds one to a daily count for its town. We don't keep a record of individual visits, or your internet address",
+];
+const SITE_KEEP: [string, string] = [
+  "Site information",
+  "Daily totals, kept to see trends. They don't identify you. Daily visit counts per town are kept for about 13 months",
+];
+
+// With the night sky on (switch night_sky, lib/nightSky.ts), the page works out when it gets
+// dark where you are from the same rough area, rounded, and keeps nothing.
+const NIGHT_COLLECT: [string, string, string] = [
+  "Approximate area for the evening look",
+  "The rough area (about city level) that your internet (IP) address points to",
+  "On each page. Used only in your browser to work out when it gets dark where you are, so the site can switch to its night look. It isn't stored",
+];
+const NIGHT_KEEP: [string, string] = ["Approximate area for the evening look", "Not kept"];
 
 export default async function PrivacyPage() {
   const stores = await isEnabled("store_locator").catch(() => false);
   const gifts = await isEnabled("gift_cards").catch(() => false);
   const signInMap = await isEnabled("login_map").catch(() => false);
-  const collect = signInMap ? COLLECT.map((r) => (r[0] === AREA_COLLECT[0] ? AREA_COLLECT : r)) : COLLECT;
-  const keep = signInMap ? KEEP.map((r) => (r[0] === AREA_KEEP[0] ? AREA_KEEP : r)) : KEEP;
+  const collect0 = signInMap ? COLLECT.map((r) => (r[0] === AREA_COLLECT[0] ? AREA_COLLECT : r[0] === SITE_COLLECT[0] ? SITE_COLLECT : r)) : COLLECT;
+  const keep0 = signInMap ? KEEP.map((r) => (r[0] === AREA_KEEP[0] ? AREA_KEEP : r[0] === SITE_KEEP[0] ? SITE_KEEP : r)) : KEEP;
+  const nightOn = brand.decor === "meadow" && (await isEnabled("night_sky").catch(() => false));
+  const keep = nightOn ? [...keep0, NIGHT_KEEP] : keep0;
+  const collect = nightOn ? [...collect0.slice(0, -1), NIGHT_COLLECT, collect0[collect0.length - 1]] : collect0;
   return (
     <div className="shell">
       <header className="masthead">
@@ -221,8 +243,8 @@ export default async function PrivacyPage() {
 
           <h3>10. Do Not Track</h3>
           <p>
-            Some browsers send a &ldquo;Do Not Track&rdquo; signal. There&rsquo;s no common standard for it, so our site
-            doesn&rsquo;t respond to it. We don&rsquo;t track you across other websites either way.
+            Some browsers send a &ldquo;Do Not Track&rdquo; or &ldquo;Global Privacy Control&rdquo; signal. If yours does, our
+            built-in site statistics don&rsquo;t count your visits at all. We don&rsquo;t track you across other websites either way.
           </p>
 
           <h3>11. Changes to this policy</h3>

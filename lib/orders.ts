@@ -74,6 +74,10 @@ export type Order = {
   paidAt?: number;
   shippedAt?: number;
   pickedUpAt?: number;
+  /** "Ready for pickup" email sent (lib/pickupReady.ts): when, and by staff or automatically. */
+  pickupReadyAt?: number;
+  pickupReadyBy?: "staff" | "auto";
+  pickupReadyFailed?: boolean;
   createdAt: number;
   /** Automatic payment reminders already sent (stage index 0-based). */
   reminders?: Array<{ stage: number; at: number; ok: boolean }>;

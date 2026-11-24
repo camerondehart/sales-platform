@@ -32,7 +32,7 @@ def confirm(a):
 # ============ Feature flags
 s,r,_=req("/api/admin/flags")
 keys=[f["key"] for f in r.get("flags",[])]
-check("flags: all 34 listed for this environment", s==200 and len(keys)==34 and r["env"]=="development", (s,r))
+check("flags: all 38 listed for this environment", s==200 and len(keys)==38 and r["env"]=="development", (s,r))
 s,r,_=req("/api/admin/flags", cookie=MEMBER)
 check("flags: admin only", s==401, s)
 _s,_fl,_=req("/api/admin/flags")
@@ -344,6 +344,42 @@ check("notes: delete", s==200 and not any(n["id"]==sid for n in req("/api/admin/
 s,r,_=req("/api/admin/today?fresh=1")
 un=[t for t in r.get("tasks",[]) if t["id"]=="unpaid"]
 check("notes: Today item shows its learned line", not un or (un[0].get("learned") and "oldest first" in un[0]["learned"][0]), un[:1])
+# ---------- Site manager review (smarter manager model, Today tweaks with Undo)
+s,r,_=req("/api/admin/manager-review", {"action":"run"}, cookie=None)
+check("manager: staff only", s==401, s)
+s,r,_=req("/api/admin/assistant", {"managerRunsPerDay":9}, method="PUT")
+check("manager: reviews a day must be 0 to 8", s==400, (s,r))
+s,r,_=req("/api/admin/assistant", {"managerRunsPerDay":3}, method="PUT")
+check("manager: reviews a day saved", s==200 and r["config"].get("managerRunsPerDay")==3, (s,r.get("config",{}).get("managerRunsPerDay")))
+s,r,_=req("/api/admin/assistant", {"managerModel":"anthropic/claude-opus-5.5"}, method="PUT")
+before=req("/api/admin/today?fresh=1")[1]
+n0=len(gwlog())
+s,r,_=req("/api/admin/manager-review", {"action":"run"})
+mlog=[l for l in gwlog()[n0:] if str(l["system"]).startswith("You are the site manager")]
+check("manager: runs on the manager model and reads the Activity log", s==200 and mlog and mlog[0]["model"]=="anthropic/claude-opus-5.5" and "ACTIVITY LOG SINCE" in mlog[0]["messages"][1]["content"] and "ALREADY PLANNED" in mlog[0]["messages"][1]["content"], (s,r,[l["model"] for l in mlog]))
+after=req("/api/admin/today?fresh=1")[1]
+m=after.get("manager") or {}
+check("manager: briefing on Today", m.get("ok") and m.get("headline")=="Steady week" and m.get("missed")==["A failed email"], m)
+check("manager: unknown ids refused, real ones applied", all(t["id"]!="nope" for t in m.get("tweaks",[])) and len(m.get("tweaks",[]))==min(2,len(before.get("tasks",[]))), m.get("tweaks"))
+bt=before.get("tasks",[])
+if len(bt)>=2:
+    ids=[t["id"] for t in after["tasks"]]
+    hid=next(t["id"] for t in m["tweaks"] if t.get("hide"))
+    mv=next(t for t in after["tasks"] if t["id"]==next(x["id"] for x in m["tweaks"] if x.get("priority")))
+    check("manager: hid one card and moved another (with why)", hid not in ids and mv["priority"]=="idea" and mv.get("managerWhy")=="Can wait", (ids,mv))
+    s,r,_=req("/api/admin/manager-review", {"action":"undo"})
+    back=req("/api/admin/today?fresh=1")[1]
+    check("manager: Undo puts the list back", s==200 and hid in [t["id"] for t in back["tasks"]] and not any(t.get("managerWhy") for t in back["tasks"]) and back["manager"]["undone"], [t["id"] for t in back["tasks"]])
+_n=len(json.loads(urllib.request.urlopen(GW+"/__mail").read()))
+req("/api/admin/export-email", {})
+_rep=[m for m in json.loads(urllib.request.urlopen(GW+"/__mail").read())[_n:] if "Manager&rsquo;s take" in str(m.get("html",""))]
+check("manager: take is in the nightly report", _rep and "Steady week" in _rep[0]["html"] and "A failed email" in _rep[0]["html"], len(_rep))
+check("manager: review logged in the Activity log", any(a.get("action")=="manager.review" and a.get("ok") for a in audit_rows()))
+n0=len(gwlog()); req("/api/admin/concierge-notes", {"action":"run"})
+check("manager: notes review uses the manager model too", any(l["model"]=="anthropic/claude-opus-5.5" for l in gwlog()[n0:]), [l["model"] for l in gwlog()[n0:]])
+req("/api/admin/flags", {"key":"manager_review","on":False})
+check("manager: switch off = no card, no tweaks", req("/api/admin/today?fresh=1")[1].get("manager") is None)
+req("/api/admin/assistant", {"managerModel":"","managerRunsPerDay":1}, method="PUT")
 req("/api/admin/flags", {"key":"concierge_learning","on":False})
 n0=len(gwlog()); chat("hello again", ip="10.9.8.3")
 check("notes: switch off = notes not used", "LEARNED NOTES" not in gwlog()[n0]["system"], "")

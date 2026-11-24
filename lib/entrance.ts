@@ -56,7 +56,9 @@ export async function entranceStatus(now = Date.now()) {
   const [on, choice] = await Promise.all([isEnabled("seasonal_entrance").catch(() => false), getEntranceChoice()]);
   const showing = resolveEntrance(choice, on, now);
   const siteOn = await isEnabled("seasonal_site").catch(() => false);
+  const nightOn = await isEnabled("night_sky").catch(() => false);
   return {
+    nightSwitchOn: nightOn,
     switchOn: on,
     siteSwitchOn: siteOn,
     siteShowing: siteOn ? ENTRANCE_THEMES[resolveEntrance(choice, true, now)].label : "Classic",

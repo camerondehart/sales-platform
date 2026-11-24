@@ -22,6 +22,10 @@ export type AssistantConfig = {
   model: string;
   /** Tried automatically by the gateway if the main model fails. "" = none. */
   fallbackModel: string;
+  /** Smarter model for the nightly site manager + notes reviews. "" = same as main. */
+  managerModel?: string;
+  /** How many times a day the site manager review runs on its own (0–8, default 1 at midnight). */
+  managerRunsPerDay?: number;
   /** Monthly ceiling in US dollars. 0 = no ceiling. */
   monthlyCapUsd: number;
   assistantName: string;
@@ -38,6 +42,12 @@ export type AssistantConfig = {
 
 export const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 export const DEFAULT_FALLBACK = "anthropic/claude-sonnet-4.6";
+
+export const DEFAULT_MANAGER_MODEL = "anthropic/claude-sonnet-4.6";
+/** The model the background reviews use (Assistant → Model & access → Manager model). */
+export function managerModelOf(c: AssistantConfig): string {
+  return c.managerModel === undefined ? DEFAULT_MANAGER_MODEL : c.managerModel || c.model;
+}
 
 export const DEFAULT_CONFIG: AssistantConfig = {
   id: "config",
@@ -118,6 +128,16 @@ export function cleanConfigPatch(
     const m = String(input.fallbackModel || "").trim();
     if (m && !isValidModelId(m)) return { ok: false, error: "That fallback model id doesn't look right." };
     patch.fallbackModel = m;
+  }
+  if ("managerModel" in input) {
+    const m = String(input.managerModel || "").trim();
+    if (m && !isValidModelId(m)) return { ok: false, error: "That manager model id doesn't look right." };
+    patch.managerModel = m;
+  }
+  if ("managerRunsPerDay" in input) {
+    const n = Number(input.managerRunsPerDay);
+    if (!Number.isInteger(n) || n < 0 || n > 8) return { ok: false, error: "Manager reviews a day must be 0 to 8." };
+    patch.managerRunsPerDay = n;
   }
   if ("monthlyCapUsd" in input) {
     const n = Number(input.monthlyCapUsd);

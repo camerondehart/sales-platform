@@ -1,6 +1,7 @@
 import { isBot, recordEvent } from "@/lib/traffic";
 import { clientIp, overLimit } from "@/lib/assistant/limits";
 import { isEnabled } from "@/lib/flags";
+import { recordVisitPlace } from "@/lib/loginPlacesLog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ export async function POST(req: Request) {
     if (text.length > 2000) return new Response(null, { status: 204 });
     const body = JSON.parse(text) as { e?: unknown; p?: unknown };
     const props = body.p && typeof body.p === "object" ? (body.p as Record<string, unknown>) : {};
-    recordEvent(String(body.e || ""), props, { country: req.headers.get("x-vercel-ip-country") || undefined });
+    const name = String(body.e || "");
+    recordEvent(name, props, { country: req.headers.get("x-vercel-ip-country") || undefined });
+    // Sign-in map's Visits view (switch login_map): rough town of each visit, as daily totals only.
+    if (name === "visit") await recordVisitPlace(req);
   } catch {
     /* ignore malformed */
   }

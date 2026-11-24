@@ -1479,4 +1479,57 @@ check("events note: after Show it again, the member sees it once more", _note(ga
 req("/api/account/events-note", {}, cookie=MEMBER)
 check("events note: ...and then not again", _none(gal(_HOME)))
 
+# =============== Night sky (switch night_sky): decided by the visitor's own clock in the browser
+def page(path, cookie=None):
+    r=urllib.request.Request(BASE+path)
+    if cookie: r.add_header("cookie", cookie)
+    try:
+        with urllib.request.urlopen(r, timeout=60) as resp: return resp.read().decode()
+    except urllib.error.HTTPError as e: return e.read().decode()
+h=page("/")
+check("night sky: the home page carries the night script (on by default off production)", 'setAttribute("data-night","1")' in h, h[:200])
+check("night sky: the script never runs on staff pages", "(admin|help)" in h, h[:200])
+check("night sky: no location is asked for", "geolocation" not in h)
+req("/api/admin/flags", {"key":"night_sky","on":False})
+h=page("/")
+check("night sky: switched off = no night script, daytime always", 'data-night' not in h, "data-night still in page")
+check("night sky: switched off = privacy page doesn't mention the evening look", "evening look" not in page("/privacy"))
+pr=urllib.request.Request(BASE+"/"); pr.add_header("cookie", ADMIN+"; fp_night_preview=on")
+with urllib.request.urlopen(pr, timeout=60) as resp: hp=resp.read().decode()
+check("night sky: staff 'Preview site at night' works even with the switch off", 'if(!/^' in hp and "&&true)" in hp and "Previewing the site" in hp, hp[:200])
+pr=urllib.request.Request(BASE+"/"); pr.add_header("cookie", MEMBER+"; fp_night_preview=on")
+with urllib.request.urlopen(pr, timeout=60) as resp: hm=resp.read().decode()
+check("night sky: the preview cookie does nothing for members", 'data-night' not in hm and "Previewing the site" not in hm)
+req("/api/admin/flags", {"key":"night_sky","on":True})
+check("night sky: switched back on", 'data-night' in page("/"))
+_pv=page("/privacy")
+check("night sky: privacy page says the rough area is used for the evening look and not kept", "Approximate area for the evening look" in _pv and "It isn" in _pv, _pv[:200])
+_pr=urllib.request.Request(BASE+"/"); _pr.add_header("x-vercel-ip-latitude","47.6062"); _pr.add_header("x-vercel-ip-longitude","-122.3321")
+with urllib.request.urlopen(_pr, timeout=60) as resp: _hg=resp.read().decode()
+check("night sky: with a rough area, dusk is worked out for it (rounded to 0.1 degree)", "(Date.now(),47.6,-122.3)" in _hg, re.findall(r"Date\.now\(\)[^)]*\)", _hg)[:2])
+
+# ---------- Ready-for-pickup messages (lib/pickupReady.ts)
+_now=int(time.time()*1000)
+_o=json.load(open(D+"orders.json"))
+_base={k:v for k,v in _o[0].items() if k not in ("pickupReadyAt","pickupReadyBy","pickupReadyFailed","paidAt","shippedAt","pickedUpAt","completedAt","reminders","expiredAt")}
+_o=[x for x in _o if not x["id"].startswith("ord_pr_")]
+_o.append({**_base,"id":"ord_pr_manual","shippingMethod":"pickup","status":"paid","paidAt":_now-3600000,"createdAt":_now-3600000,"userEmail":"pick1@example.com","userName":"Pia Pickup","isInquiry":False,"paymentToken":"prtok1"})
+_o.append({**_base,"id":"ord_pr_late","shippingMethod":"pickup","status":"paid","paidAt":_now-25*3600000,"createdAt":_now-60000,"userEmail":"pick2@example.com","userName":"Lou Late","isInquiry":False,"paymentToken":"prtok2"})
+_o.append({**_base,"id":"ord_pr_old","shippingMethod":"pickup","status":"paid","paidAt":_now-90*86400000,"createdAt":_now-90*86400000,"userEmail":"pick3@example.com","userName":"Old Order","isInquiry":False,"paymentToken":"prtok3"})
+json.dump(_o,open(D+"orders.json","w"))
+s,r=req("/api/admin/orders/pickup-ready", {"id":"ord_pr_manual"}, cookie=None)
+check("pickup ready: staff only", s==401, s)
+n=len(mail())
+s,r=req("/api/admin/orders/pickup-ready", {"id":"ord_pr_manual"})
+m=[x for x in mail()[n:] if "pick1@example.com" in json.dumps(x.get("to"))]
+check("pickup ready: button emails the customer and stamps the order", s==200 and r["order"].get("pickupReadyAt") and r["order"].get("pickupReadyBy")=="staff" and m and "ready" in m[0]["subject"].lower(), (s,r,len(m)))
+s,r=req("/api/admin/orders/pickup-ready", {"id":"ord_pr_manual"})
+check("pickup ready: never sent twice", s==400, (s,r))
+n=len(mail()); req("/api/cron/tick", cookie=ADMIN)
+new=mail()[n:]
+check("pickup ready: a day late = sent automatically + staff nudged", any("pick2@example.com" in json.dumps(x.get("to")) for x in new) and any("Lou Late" in x.get("subject","") and "packed" in x.get("subject","") for x in new), [x.get("subject") for x in new])
+check("pickup ready: old orders never get a sudden email", not any("pick3@example.com" in json.dumps(x.get("to")) for x in new))
+n=len(mail()); req("/api/cron/tick", cookie=ADMIN)
+check("pickup ready: auto send happens once", not any("pick2@example.com" in json.dumps(x.get("to")) for x in mail()[n:]))
+
 print(f"\n{sum(res)}/{len(res)} passed")

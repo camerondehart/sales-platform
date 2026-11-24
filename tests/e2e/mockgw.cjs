@@ -117,6 +117,18 @@ http.createServer((req, res) => {
     log.push({ auth: req.headers.authorization, model: j.model, models: j.models, max_tokens: j.max_tokens, tool_choice: j.tool_choice, tools: (j.tools || []).map((t) => t.function.name), system: j.messages[0].content, messages: JSON.parse(JSON.stringify(j.messages)) });
     // A turn with a photo has text + image parts; the canned replies below read plain text.
     for (const m of j.messages) if (Array.isArray(m.content)) m.content = m.content.filter((x) => x.type === "text").map((x) => x.text).join(" ") + (m.content.some((x) => x.type === "image_url") ? " [IMAGE]" : "");
+    // ---- Site manager review: a briefing, one priority move, one hide and an unknown id (refused).
+    if (String(j.messages[0].content || "").startsWith("You are the site manager")) {
+      const u = String(j.messages[1].content || "");
+      const ids = Array.from(u.matchAll(/^([a-z0-9:_-]+) \| (now|today|this week|campaign|idea) \|/gm)).map((m) => m[1]);
+      const sawLog = u.includes("ACTIVITY LOG SINCE") && u.includes("COUNTS BY ACTION");
+      return reply(res, { content: JSON.stringify({
+        headline: "Steady week" + (sawLog ? "" : " (no log!)"),
+        wins: ["Sales are up"], concerns: ["Two orders waiting"], insights: ["Weekends sell best"], missed: ["A failed email"],
+        actions: [{ title: "Chase unpaid", ask: "Prepare payment reminder cards for unpaid orders." }],
+        tweaks: [ids[0] && { id: ids[0], priority: "idea", why: "Can wait" }, ids[1] && { id: ids[1], hide: true, why: "Not today" }, { id: "nope", hide: true, why: "x" }].filter(Boolean),
+      }) });
+    }
     // ---- The Concierge's nightly notes review: a JSON list of notes, including
     // some the site must refuse (personal data, rule-changing, unknown Today key).
     if (String(j.messages[0].content || "").startsWith('You keep the "learned notes"')) {

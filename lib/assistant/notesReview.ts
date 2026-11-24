@@ -1,7 +1,7 @@
 import { auditSystem } from "../audit";
 import { isEnabled } from "../flags";
 import { recentDone } from "../todayDone";
-import { getAssistantConfig } from "./config";
+import { getAssistantConfig, managerModelOf } from "./config";
 import { chatCompletion, costOf, gatewayCredential, resolveAnsweringModel, type GatewayMessage } from "./gateway";
 import { applyReview, getNotes, getRuns, nightlyDue, parseReviewJson, recordRun, reviewMaterial, REVIEW_INSTRUCTIONS, saveReviewResult } from "./learnedNotes";
 import { flushUsage, monthSpend, recordUsage } from "./usage";
@@ -11,7 +11,7 @@ const DAILY_KEYS = ["requests", "members", "unpaid", "fulfil", "events", "codes"
 /**
  * The Concierge's notes review (see lib/assistant/learnedNotes.ts).
  * Nightly from the cron tick, or "Review chats now" in the Assistant tab.
- * Uses the main model, counts toward the monthly AI limit, never throws.
+ * Uses the manager model (Assistant → Model & access), counts toward the monthly AI limit, never throws.
  */
 export async function runNotesReview(opts: { trigger: "nightly" | "manual"; req?: Request }): Promise<{ ok: boolean; skipped?: string; summary?: string; added?: number; removed?: number; kept?: number; rejected?: number; error?: string }> {
   if (!(await isEnabled("concierge_learning"))) return { ok: false, skipped: "The “Concierge learns from chats” switch is off." };
@@ -30,7 +30,8 @@ export async function runNotesReview(opts: { trigger: "nightly" | "manual"; req?
   const started = Date.now();
   // Activity log: a button press is staff, the nightly run is the schedule.
   const who = opts.trigger === "manual" ? { actor: "admin", actorType: "admin" as const, source: "human" as const } : {};
-  let model = config.model;
+  const reviewModel = managerModelOf(config);
+  let model = reviewModel;
   try {
     const { todaySuggestions } = await import("../todayBulletin");
     const { runTool } = await import("./tools");
@@ -56,14 +57,14 @@ export async function runNotesReview(opts: { trigger: "nightly" | "manual"; req?
       const callStarted = Date.now();
       const res = await chatCompletion({
         credential,
-        model: config.model,
+        model: reviewModel,
         fallbackModel: config.fallbackModel,
         messages: convo,
         // Thinking models spend part of this on reasoning before the JSON.
         maxTokens: 8000,
         timeoutMs: 25_000, // x2 attempts still fits the 60 s cron
       });
-      model = resolveAnsweringModel(res.model, config.model, config.fallbackModel);
+      model = resolveAnsweringModel(res.model, reviewModel, config.fallbackModel);
       const cost = await costOf(model, res.usage);
       costUsd += cost;
       recordUsage({ audience: "admin", model, inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, costUsd: cost, toolCalls: 0, latencyMs: Date.now() - callStarted });

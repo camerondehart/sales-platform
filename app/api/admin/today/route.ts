@@ -11,6 +11,9 @@ import { singleton } from "@/lib/assistant/singleton";
 import { doneToday, setDone } from "@/lib/todayDone";
 import { audited } from "@/lib/audit";
 import { notesForToday } from "@/lib/assistant/learnedNotes";
+import { actionFor } from "@/lib/todayActions";
+import { pacificDay } from "@/lib/periods";
+import { activeTweaks, latestReview } from "@/lib/assistant/managerReview";
 
 export const dynamic = "force-dynamic";
 
@@ -29,32 +32,6 @@ const CACHE = singleton("todayBulletin", () => ({ at: 0, body: null as unknown }
 const RANK: Record<Priority, number> = { now: 0, today: 1, "this week": 2, campaign: 3, idea: 4 };
 
 type Task = { priority: "now" | "today" | "this week"; task: string; items: string[] };
-
-// What each kind of task's button does. Prompts stay under the widget's 300 characters.
-function actionFor(task: string): { key: string; ask?: string; tab?: string; button: string } {
-  if (/^Reply to/i.test(task)) return { key: "requests", tab: "assistant", button: "Open replies" };
-  if (/membership request/i.test(task))
-    return {
-      key: "members",
-      ask: "Prepare a card for each membership request that's waiting, so I can approve or decline each one. Point out anyone who didn't confirm 21+.",
-      button: "Prepare approval cards",
-    };
-  if (/^Chase/i.test(task))
-    return {
-      key: "unpaid",
-      ask: "Prepare payment reminder cards (with the pay button) for the unpaid orders on today's Chase list (daily_tasks) — one card per order, up to 10. Skip cash-at-pickup orders and any chased in the last 3 days.",
-      button: "Prepare reminder cards",
-    };
-  if (/^Pack and/i.test(task))
-    return {
-      key: "fulfil",
-      ask: "For the paid orders waiting to go out: prepare a shipping label card for each shipping order that still needs a label (leave the weight out — it's worked out from product weights), and a 'mark completed' card for each order that's ready. One card per order.",
-      button: "Prepare shipping cards",
-    };
-  if (/event/i.test(task)) return { key: "events", tab: "events", button: "Open events" };
-  if (/discount code/i.test(task)) return { key: "codes", tab: "marketing", button: "Open codes" };
-  return { key: "other", tab: "overview", button: "Open" };
-}
 
 export async function GET(req: Request) {
   if (!(await isAdmin())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -112,13 +89,27 @@ export async function GET(req: Request) {
     const ideas = shape(manager);
     const campaignIdeas = shape(marketing);
 
-    const sorted = [...daily, ...ideas, ...campaignIdeas].sort((a, b) => RANK[a.priority as Priority] - RANK[b.priority as Priority]);
+    // Site manager review (lib/assistant/managerReview.ts): today's priority moves and hides, undoable.
+    const tweaks = await activeTweaks().catch(() => []);
+    const tw = new Map(tweaks.map((t) => [t.id, t]));
+    const all = [...daily, ...ideas, ...campaignIdeas]
+      .filter((t) => !tw.get(t.id)?.hide)
+      .map((t) => {
+        const x = tw.get(t.id);
+        return x?.priority && x.priority !== t.priority ? { ...t, priority: x.priority as Priority, managerWhy: x.why, managerFrom: t.priority } : t;
+      });
+    const sorted = all.sort((a, b) => RANK[a.priority as Priority] - RANK[b.priority as Priority]);
     // "Learned" lines from the Concierge's notes (Assistant tab → Concierge notes).
     const tasks = await Promise.all(sorted.map(async (t) => {
       const learned = await notesForToday(t.id);
       return learned.length ? { ...t, learned: learned.slice(0, 2) } : t;
     }));
-    const body = { asOf: out.as_of || "", allClear: tasks.length === 0, tasks, conciergeReady };
+    const mrOn = await isEnabled("manager_review").catch(() => false);
+    const mr = mrOn ? await latestReview().catch(() => null) : null;
+    const managerTake = !mrOn ? undefined : mr
+      ? { at: mr.at, ok: mr.ok, error: mr.error, model: mr.model, wanted: mr.wanted, headline: mr.headline, wins: mr.wins, concerns: mr.concerns, insights: mr.insights, missed: mr.missed, actions: conciergeReady ? mr.actions : [], tweaks: mr.tweaks, undone: !!mr.undone, today: mr.day === pacificDay(), logEntries: mr.logEntries, briefed: mr.briefed }
+      : null;
+    const body = { asOf: out.as_of || "", allClear: tasks.length === 0, tasks, conciergeReady, manager: managerTake };
     Object.assign(CACHE, { at: Date.now(), body });
     return NextResponse.json({ ...body, done }, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {

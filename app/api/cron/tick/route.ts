@@ -6,7 +6,9 @@ import { runReminders } from "@/lib/reminders";
 import { runScheduledCampaigns } from "@/lib/campaignSchedule";
 import { pruneTranscripts } from "@/lib/assistant/transcripts";
 import { flushTraffic } from "@/lib/traffic";
+import { flushVisitPlaces } from "@/lib/loginPlacesLog";
 import { runNotesReview } from "@/lib/assistant/notesReview";
+import { runManagerReview } from "@/lib/assistant/managerReview";
 import { fixPoints } from "@/lib/loyalty";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +65,24 @@ export async function GET(req: Request) {
   } catch (err) {
     failures.push(`notes review: ${err instanceof Error ? err.message : err}`);
   }
+  // Ready-for-pickup messages a day overdue: sent automatically + staff nudged (lib/pickupReady.ts).
+  try {
+    const { runPickupReady } = await import("@/lib/pickupReady");
+    const { getAssistantConfig } = await import("@/lib/assistant/config");
+    const { staffInbox } = await import("@/lib/assistant/tools");
+    const pr = await runPickupReady(staffInbox(await getAssistantConfig()), siteUrl);
+    if (pr.sent.length) out.pickupReady = pr.sent;
+  } catch (err) {
+    failures.push(`pickup ready: ${err instanceof Error ? err.message : err}`);
+  }
+  // Site manager review (switch "Site manager review"; once a day, 5–8am
+  // Pacific, outside the notes review's hours). Logs its own Activity entry.
+  try {
+    const mr = await runManagerReview({ trigger: "nightly", req });
+    if (!mr.skipped) out.managerReview = { ok: mr.ok, error: mr.error };
+  } catch (err) {
+    failures.push(`manager review: ${err instanceof Error ? err.message : err}`);
+  }
   // Loyalty points: add them to orders completed over an hour ago, and put
   // right any order whose points don't match the rule (lib/loyalty.ts).
   try {
@@ -72,6 +92,7 @@ export async function GET(req: Request) {
     failures.push(`points: ${err instanceof Error ? err.message : err}`);
   }
   await flushTraffic(true).catch(() => {});
+  await flushVisitPlaces(true).catch(() => {});
 
   const r = out.reminders as { sent?: number; failed?: number; expired?: number } | undefined;
   const c = out.campaigns as { sent?: number; failed?: number } | undefined;

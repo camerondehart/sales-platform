@@ -166,5 +166,29 @@ rq=urllib.request.Request(BASE+"/api/admin/flags", data=json.dumps({"key":"login
 urllib.request.urlopen(rq).read()
 s,d=get("/api/admin/login-places?days=7&kind=staff")
 check("sign-in map: nothing noted while off", d.get("total")==3, d)
+# ---- Visits on the same map: once per tab session from /api/t, daily town totals only
+def visit(hdrs, cookie=None, ua="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Safari/604.1"):
+    r=urllib.request.Request(BASE+"/api/t", data=json.dumps({"e":"visit","p":{"path":"/","device":"phone"}}).encode(), method="POST")
+    r.add_header("content-type","application/json"); r.add_header("user-agent",ua)
+    if cookie: r.add_header("cookie",cookie)
+    for k,v in hdrs.items(): r.add_header(k,v)
+    with urllib.request.urlopen(r, timeout=30) as resp: return resp.status
+REDDING={"x-forwarded-for":"10.62.0.1","x-vercel-ip-latitude":"40.59","x-vercel-ip-longitude":"-122.39","x-vercel-ip-city":"Redding","x-vercel-ip-country-region":"CA","x-vercel-ip-country":"US"}
+check("visit map: visit beacon answers 204", visit(REDDING)==204)
+visit(dict(REDDING, **{"x-forwarded-for":"10.62.0.2"}))
+visit(dict(CHICO, **{"x-forwarded-for":"10.62.0.3"}))
+visit(dict(CHICO, **{"x-forwarded-for":"10.62.0.4"}), ua="Googlebot/2.1")
+visit(dict(CHICO, **{"x-forwarded-for":"10.62.0.5"}), cookie=ADMIN)
+visit({"x-forwarded-for":"10.62.0.6"})
+s,d=get("/api/admin/login-places?days=7&kind=visit")
+vp={p["city"]:p["count"] for p in d.get("places",[])}
+check("visit map: visits counted per town (no bots, no staff browsers, no location = nothing)", s==200 and d.get("kind")=="visit" and d.get("total")==3 and vp=={"Redding":2,"Chico":1}, d)
+s,d=get("/api/admin/login-places?days=7")
+s2,d2=get("/api/admin/login-places?days=7&kind=staff")
+check("visit map: visits stay out of sign-ins", d.get("total")==0 and d2.get("total")==3 and "Redding" not in [p["city"] for p in d2.get("places",[])], (d, d2))
+vblob=json.dumps([json.load(open(f)) for f in glob.glob(D+"visit-places-*")])
+check("visit map: no internet address saved", "Redding" in vblob and "10.62.0" not in vblob, vblob[:300])
+_h=urllib.request.urlopen(BASE+"/privacy").read().decode()
+check("visit map: privacy page says visits are counted per town", "rough town (about city level) your internet (IP) address points to" in _h and "visit counts per town are kept for about 13 months" in _h, _h[:200])
 
 print(f"\n{sum(res)}/{len(res)} passed")

@@ -7,13 +7,14 @@ import { getInquiries, type Inquiry } from "@/lib/inquiries";
 import { getSubscribers } from "@/lib/subscribers";
 import { getProducts, type Product } from "@/lib/storage";
 import { getOrders } from "@/lib/orders";
-import { getInsights, money, type Insights } from "@/lib/analytics";
+import { getInsights, money } from "@/lib/analytics";
 import { generateRevenueCSV } from "@/lib/revenueCsv";
-import { escapeHtml } from "@/lib/invoiceEmail";
 import { auditSystem } from "@/lib/audit";
 import { brand } from "@/lib/brand";
 import { isEnabled } from "@/lib/flags";
 import { phraseFor, phraseStartedAt } from "@/lib/staffPhrase";
+import { reportExtras, buildReportHtml } from "@/lib/nightlyReport";
+import { siteUrlFrom } from "@/lib/giftCardDelivery";
 
 // ==================== CSV helpers ====================
 function csvCell(value: string | number | undefined | null): string {
@@ -96,139 +97,13 @@ async function generateOrdersCSV(): Promise<string> {
 }
 
 // ==================== Email HTML builder ====================
-function pct(n: number | null): string {
-  if (n === null) return "";
-  const sign = n >= 0 ? "+" : "";
-  const color = n >= 0 ? "#6fa336" : "#c86164";
-  return `<span style="color:${color};font-weight:700;">${sign}${n.toFixed(0)}%</span>`;
-}
-
-function statCard(label: string, value: string, sub = ""): string {
-  return `
-    <td style="padding:6px;">
-      <div style="background:#f3f6ec;border-radius:8px;padding:14px;text-align:center;">
-        <div style="font-size:1.6rem;font-weight:700;color:#6fa336;line-height:1.2;">${value}</div>
-        <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:#61676d;margin-top:4px;">${label}</div>
-        ${sub ? `<div style="font-size:0.72rem;color:#81858b;margin-top:2px;">${sub}</div>` : ""}
-      </div>
-    </td>`;
-}
-
-function buildEmailHtml(i: Insights, attachments: string[], phrase: string | null = null): string {
-  const actions: string[] = [];
-  if (i.pendingOver3Days.length > 0) {
-    actions.push(
-      `<strong>${i.pendingOver3Days.length} order${i.pendingOver3Days.length !== 1 ? "s" : ""} waiting on payment for 3+ days</strong> (${money(i.pendingOver3Days.reduce((n, o) => n + o.total, 0))} total). Longest: ${escapeHtml(i.pendingOver3Days[0].userName)}, ${i.pendingOver3Days[0].daysWaiting} days.`
-    );
-  }
-  if (i.awaitingFulfillment > 0) {
-    actions.push(`<strong>${i.awaitingFulfillment} paid order${i.awaitingFulfillment !== 1 ? "s" : ""}</strong> ready to ship or hand off.`);
-  }
-  if (i.pendingApprovals > 0) {
-    actions.push(`<strong>${i.pendingApprovals} member request${i.pendingApprovals !== 1 ? "s" : ""}</strong> waiting for review.`);
-  }
-  if (i.revenueChangePct !== null && i.revenueChangePct <= -25) {
-    actions.push(`Revenue is down ${Math.abs(i.revenueChangePct).toFixed(0)}% versus the previous week. Might be a good week for a promo or a countdown sale.`);
-  }
-  if (i.slowMovers.length > 0) {
-    const sample = i.slowMovers.slice(0, 3).map((p) => escapeHtml(p.name)).join(", ");
-    actions.push(`${i.slowMovers.length} product${i.slowMovers.length !== 1 ? "s haven't" : " hasn't"} sold in 30 days: ${sample}${i.slowMovers.length > 3 ? "…" : ""}.`);
-  }
-  if (actions.length === 0) actions.push("Nothing needs attention. Everything is paid, shipped, and moving.");
-
-  const topProductRows = i.topProducts.map((p, idx) => `
-    <tr style="border-bottom:1px solid #e8e5e5;">
-      <td style="padding:0.5rem 0;">${idx + 1}. ${escapeHtml(p.name)}</td>
-      <td style="padding:0.5rem 0;text-align:center;color:#81858b;">${p.unitsSold}</td>
-      <td style="padding:0.5rem 0;text-align:right;font-weight:700;">${money(p.revenue)}</td>
-    </tr>`).join("");
-
-  const topCustomerRows = i.topCustomers.map((c) => `
-    <tr style="border-bottom:1px solid #e8e5e5;">
-      <td style="padding:0.5rem 0;">${escapeHtml(c.name)}</td>
-      <td style="padding:0.5rem 0;text-align:center;color:#81858b;">${c.orders}</td>
-      <td style="padding:0.5rem 0;text-align:right;font-weight:700;">${money(c.spend)}</td>
-    </tr>`).join("");
-
-  const categoryRows = i.categoryRevenue.slice(0, 5).map((c) => `
-    <tr style="border-bottom:1px solid #e8e5e5;">
-      <td style="padding:0.4rem 0;">${escapeHtml(c.category)}</td>
-      <td style="padding:0.4rem 0;text-align:center;color:#81858b;">${c.units}</td>
-      <td style="padding:0.4rem 0;text-align:right;">${money(c.revenue)}</td>
-    </tr>`).join("");
-
-  return `
-<!DOCTYPE html>
-<html><head><meta charset="UTF-8"></head>
-<body style="font-family:'Optima','Helvetica Neue',sans-serif;background:#f9f9f8;padding:20px;color:#61676d;">
-  <div style="max-width:620px;margin:0 auto;background:white;border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-    <div style="background:#85ba45;padding:20px 24px;color:white;">
-      <h1 style="margin:0;font-family:'Libre Baskerville',Georgia,serif;font-style:italic;font-weight:400;font-size:1.5rem;">${brand.name}</h1>
-      <p style="margin:8px 0 0;opacity:0.85;">Nightly report &amp; backup &middot; ${new Date(i.generatedAt).toLocaleDateString("en-US", { timeZone: brand.timezone, month: "short", day: "numeric", year: "numeric" })} &middot; local time</p>
-    </div>
-    <div style="padding:24px;">
-      ${phrase ? `
-      <div style="margin:0 0 24px;padding:14px 16px;border:1px solid #d6d8dc;border-radius:8px;">
-        <div style="font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;margin-bottom:6px;">Today&rsquo;s staff password</div>
-        <div style="font-size:1.3rem;font-weight:700;color:#2e3236;font-family:Menlo,Consolas,monospace;">${escapeHtml(phrase)}</div>
-        <p style="margin:6px 0 0;font-size:0.8rem;color:#81858b;">For the admin sign-in until midnight Pacific (yesterday&rsquo;s works until noon). Signed-in staff can always see it in Settings &rarr; Steward password. Don&rsquo;t forward this email.</p>
-      </div>` : ""}
-
-      <div style="font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;margin-bottom:12px;">Revenue</div>
-      <table style="width:100%;border-collapse:collapse;"><tr>
-        ${statCard("Yesterday", money(i.yesterday.revenue), `${i.yesterday.orders} order${i.yesterday.orders !== 1 ? "s" : ""}`)}
-        ${statCard("Last 7 days", money(i.last7.revenue), `${i.last7.orders} orders ${pct(i.revenueChangePct)}`)}
-        ${statCard("Last 30 days", money(i.last30.revenue), `${i.last30.orders} orders`)}
-      </tr><tr>
-        ${statCard("Avg order", money(i.last7.avgOrderValue), "last 7 days")}
-        ${statCard("Awaiting payment", money(i.pendingValue), `${i.pendingCount} order${i.pendingCount !== 1 ? "s" : ""}`)}
-        ${statCard("All time", money(i.allTime.revenue), `${i.allTime.orders} orders`)}
-      </tr></table>
-
-      <div style="margin:28px 0 12px;font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;">Needs your attention</div>
-      <div style="background:#fdf6e3;border-left:4px solid #a2a434;padding:14px 16px;border-radius:0 6px 6px 0;">
-        <ul style="margin:0;padding-left:18px;line-height:1.7;">
-          ${actions.map((a) => `<li>${a}</li>`).join("")}
-        </ul>
-      </div>
-
-      <div style="margin:28px 0 8px;font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;">Top sellers (30 days)</div>
-      ${i.topProducts.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.92rem;">
-        <tr style="border-bottom:1px solid #abaeb2;"><th style="text-align:left;padding-bottom:4px;">Product</th><th style="text-align:center;padding-bottom:4px;">Units</th><th style="text-align:right;padding-bottom:4px;">Revenue</th></tr>
-        ${topProductRows}
-      </table>` : `<p style="color:#81858b;">No sales in the last 30 days.</p>`}
-
-      ${i.categoryRevenue.length ? `
-      <div style="margin:28px 0 8px;font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;">By category (30 days)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
-        <tr style="border-bottom:1px solid #abaeb2;"><th style="text-align:left;padding-bottom:4px;">Category</th><th style="text-align:center;padding-bottom:4px;">Units</th><th style="text-align:right;padding-bottom:4px;">Revenue</th></tr>
-        ${categoryRows}
-      </table>` : ""}
-
-      <div style="margin:28px 0 8px;font-size:0.7rem;letter-spacing:0.18em;text-transform:uppercase;color:#85ba45;font-weight:700;">Customers</div>
-      <p style="margin:0 0 10px;line-height:1.6;">
-        Last 7 days: <strong>${i.newCustomers7}</strong> new customer${i.newCustomers7 !== 1 ? "s" : ""},
-        <strong>${i.repeatCustomers7}</strong> returning (<strong>${i.repeatRatePct.toFixed(0)}%</strong> repeat rate).<br/>
-        Fulfillment: <strong>${i.shipCount7}</strong> shipped &middot; <strong>${i.pickupCount7}</strong> pickup.
-      </p>
-      ${i.topCustomers.length ? `<table style="width:100%;border-collapse:collapse;font-size:0.92rem;">
-        <tr style="border-bottom:1px solid #abaeb2;"><th style="text-align:left;padding-bottom:4px;">Top customers (all time)</th><th style="text-align:center;padding-bottom:4px;">Orders</th><th style="text-align:right;padding-bottom:4px;">Spend</th></tr>
-        ${topCustomerRows}
-      </table>` : ""}
-
-      <div style="margin:32px 0 0;border-top:1px solid #ddd;padding-top:18px;">
-        <p style="margin:0 0 6px;"><strong>Attached backups</strong></p>
-        <ul style="margin:0 0 8px 18px;line-height:1.6;">${attachments.map((a) => `<li>${a}</li>`).join("")}</ul>
-        <p style="font-size:0.8rem;color:#81858b;margin:0;">Keep the latest email and you can always restore the catalog or reconstruct orders. Revenue figures count orders marked paid or shipped.</p>
-      </div>
-
-    </div>
-  </div>
-</body></html>`;
-}
+// The email itself is built in lib/nightlyReport.ts.
 
 // Vercel Cron invokes scheduled jobs with a GET request, so the nightly
 // backup needs a GET handler. Both verbs share the same implementation.
+// Room for the Manager's take to finish before the scheduled report goes out.
+export const maxDuration = 120;
+
 export async function GET(req: Request) {
   return logJobRun(req, "job.nightly_report");
 }
@@ -373,7 +248,21 @@ async function runExport(req: Request) {
     await phraseStartedAt();
     phrase = phraseFor(pacificDay());
   }
-  const emailHtml = buildEmailHtml(insights, attachmentLabels, phrase);
+  // The scheduled report waits for tonight's Manager's take: if
+  // the midnight review hasn't finished (or failed), run it now, before the email.
+  if (isCron) {
+    try {
+      const { latestReview, runManagerReview } = await import("@/lib/assistant/managerReview");
+      const { getAssistantConfig } = await import("@/lib/assistant/config");
+      const last = await latestReview();
+      if ((await getAssistantConfig()).managerRunsPerDay !== 0 && (!last?.ok || Date.now() - last.at > 6 * 3_600_000)) await runManagerReview({ trigger: "nightly", req, force: true });
+    } catch (err) {
+      console.error("[export-email] manager review before the report failed", err);
+    }
+  }
+  // Extras are read after the backups, one at a time, so they never pile onto the order reads above.
+  const extras = await reportExtras(siteUrlFrom(req));
+  const emailHtml = buildReportHtml(insights, extras, attachmentLabels, phrase);
 
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.INQUIRY_FROM_EMAIL || "onboarding@resend.dev";

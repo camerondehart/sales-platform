@@ -40,6 +40,8 @@ export type Product = {
   bundleDiscount?: number;   // optional % off the combined component price
   /** Shop pages only (lib/stock.ts applyStockFlag): at 0 in Stock counts. Never saved. */
   restocking?: boolean;
+  /** A scheduled sitewide sale running now (lib/siteSales.ts), % off. Added by getProducts(), never saved. */
+  sitePromo?: number;
   createdAt: number;
 };
 
@@ -137,6 +139,7 @@ export async function mutateProducts<R>(
     let saved: Product[] | null = null;
     const result = await productStore.mutate(async (list) => {
       const out = await fn(list);
+      if (out.data) out.data = unsaved(out.data);
       saved = out.data;
       return out;
     });
@@ -200,7 +203,18 @@ async function fsWrite(file: string, value: unknown): Promise<void> {
   await fs.writeFile(file, JSON.stringify(value, null, 2), "utf8");
 }
 
+/**
+ * The catalog as customers are charged right now: any running scheduled
+ * sitewide sale is applied (`sitePromo`, lib/siteSales.ts). Use getCatalog()
+ * for the products exactly as saved (editing, saving).
+ */
 export async function getProducts(): Promise<Product[]> {
+  const { applySiteSales } = await import("./siteSales");
+  return applySiteSales(await getCatalog());
+}
+
+/** The products exactly as saved, without any sitewide sale. */
+export async function getCatalog(): Promise<Product[]> {
   if (await versionedReads()) {
     try {
       return (await productStore.read()).data;
@@ -255,14 +269,23 @@ export async function getProductsForUpdate(): Promise<Product[]> {
   const { list } = await import("@vercel/blob");
   const { blobs } = await list({ prefix: BLOB_KEY });
   const match = blobs.find((b) => b.pathname === BLOB_KEY);
-  if (!match) return getProducts(); // first deploy: seeds as before
+  if (!match) return getCatalog(); // first deploy: seeds as before
   const url = `${match.url}${match.url.includes("?") ? "&" : "?"}nocache=${Date.now()}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Couldn't read the product catalog (HTTP ${res.status}). Please try again.`);
   return (await res.json()) as Product[];
 }
 
-export async function saveProducts(products: Product[]): Promise<void> {
+/** A running sitewide sale is worked out on reading and must never be written back. */
+const unsaved = (products: Product[]): Product[] =>
+  products.map((p) => {
+    if (p.sitePromo === undefined) return p;
+    const { sitePromo: _s, ...rest } = p;
+    return rest;
+  });
+
+export async function saveProducts(input: Product[]): Promise<void> {
+  const products = unsaved(input);
   if (await versionedWrites()) {
     // Whole-list save (prefer mutateProducts): still exact, via a new version.
     await productStore.mutate(() => ({ data: products, result: undefined }));
@@ -272,7 +295,7 @@ export async function saveProducts(products: Product[]): Promise<void> {
   // Safety guard: refuse to overwrite a non-empty list with an empty one
   if (products.length === 0) {
     try {
-      const existing = await getProducts();
+      const existing = await getCatalog();
       if (existing.length > 0) {
         throw new Error(
           `Refusing to write empty products list – existing list has ${existing.length} product(s). ` +
@@ -310,7 +333,7 @@ export async function reorderProduct(id: string, direction: "up" | "down"): Prom
       return { data: products, result: undefined };
     });
   }
-  const products = await getProducts();
+  const products = await getCatalog();
   const idx = products.findIndex((p) => p.id === id);
   if (idx === -1) return;
   const swapWith = direction === "up" ? idx - 1 : idx + 1;
@@ -357,7 +380,7 @@ export async function updateProducts(
     });
   }
   // Read as late as possible so the snapshot is the freshest available.
-  const products = await getProducts();
+  const products = await getCatalog();
   const wanted = new Set(ids);
   const updated: Product[] = [];
 

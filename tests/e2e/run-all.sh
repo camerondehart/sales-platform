@@ -53,6 +53,8 @@ unit "Label log shipping numbers (unit)" label-log.cjs "Label log unit check fai
 unit "Ambassador panel ranges and chart (unit)" ambassador-panel.cjs "Ambassador panel unit check failed"
 unit "Banner HTML can't run scripts (unit)" safe-html.cjs "Banner HTML unit check failed"
 unit "Sign-in map daily town totals (unit)" login-places.cjs "Sign-in map unit check failed"
+unit "Night sky on the visitor's own clock (unit)" night-sky.cjs "Night sky unit check failed"
+unit "Scheduled sitewide sales (unit)" site-sales.cjs "Sitewide sales unit check failed"
 if [ -d /tmp/next-cache-keep ]; then mkdir -p /tmp/final/.next && mv /tmp/next-cache-keep /tmp/final/.next/cache; echo "Building (cached; --clean for a fresh build)…"; else echo "Building…"; fi
 (cd /tmp/final && npx next build >/tmp/harness/build.log 2>&1) || { echo "Build failed — see /tmp/harness/build.log"; exit 1; }
 set +e

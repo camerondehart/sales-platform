@@ -30,6 +30,7 @@ import { useAdminTheme } from "./useAdminTheme";
 import MediaUpload from "./MediaUpload";
 import { dataUrlToBlob, imageLine, uploadCampaignImage } from "./campaignImage";
 import BundlesPanel from "./BundlesPanel";
+import SiteSalesPanel from "./SiteSalesPanel";
 import TodayBulletin from "./TodayBulletin";
 import QaIcon, { type QaIconName } from "./QaIcon";
 import FaqPanel from "./FaqPanel";
@@ -70,7 +71,7 @@ const SUBS_PER_PAGE = 25;
 const SHOW_LEGACY_INQUIRY_ARCHIVE = false;
 
 // Marketing tab sections (cards at the top; one shows at a time).
-const MKT_SECTIONS = ["compose", "sent", "codes", "bundles", "banner", "audience"] as const;
+const MKT_SECTIONS = ["compose", "sent", "codes", "sales", "bundles", "banner", "audience"] as const;
 type MktSection = (typeof MKT_SECTIONS)[number];
 
 type TabKey = "overview" | "analytics" | "orders" | "members" | "products" | "events" | "marketing" | "ambassadors" | "retail" | "assistant" | "settings";
@@ -3718,6 +3719,7 @@ ${qrSvg(qrUrl, { size: 520, margin: 3 })}
             { key: "compose", icon: "mail", label: "Write a campaign", status: campEditing ? <span className="secnav-dirty">Editing a scheduled one</span> : `${subActiveCount} active subscriber${subActiveCount === 1 ? "" : "s"}` },
             { key: "sent", icon: "inbox", label: "Sent & scheduled", status: "Results, edit or cancel" },
             { key: "codes", icon: "tag", label: "Discount codes", badge: discounts.filter((d) => codeState(d) === "live").length, status: `${discounts.filter((d) => codeState(d) === "live").length} live · ${discounts.length} in all` },
+            { key: "sales", icon: "clock", label: "Sitewide sales", status: "% off everything, scheduled" },
             { key: "bundles", icon: "basket", label: "Bundles", status: "Mix & match sets" },
             { key: "banner", icon: "megaphone", label: "Site banner", status: bannerEnabled ? "Showing on the site" : "Off" },
             { key: "audience", icon: "members", label: "Subscribers & QR", status: `${subscribers.length} on the list · sign-up QR` },
@@ -4011,6 +4013,7 @@ We just finished a new run and wanted you to hear it first.
 
       {/* Discount codes */}
       {tab === "marketing" && mktSection === "bundles" && <BundlesPanel products={products} />}
+      {tab === "marketing" && mktSection === "sales" && <SiteSalesPanel products={products} />}
       {tab === "ambassadors" && <AmbassadorsPanel products={products} />}
       {tab === "retail" && <RetailPanel onPending={setRetailPending} />}
       {tab === "marketing" && mktSection === "codes" && (
@@ -5275,7 +5278,11 @@ function OrderDetailModal({
               {order.paidAt ? `Paid ${formatDateTime(order.paidAt)}. ` : ""}
               {order.shippedAt ? `Shipped ${formatDateTime(order.shippedAt)}.` : ""}
               {order.pickedUpAt ? `Picked up ${formatDateTime(order.pickedUpAt)}.` : ""}
+              {order.pickupReadyAt ? ` Ready-for-pickup email ${order.pickupReadyFailed ? "FAILED" : "sent"} ${formatDateTime(order.pickupReadyAt)}${order.pickupReadyBy === "auto" ? " (automatically)" : ""}.` : ""}
             </div>
+            {order.shippingMethod === "pickup" && !order.pickupReadyAt && !order.giftCardOrder && (order.status === "paid" || (order.status === "pending" && order.paymentMethod === "cash")) && (
+              <PickupReadyButton order={order} onRefreshed={onRefreshed} />
+            )}
           </div>
 
           {/* Automatic payment reminders */}
@@ -5434,6 +5441,34 @@ function generatePassword(): string {
 
 
 /** Reminder history + Revive / Stop controls inside the order window. */
+/** One tap: email the customer that their pickup order is ready (lib/pickupReady.ts). */
+function PickupReadyButton({ order, onRefreshed }: { order: Order; onRefreshed: (o: Order) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  return (
+    <div style={{ marginTop: "0.6rem", display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
+      <button
+        type="button"
+        className="approve"
+        style={{ padding: "0.55rem 1rem" }}
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          setMsg("");
+          const r = await fetch("/api/admin/orders/pickup-ready", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: order.id }) });
+          const d = await r.json().catch(() => ({}));
+          if (d.order) onRefreshed(d.order);
+          setMsg(r.ok ? "Sent." : d.error || "That didn't send.");
+          setBusy(false);
+        }}
+      >
+        <Glyph name="bag" /> {busy ? "Sending…" : "Ready for pickup"}
+      </button>
+      <span style={{ fontSize: "0.78rem", color: "var(--ink-soft)" }}>{msg || "Emails them that it's packed and waiting. Sent automatically after a day if not."}</span>
+    </div>
+  );
+}
+
 function OrderReminders({ order, onRefreshed }: { order: Order; onRefreshed: (o: Order) => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");

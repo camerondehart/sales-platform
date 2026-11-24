@@ -11,6 +11,7 @@ type Status = {
   switchOn: boolean;
   siteSwitchOn?: boolean;
   siteShowing?: string;
+  nightSwitchOn?: boolean;
   choice: EntranceChoice;
   showing: EntranceKey;
   showingLabel: string;
@@ -23,6 +24,8 @@ const day = (ymd: string) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString("en
 export default function EntrancePanel() {
   const [st, setSt] = useState<Status | null>(null);
   const [playing, setPlaying] = useState<EntranceKey | null>(null);
+  const [playNight, setPlayNight] = useState(false);
+  const play = (k: EntranceKey, night = false) => { setPlayNight(night); setPlaying(k); };
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -57,12 +60,19 @@ export default function EntrancePanel() {
       <p className="ent-now">
         Members see <strong>{ENTRANCE_THEMES[st.showing].emoji} {st.showingLabel}</strong> right now
         {st.switchOn ? (st.choice === "auto" ? " (Auto)." : ".") : ". Seasonal entrances are switched off, so it's always Classic."}
-        <button type="button" className="esc-btn" onClick={() => setPlaying(st.showing)}><Glyph name="play" /> Play it</button>
+        <button type="button" className="esc-btn" onClick={() => play(st.showing)}><Glyph name="play" /> Play it</button>
       </p>
       <p className="field-hint">
         {st.siteSwitchOn
           ? <>The site&rsquo;s background follows the same theme (soft colours and a few leaves, snowflakes or petals drifting down): now <strong>{st.siteShowing}</strong>. Staff pages never change.</>
           : <>Switch on <strong>Seasonal site backgrounds</strong> in Feature switches to have the site&rsquo;s background follow this theme too.</>}
+      </p>
+      <p className="field-hint ent-night">
+        {st.nightSwitchOn
+          ? <>🌙 <strong>At night</strong> (dusk to dawn on each visitor&rsquo;s own clock, wherever they are) the site turns to a moonlit valley with stars and fireflies, and the entrance plays by moonlight.</>
+          : <>🌙 Switch on <strong>Night sky</strong> in Feature switches for a moonlit look from dusk to dawn on each visitor&rsquo;s own clock. You can still preview it.</>}{" "}
+        <button type="button" className="esc-btn" onClick={() => play(st.showing, true)}><Glyph name="play" /> Play at night</button>{" "}
+        <a className="esc-btn" href="/api/admin/season-preview?night=on&amp;to=/" target="_blank" rel="noopener" title="Open the site at night, just for you (for an hour)">Preview site at night</a>
       </p>
       {!st.switchOn && (
         <p className="field-hint">Switch on <strong>Seasonal entrance animations</strong> in Feature switches to use the themes below. You can still preview them.</p>
@@ -89,7 +99,7 @@ export default function EntrancePanel() {
             <strong>{t.label}</strong>
             <span className="ent-when">{t.when}</span>
             <div className="ent-actions">
-              <button type="button" className="esc-btn" onClick={() => setPlaying(t.key)}><Glyph name="play" /> Preview</button>
+              <button type="button" className="esc-btn" onClick={() => play(t.key)}><Glyph name="play" /> Preview</button>
               <a className="esc-btn" href={`/api/admin/season-preview?key=${t.key}&to=/`} target="_blank" rel="noopener" title="Open the site with this season's background, just for you (for an hour)">Preview background</a>
               <button type="button" className="esc-btn primary" disabled={busy || st.choice === t.key} onClick={() => choose(t.key)}>{st.choice === t.key ? "In use" : "Use"}</button>
             </div>
@@ -111,7 +121,7 @@ export default function EntrancePanel() {
       <p className="field-hint"><strong><Glyph name="play" /> Preview</strong> plays the entrance here. <strong>Preview background</strong> opens the site in a new tab with that season&rsquo;s background, just for you, for up to an hour (nothing changes for anyone else; the bar at the top has Stop).</p>
       {msg && <p className="field-hint" role="status">{msg}</p>}
       <p className="field-hint">The entrance plays once per visit, right after a member signs in. Anyone who has asked their device to reduce motion doesn&rsquo;t see it.</p>
-      {playing && <EntrancePlayer theme={playing} onDone={() => setPlaying(null)} />}
+      {playing && <EntrancePlayer theme={playing} night={playNight} onDone={() => setPlaying(null)} />}
     </div>
   );
 }
