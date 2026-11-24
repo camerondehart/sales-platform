@@ -107,7 +107,7 @@ export async function GET(req: Request) {
     const mrOn = await isEnabled("manager_review").catch(() => false);
     const mr = mrOn ? await latestReview().catch(() => null) : null;
     const managerTake = !mrOn ? undefined : mr
-      ? { at: mr.at, ok: mr.ok, error: mr.error, model: mr.model, wanted: mr.wanted, headline: mr.headline, wins: mr.wins, concerns: mr.concerns, insights: mr.insights, missed: mr.missed, actions: conciergeReady ? mr.actions : [], tweaks: mr.tweaks, undone: !!mr.undone, today: mr.day === pacificDay(), logEntries: mr.logEntries, briefed: mr.briefed }
+      ? { at: mr.at, ok: mr.ok, error: mr.error, model: mr.model, wanted: mr.wanted, primaryError: mr.primaryError, headline: mr.headline, wins: mr.wins, concerns: mr.concerns, insights: mr.insights, missed: mr.missed, actions: conciergeReady ? mr.actions : [], tweaks: mr.tweaks, undone: !!mr.undone, today: mr.day === pacificDay(), logEntries: mr.logEntries, briefed: mr.briefed }
       : null;
     const body = { asOf: out.as_of || "", allClear: tasks.length === 0, tasks, conciergeReady, manager: managerTake };
     Object.assign(CACHE, { at: Date.now(), body });

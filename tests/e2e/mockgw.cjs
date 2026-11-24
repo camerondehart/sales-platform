@@ -119,6 +119,7 @@ http.createServer((req, res) => {
     for (const m of j.messages) if (Array.isArray(m.content)) m.content = m.content.filter((x) => x.type === "text").map((x) => x.text).join(" ") + (m.content.some((x) => x.type === "image_url") ? " [IMAGE]" : "");
     // ---- Site manager review: a briefing, one priority move, one hide and an unknown id (refused).
     if (String(j.messages[0].content || "").startsWith("You are the site manager")) {
+      if (/fail/.test(String(j.model))) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: { message: "model not supported for this request" } })); }
       const u = String(j.messages[1].content || "");
       const ids = Array.from(u.matchAll(/^([a-z0-9:_-]+) \| (now|today|this week|campaign|idea) \|/gm)).map((m) => m[1]);
       const sawLog = u.includes("ACTIVITY LOG SINCE") && u.includes("COUNTS BY ACTION");

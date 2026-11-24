@@ -16,6 +16,7 @@ export type Manager = {
   error?: string;
   model?: string;
   wanted?: string;
+  primaryError?: string;
   headline?: string;
   wins?: string[];
   concerns?: string[];
@@ -59,8 +60,13 @@ export default function ManagerTake({ manager, onChanged }: { manager: Manager |
     setMsg(action === "run" ? "Looking over the whole site… up to a minute." : "");
     try {
       const r = await fetch("/api/admin/manager-review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "That didn't work.");
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d) {
+        throw new Error(
+          d?.error ||
+            (r.status === 504 || r.status === 524 ? "The review ran out of time before the model answered. Try a faster model, or press Run now again." : `The server stopped the review (error ${r.status}). Try again in a minute.`)
+        );
+      }
       setMsg(action === "undo" ? "Today's list is back as it was." : "");
       onChanged();
     } catch (err) {
@@ -170,7 +176,7 @@ export default function ManagerTake({ manager, onChanged }: { manager: Manager |
           </div>
           {fellBack && (
             <div className="mt-warn-note">
-              {short(m.wanted)} didn&apos;t answer, so your backup model {short(m.model)} wrote this. Batch models may not answer live requests; pick a regular model if this keeps happening.
+              {short(m.wanted)} didn&apos;t write this{m.primaryError ? ` (${m.primaryError})` : ""}, so your backup model {short(m.model)} did. Batch models may not answer live requests; pick a regular model if this keeps happening.
             </div>
           )}
         </div>

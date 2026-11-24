@@ -5,7 +5,7 @@ import { recentDone } from "../todayDone";
 import { VersionedStore } from "../versionedStore";
 import { isEnabled } from "../flags";
 import { getAssistantConfig, managerModelOf } from "./config";
-import { chatCompletion, costOf, gatewayCredential, resolveAnsweringModel, type GatewayMessage } from "./gateway";
+import { chatCompletion, costOf, explainGatewayError, GatewayError, gatewayCredential, resolveAnsweringModel, type GatewayMessage } from "./gateway";
 import { getNotes } from "./learnedNotes";
 import { flushUsage, monthSpend, recordUsage } from "./usage";
 import { brand } from "../brand";
@@ -42,6 +42,8 @@ export type ManagerReview = {
   model?: string;
   /** The manager model that was asked; differs from `model` when the backup answered. */
   wanted?: string;
+  /** Why the manager model didn't write it, when the backup did. */
+  primaryError?: string;
   costUsd?: number;
   error?: string;
   headline?: string;
@@ -187,7 +189,7 @@ export function cleanReply(raw: Record<string, unknown>, validIds: Set<string>) 
   };
 }
 
-export async function runManagerReview(opts: { trigger: "nightly" | "manual"; req?: Request; force?: boolean }): Promise<{ ok: boolean; skipped?: string; error?: string; review?: ManagerReview }> {
+export async function runManagerReview(opts: { trigger: "nightly" | "manual"; req?: Request; force?: boolean; budgetMs?: number }): Promise<{ ok: boolean; skipped?: string; error?: string; review?: ManagerReview }> {
   if (!(await isEnabled("manager_review"))) return { ok: false, skipped: "The “Site manager review” switch is off." };
   const last = await latestReview();
   const config = await getAssistantConfig();
@@ -266,19 +268,48 @@ export async function runManagerReview(opts: { trigger: "nightly" | "manual"; re
       { role: "system", content: MANAGER_INSTRUCTIONS },
       { role: "user", content: material },
     ];
-    const t0 = Date.now();
-    let raw: Record<string, unknown>;
+    // Any model in the picker: one try on the manager model with a generous
+    // time limit (thinking models can take minutes), then the backup model if
+    // it fails or doesn't send a briefing. The card says when the backup wrote it.
+    const deadline = Date.now() + (opts.budgetMs ?? 240_000);
+    let raw: Record<string, unknown> | null = null;
     let costUsd = 0;
-    try {
-      const res = await chatCompletion({ credential, model: model0, fallbackModel: config.fallbackModel, messages: convo, maxTokens: 9000, timeoutMs: 40_000 /* fits the 60 s cron */ });
-      model = resolveAnsweringModel(res.model, model0, config.fallbackModel);
-      costUsd = await costOf(model, res.usage);
-      recordUsage({ audience: "admin", model, inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, costUsd, toolCalls: 0, latencyMs: Date.now() - t0 });
+    let primaryError = "";
+    const ask = async (id: string): Promise<Record<string, unknown>> => {
+      const t0 = Date.now();
+      const left = deadline - t0;
+      if (left < 20_000) throw new Error("Ran out of time.");
+      const res = await chatCompletion({ credential, model: id, messages: convo, maxTokens: 9000, timeoutMs: Math.min(left, 180_000), attempts: 1 });
+      const used = resolveAnsweringModel(res.model, id);
+      const cost = await costOf(used, res.usage);
+      costUsd += cost;
+      model = used;
+      recordUsage({ audience: "admin", model: used, inputTokens: res.usage.inputTokens, outputTokens: res.usage.outputTokens, costUsd: cost, toolCalls: 0, latencyMs: Date.now() - t0 });
       const reply = (res.message.content || "").trim();
       try {
-        raw = parseJson(reply);
+        return parseJson(reply);
       } catch {
-        throw new Error(reply ? `The manager model didn't reply with a briefing (it began: “${reply.slice(0, 80)}”).` : "The manager model's reply was empty. Try again, or pick another model.");
+        throw new Error(reply ? `it didn't reply with a briefing (it began: “${reply.slice(0, 80)}”)` : "its reply was empty (it may have spent its whole allowance thinking)");
+      }
+    };
+    const why = (err: unknown) => {
+      if (err instanceof Error && /abort/i.test(err.name + err.message)) return "it took too long to answer";
+      if (err instanceof GatewayError) return `${explainGatewayError(err).replace(/\.$/, "")} (${err.message.slice(0, 160)})`;
+      return err instanceof Error ? err.message : "it failed";
+    };
+    try {
+      try {
+        raw = await ask(model0);
+      } catch (err) {
+        primaryError = why(err);
+        console.warn(`[manager] ${model0} failed: ${primaryError}`);
+        const backup = config.fallbackModel;
+        if (!backup || backup === model0) throw new Error(`${model0.split("/").pop()}: ${primaryError}`);
+        try {
+          raw = await ask(backup);
+        } catch (err2) {
+          throw new Error(`${model0.split("/").pop()}: ${primaryError}. The backup ${backup.split("/").pop()} also failed: ${why(err2)}.`);
+        }
       }
     } finally {
       await flushUsage();
@@ -297,7 +328,7 @@ export async function runManagerReview(opts: { trigger: "nightly" | "manual"; re
         if (await addBrief(n, text).catch(() => false)) briefed++;
       }
     }
-    const review: ManagerReview = { id: "latest", at: Date.now(), day: today, ok: true, trigger: opts.trigger, model, wanted: model0, costUsd, logEntries: log.length, briefed, ...c };
+    const review: ManagerReview = { id: "latest", at: Date.now(), day: today, ok: true, trigger: opts.trigger, model, wanted: model0, primaryError: primaryError || undefined, costUsd, logEntries: log.length, briefed, ...c };
     await saveReview(review);
     await auditSystem({
       action: "manager.review",

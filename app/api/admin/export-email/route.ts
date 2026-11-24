@@ -102,7 +102,7 @@ async function generateOrdersCSV(): Promise<string> {
 // Vercel Cron invokes scheduled jobs with a GET request, so the nightly
 // backup needs a GET handler. Both verbs share the same implementation.
 // Room for the Manager's take to finish before the scheduled report goes out.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function GET(req: Request) {
   return logJobRun(req, "job.nightly_report");
@@ -255,7 +255,7 @@ async function runExport(req: Request) {
       const { latestReview, runManagerReview } = await import("@/lib/assistant/managerReview");
       const { getAssistantConfig } = await import("@/lib/assistant/config");
       const last = await latestReview();
-      if ((await getAssistantConfig()).managerRunsPerDay !== 0 && (!last?.ok || Date.now() - last.at > 6 * 3_600_000)) await runManagerReview({ trigger: "nightly", req, force: true });
+      if ((await getAssistantConfig()).managerRunsPerDay !== 0 && (!last?.ok || Date.now() - last.at > 6 * 3_600_000)) await runManagerReview({ trigger: "nightly", req, force: true, budgetMs: 180_000 });
     } catch (err) {
       console.error("[export-email] manager review before the report failed", err);
     }

@@ -374,6 +374,15 @@ _n=len(json.loads(urllib.request.urlopen(GW+"/__mail").read()))
 req("/api/admin/export-email", {})
 _rep=[m for m in json.loads(urllib.request.urlopen(GW+"/__mail").read())[_n:] if "Manager&rsquo;s take" in str(m.get("html",""))]
 check("manager: take is in the nightly report", _rep and "Steady week" in _rep[0]["html"] and "A failed email" in _rep[0]["html"], len(_rep))
+req("/api/admin/assistant", {"managerModel":"google/gemini-fail","fallbackModel":"anthropic/claude-sonnet-4.6"}, method="PUT")
+s,r,_=req("/api/admin/manager-review", {"action":"run"})
+_mf=req("/api/admin/today?fresh=1")[1].get("manager") or {}
+check("manager: a model that fails falls back to the backup, with the reason", s==200 and _mf.get("ok") and _mf.get("wanted")=="google/gemini-fail" and _mf.get("model")=="anthropic/claude-sonnet-4.6" and "not supported" in (_mf.get("primaryError") or ""), (s,r,{k:_mf.get(k) for k in ("wanted","model","primaryError")}))
+req("/api/admin/assistant", {"managerModel":"google/gemini-fail","fallbackModel":""}, method="PUT")
+s,r,_=req("/api/admin/manager-review", {"action":"run"})
+check("manager: with no backup the real reason is shown", s==502 and "gemini-fail" in r.get("error","") and "not supported" in r.get("error",""), (s,r))
+req("/api/admin/assistant", {"managerModel":"anthropic/claude-opus-5.5","fallbackModel":"anthropic/claude-sonnet-4.6"}, method="PUT")
+req("/api/admin/manager-review", {"action":"undo"})  # leave today's list as the later suites expect
 check("manager: review logged in the Activity log", any(a.get("action")=="manager.review" and a.get("ok") for a in audit_rows()))
 n0=len(gwlog()); req("/api/admin/concierge-notes", {"action":"run"})
 check("manager: notes review uses the manager model too", any(l["model"]=="anthropic/claude-opus-5.5" for l in gwlog()[n0:]), [l["model"] for l in gwlog()[n0:]])

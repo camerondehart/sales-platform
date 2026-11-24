@@ -4,7 +4,8 @@ import { audited } from "@/lib/audit";
 import { runManagerReview, undoTweaks } from "@/lib/assistant/managerReview";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Thinking models can take a few minutes; the review falls back to the backup model in time.
+export const maxDuration = 300;
 
 /** Today panel → Manager's take: "Run now" and "Undo tweaks". */
 async function POST_handler(req: Request) {
@@ -15,7 +16,7 @@ async function POST_handler(req: Request) {
     return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ error: "Nothing to undo." }, { status: 400 });
   }
   if (b.action === "run") {
-    const r = await runManagerReview({ trigger: "manual", req });
+    const r = await runManagerReview({ trigger: "manual", req, budgetMs: 270_000 });
     if (r.skipped) return NextResponse.json({ error: r.skipped }, { status: 400 });
     if (!r.ok) return NextResponse.json({ error: r.error || "The review didn't finish." }, { status: 502 });
     return NextResponse.json({ ok: true });

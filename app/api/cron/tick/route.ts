@@ -12,7 +12,8 @@ import { runManagerReview } from "@/lib/assistant/managerReview";
 import { fixPoints } from "@/lib/loyalty";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// The manager review (once a day) may need minutes with a thinking model.
+export const maxDuration = 300;
 
 /**
  * The every-15-minutes job (vercel.json → crons). Runs whatever is due:
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
   // Site manager review (switch "Site manager review"; once a day, 5–8am
   // Pacific, outside the notes review's hours). Logs its own Activity entry.
   try {
-    const mr = await runManagerReview({ trigger: "nightly", req });
+    const mr = await runManagerReview({ trigger: "nightly", req, budgetMs: 200_000 });
     if (!mr.skipped) out.managerReview = { ok: mr.ok, error: mr.error };
   } catch (err) {
     failures.push(`manager review: ${err instanceof Error ? err.message : err}`);

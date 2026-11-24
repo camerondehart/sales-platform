@@ -130,6 +130,8 @@ export async function chatCompletion(opts: {
   maxTokens: number;
   temperature?: number;
   timeoutMs?: number;
+  /** Tries before giving up (default 2). Background jobs with a deadline use 1. */
+  attempts?: number;
 }): Promise<{
   message: { content: string | null; tool_calls?: GatewayToolCall[]; reasoning_details?: unknown[] };
   usage: Usage;
@@ -152,7 +154,8 @@ export async function chatCompletion(opts: {
   }
 
   let lastErr: unknown;
-  for (let attempt = 1; attempt <= 2; attempt++) {
+  const tries = Math.max(1, opts.attempts ?? 2);
+  for (let attempt = 1; attempt <= tries; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 30_000);
     try {
@@ -208,7 +211,7 @@ export async function chatCompletion(opts: {
       lastErr = err;
       const retryable =
         err instanceof GatewayError ? err.retryable : true; // network error / timeout
-      if (!retryable || attempt === 2) break;
+      if (!retryable || attempt >= tries) break;
       await sleep(700);
     } finally {
       clearTimeout(timer);
